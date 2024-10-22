@@ -15,12 +15,12 @@ class FileManager extends Facade
         return \Kirantimsina\FileManager\FileManager::class;
     }
 
-    public static function getMediaPath($file = null, $size = null)
+    public static function getMediaPath($file = null, $size = null): string
     {
         return static::getImagePath($file, $size);
     }
 
-    public static function getImagePath(?string $file = null, ?string $size = null)
+    public static function getImagePath(?string $file = null, ?string $size = null): ?string
     {
         if (! $file) {
             return null;
@@ -38,7 +38,7 @@ class FileManager extends Facade
         return static::s3Url()."$model/$size/$file";
     }
 
-    public static function getExtensionFromName(string $filename)
+    public static function getExtensionFromName(string $filename): string
     {
         return Arr::last(explode('.', $filename));
     }
