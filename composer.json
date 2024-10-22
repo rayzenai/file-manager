@@ -1,10 +1,11 @@
 {
     "name": "rayzenai/file-manager",
-    "description": "This is FileHandling package .",
+    "description": "This is FileHandling package to be used with FilamentPHP/Laravel.",
     "keywords": [
         "kirantimsina",
         "laravel",
-        "file-manager"
+        "file-manager",
+        "filamentphp"
     ],
     "homepage": "https://github.com/rayzenai/file-manager",
     "license": "MIT",
