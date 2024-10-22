@@ -1,6 +1,6 @@
 {
     "name": "rayzenai/file-manager",
-    "description": "This is FileHandling package to be used with FilamentPHP.",
+    "description": "This is FileHandling package to be used with FilamentPHP/Laravel.",
     "keywords": [
         "kirantimsina",
         "laravel",
