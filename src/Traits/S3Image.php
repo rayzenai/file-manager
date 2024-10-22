@@ -8,7 +8,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Support\Collection;
 use Kirantimsina\FileManager\Facades\FileManager;
 
-trait S3Image
+abstract class S3Image
 {
     public static function make(
         string|array $field,
