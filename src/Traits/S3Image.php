@@ -6,6 +6,7 @@ use Closure;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Support\Collection;
+use Kirantimsina\FileManager\Facades\FileManager;
 
 trait S3Image
 {
@@ -33,14 +34,14 @@ trait S3Image
 
                 // Handle collections and arrays of images
                 if ($temp instanceof Collection) {
-                    return $temp->map(fn ($file) => getMediaPath($file, $size))->toArray();
+                    return $temp->map(fn ($file) => FileManager::getMediaPath($file, $size))->toArray();
                 }
 
                 if (is_array($temp)) {
-                    return array_map(fn ($file) => getMediaPath($file, $size), $temp);
+                    return array_map(fn ($file) => FileManager::getMediaPath($file, $size), $temp);
                 }
 
-                return getMediaPath($temp, $size);
+                return FileManager::getMediaPath($temp, $size);
             })->circular()
             ->stacked()
             ->height(35)
@@ -61,11 +62,11 @@ trait S3Image
                         }
 
                         if ($temp instanceof Collection) {
-                            $temp = $temp->map(fn ($image) => getMediaPath($image, $modalSize))->toArray();
+                            $temp = $temp->map(fn ($image) => FileManager::getMediaPath($image, $modalSize))->toArray();
                         } elseif (is_array($temp)) {
-                            $temp = array_map(fn ($image) => getMediaPath($image, $modalSize), $temp);
+                            $temp = array_map(fn ($image) => FileManager::getMediaPath($image, $modalSize), $temp);
                         } elseif (! is_null($temp)) {
-                            $temp = [getMediaPath($temp, $modalSize)];
+                            $temp = [FileManager::getMediaPath($temp, $modalSize)];
                         } else {
                             return null;
                         }
