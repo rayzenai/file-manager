@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Intervention\Gif\Exceptions\NotReadableException;
 use Intervention\Image\Exceptions\NotSupportedException;
 use Intervention\Image\ImageManager;
+use Kirantimsina\FileManager\Facades\FileManager as FacadesFileManager;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
@@ -122,7 +123,7 @@ class FileManager
             return [
                 'status' => true,
                 'file' => $uploadedFilename,
-                'link' => getMediaPath($uploadedFilename),
+                'link' => FacadesFileManager::getMediaPath($uploadedFilename),
                 'mime' => $mime,
             ];
         } else {
@@ -142,7 +143,7 @@ class FileManager
         $path = Arr::first($exploded);
 
         try {
-            $img = ImageManager::gd()->read(\file_get_contents(getMediaPath($file)));
+            $img = ImageManager::gd()->read(\file_get_contents(FacadesFileManager::getMediaPath($file)));
             foreach (static::SIZE_ARR as $key => $val) {
                 if ($fit) {
                     $img->coverDown(width: $val, height: $val);
@@ -221,7 +222,7 @@ class FileManager
             return [
                 'status' => true,
                 'file' => explode('/', $upload)[1],
-                'link' => getMediaPath($upload),
+                'link' => FacadesFileManager::getMediaPath($upload),
             ];
         } else {
             return [

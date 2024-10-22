@@ -5,6 +5,7 @@ namespace Kirantimsina\FileManager\Traits;
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
+use Kirantimsina\FileManager\Facades\FileManager as FacadesFileManager;
 use Kirantimsina\FileManager\FileManager;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -24,11 +25,12 @@ abstract class ImageUpload
             ->openable()
             ->maxSize(FileManager::MAX_UPLOAD_SIZE)
             ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) {
+                //class name is predefined laravel method to get the class name
                 $directory = FileManager::getUploadDirectory(class_basename($model));
 
                 $filename = (string) FileManager::filename($file, $get('slug') ?: $get('name'), 'webp');
 
-                $img = ImageManager::gd()->read(\file_get_contents(\getMediaPath($file->path())));
+                $img = ImageManager::gd()->read(\file_get_contents(FacadesFileManager::getMediaPath($file->path())));
                 $image = $img->toWebp(100)->toFilePointer();
 
                 $filename = "{$directory}/{$filename}";
