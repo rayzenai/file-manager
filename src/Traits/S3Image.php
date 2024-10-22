@@ -71,7 +71,8 @@ abstract class S3Image
                             return null;
                         }
 
-                        return view('filament.pages.carousel', [
+                        // Return the view from your package
+                        return view('file-manager::image-display', [
                             'images' => $temp,
                         ]);
                     })->slideOver()
