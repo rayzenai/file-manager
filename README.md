@@ -59,7 +59,7 @@ To use the **RayzenAI File Manager** in your Filament project, you need to imple
 
     ```php
     use Kirantimsina\FileManager\Interfaces\HasImages as InterfacesHasImages;
-    use Kirantimsina\FileManager\Traits.HasImages;
+    use Kirantimsina\FileManager\Traits\HasImages;
 
     class YourModel extends Model implements InterfacesHasImages
     {
