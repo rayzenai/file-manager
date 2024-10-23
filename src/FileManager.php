@@ -161,7 +161,7 @@ class FileManager
 
                 $image = $img->toWebp(85)->toFilePointer();
 
-                $status = Storage::disk('s3')->put(
+                $status = Storage::disk('default')->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
                     'public'

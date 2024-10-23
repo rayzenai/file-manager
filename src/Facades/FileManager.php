@@ -15,7 +15,7 @@ class FileManager extends Facade
         return \Kirantimsina\FileManager\FileManager::class;
     }
 
-    public static function getMediaPath(?string $file = null, ?string $size = null, ?string $disk = 'public'): ?string
+    public static function getMediaPath(?string $file = null, ?string $size = null, ?string $disk = 'default'): ?string
     {
 
         if (is_null($file)) {
@@ -26,7 +26,9 @@ class FileManager extends Facade
 
         if (in_array($ext, ['gif']) || is_null($size)) {
 
-            return $disk === 's3' ? static::s3Url().$file : $file;
+            return $disk === 's3'
+            ? static::s3Url().$file
+            : env('APP_URL')."storage/{$file}"; // This should be done through a method
         }
 
         $model = Arr::first(explode('/', $file));
