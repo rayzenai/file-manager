@@ -40,7 +40,11 @@ You can publish the config file with:
 php artisan vendor:publish --tag="file-manager-config"
 ```
 
-This is the contents of the published config file:
+```bash
+php artisan vendor:publish --tag="path-config"
+```
+
+This is the path file which handles models repespective to their tables name.
 
 ```php
 return [

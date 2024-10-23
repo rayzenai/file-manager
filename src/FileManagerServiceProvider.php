@@ -19,7 +19,6 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->name('file-manager')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_file_manager_table')
             ->hasCommand(FileManagerCommand::class);
     }
 }

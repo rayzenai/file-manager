@@ -20,7 +20,7 @@ class FileManager
 
     const SIZE_ARR = [
         'full' => '1080',
-        'card' => '720',
+        'card' => '640',
         'thumb' => '360',
         'icon' => '120',
     ];
@@ -93,7 +93,7 @@ class FileManager
 
     public static function getUploadDirectory($model)
     {
-        return config('path.'.$model);
+        return config('file-manager.'.$model);
     }
 
     // This method is being used by API only, and not the Filament Backend

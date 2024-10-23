@@ -41,9 +41,7 @@ abstract class S3Image
                     return array_map(fn ($file) => FileManager::getMediaPath($file, $size), $temp);
                 }
 
-                $image_url = json_decode(FileManager::getMediaPath($temp, $size));
-
-                return $image_url;
+                return FileManager::getMediaPath($temp, $size);
             })->circular()
             ->stacked()
             ->height(35)
@@ -73,11 +71,9 @@ abstract class S3Image
                             return null;
                         }
 
-                        $images = json_decode($temp[0], true);
-
                         // Return the view from your package
                         return view('file-manager::image-display', [
-                            'images' => $images,
+                            'images' => $temp,
                         ]);
                     })->slideOver()
                     ->modalSubmitActionLabel('Close')

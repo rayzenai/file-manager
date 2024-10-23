@@ -1,3 +1,3 @@
 @foreach ($images as $image)
-    <img src="{{ $image }}" alt="Image" />
+    <img src="{{ asset('storage/.'$image) }}" alt="Image" />
 @endforeach
