@@ -15,7 +15,6 @@ abstract class ImageUpload
     {
         return FileUpload::make($field, $hintLabel = null)
             ->image()
-            ->disk('s3')
             ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png'])
             ->imagePreviewHeight(200)
             ->imageResizeTargetHeight(FileManager::ORIGINAL_SIZE)
@@ -34,7 +33,7 @@ abstract class ImageUpload
                 $image = $img->toWebp(100)->toFilePointer();
 
                 $filename = "{$directory}/{$filename}";
-                Storage::disk('s3')->put($filename, $image);
+                Storage::disk('public')->put($filename, $image);
 
                 return $filename;
             })

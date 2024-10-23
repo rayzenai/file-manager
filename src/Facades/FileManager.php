@@ -15,27 +15,26 @@ class FileManager extends Facade
         return \Kirantimsina\FileManager\FileManager::class;
     }
 
-    public static function getMediaPath($file = null, $size = null): string
+    public static function getMediaPath(?string $file = null, ?string $size = null, ?string $disk = 'public'): ?string
     {
-        return static::getImagePath($file, $size);
-    }
 
-    public static function getImagePath(?string $file = null, ?string $size = null): ?string
-    {
-        if (! $file) {
+        if (is_null($file)) {
             return null;
         }
 
         $ext = static::getExtensionFromName($file);
 
-        if (in_array($ext, ['gif']) || ! $size) {
-            return static::s3Url()."$file";
+        if (in_array($ext, ['gif']) || is_null($size)) {
+
+            return $disk === 's3' ? static::s3Url().$file : $file;
         }
 
         $model = Arr::first(explode('/', $file));
-        $file = Arr::last(explode('/', $file));
+        $fileName = Arr::last(explode('/', $file));
 
-        return static::s3Url()."$model/$size/$file";
+        return $disk === 's3'
+            ? static::s3Url()."{$model}/{$size}/{$fileName}"
+            : env('APP_URL')."/storage/{$model}/{$size}/{$fileName}";
     }
 
     public static function getExtensionFromName(string $filename): string
@@ -43,11 +42,11 @@ class FileManager extends Facade
         return Arr::last(explode('.', $filename));
     }
 
-    public static function s3Url()
+    public static function s3Url(): string
     {
         $region = config('filesystems.disks.s3.region');
         $bucket = config('filesystems.disks.s3.bucket');
 
-        return "https://$bucket.s3.$region.amazonaws.com/";
+        return "https://{$bucket}.s3.{$region}.amazonaws.com/";
     }
 }
