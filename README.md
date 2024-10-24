@@ -51,14 +51,14 @@ Follow these steps to install the package in your Filament-powered Laravel appli
 
 To use the **RayzenAI File Manager** in your Filament project, you need to implement the `HasImages` interface in the models that handle file management. Here's how:
 
-1. **Implement the `HasImages` Interface:**
+1. **Use the `HasImages` Trait:**
 
-   In the model where you want to manage files, implement the `HasImages` interface and use the `HasImages` trait. This allows your model to manage file uploads and retrievals easily.
+   In the model where you want to manage files, use the `HasImages` trait. This allows your model to manage file uploads and retrievals easily.
 
    Example:
 
     ```php
-    use Kirantimsina\FileManager\Interfaces\HasImages as InterfacesHasImages;
+
     use Kirantimsina\FileManager\Traits\HasImages;
 
     class YourModel extends Model implements InterfacesHasImages
