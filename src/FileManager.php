@@ -187,7 +187,7 @@ class FileManager
 
         $newFile = $path.'/'.Arr::last(explode('/', $tempFile));
 
-        $status = Storage::disk('s3')->move($tempFile, $newFile);
+        $status = Storage::disk('default')->move($tempFile, $newFile);
 
         if ($status) {
             ResizeImages::dispatch([$newFile]);
@@ -211,7 +211,7 @@ class FileManager
             $filename = time().'-'.Str::random(10).'.'.$file->extension();
         }
 
-        $upload = Storage::disk('s3')->putFileAs(
+        $upload = Storage::disk('default')->putFileAs(
             'temp',
             new File($file),
             $filename,
@@ -233,7 +233,7 @@ class FileManager
 
     public function moveTempVideo($filename, $to)
     {
-        Storage::disk('s3')->move('temp/'.$filename, $to.$filename);
+        Storage::disk('default')->move('temp/'.$filename, $to.$filename);
 
         return true;
     }

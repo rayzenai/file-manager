@@ -2,7 +2,7 @@
 
 namespace Kirantimsina\FileManager\Interfaces;
 
-interface HasImages
+interface HasImageFields
 {
     /**
      * Get the fields that should be watched for image resizing

@@ -28,7 +28,7 @@ class FileManager extends Facade
 
             return $disk === 's3'
             ? static::s3Url().$file
-            : env('APP_URL')."storage/{$file}"; // This should be done through a method
+            : $file;
         }
 
         $model = Arr::first(explode('/', $file));
@@ -42,6 +42,11 @@ class FileManager extends Facade
     public static function getExtensionFromName(string $filename): string
     {
         return Arr::last(explode('.', $filename));
+    }
+
+    public static function publicUrl(): string
+    {
+        return env('APP_URL').'storage/';
     }
 
     public static function s3Url(): string
