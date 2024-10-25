@@ -5,6 +5,7 @@ namespace Kirantimsina\FileManager;
 use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Gif\Exceptions\NotReadableException;
@@ -46,14 +47,14 @@ class FileManagerService
 
     public static function filename($file, $tag = null, $ext = null)
     {
-        if (auth()->check()) {
-            $filename = auth()->id().time().'-'.Str::random(10);
+        if (Auth::check()) {
+            $filename = Auth::id() . time() . '-' . Str::random(10);
         } else {
-            $filename = time().'-'.Str::random(10);
+            $filename = time() . '-' . Str::random(10);
         }
 
         if (! empty($tag)) {
-            $filename = Str::slug($tag).'-'.$filename;
+            $filename = Str::slug($tag) . '-' . $filename;
         }
 
         $orginalName = $file->getClientOriginalName();
@@ -65,7 +66,7 @@ class FileManagerService
         if (Str::contains($orginalName, '.apk')) {
             $ext = 'apk';
         }
-        $filename = $filename.'.'.$ext;
+        $filename = $filename . '.' . $ext;
 
         return $filename;
     }
@@ -74,7 +75,7 @@ class FileManagerService
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Image)) {
             $fileData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64Image));
-            $tmpFilePath = sys_get_temp_dir().'/'.Str::uuid()->toString();
+            $tmpFilePath = sys_get_temp_dir() . '/' . Str::uuid()->toString();
             file_put_contents($tmpFilePath, $fileData);
             $tmpFile = new File($tmpFilePath);
             $file = new UploadedFile(
@@ -93,7 +94,7 @@ class FileManagerService
 
     public static function getUploadDirectory($model)
     {
-        return config('file-manager.model.'.$model);
+        return config('file-manager.model.' . $model);
     }
 
     // This method is being used by API only, and not the Filament Backend
@@ -110,7 +111,7 @@ class FileManagerService
             $img = ImageManager::gd()->read($file);
             $img = $img->toWebp(100)->toFilePointer();
             $ext = 'webp';
-            $filename = \explode('.', $filename)[0].'.'.$ext;
+            $filename = \explode('.', $filename)[0] . '.' . $ext;
         }
 
         $uploadedFilename = $file->storeAs($path, $filename);
@@ -185,9 +186,9 @@ class FileManagerService
 
         $path = static::getUploadDirectory($model);
 
-        $newFile = $path.'/'.Arr::last(explode('/', $tempFile));
+        $newFile = $path . '/' . Arr::last(explode('/', $tempFile));
 
-        $status = Storage::disk('s3')->move($tempFile, $newFile);
+        $status = Storage::disk('default')->move($tempFile, $newFile);
 
         if ($status) {
             ResizeImages::dispatch([$newFile]);
@@ -205,13 +206,13 @@ class FileManagerService
 
     public function uploadTempVideo($file)
     {
-        if (auth()->check()) {
-            $filename = auth()->id().time().'-'.Str::random(5).'.'.$file->extension();
+        if (Auth::check()) {
+            $filename = Auth::id() . time() . '-' . Str::random(5) . '.' . $file->extension();
         } else {
-            $filename = time().'-'.Str::random(10).'.'.$file->extension();
+            $filename = time() . '-' . Str::random(10) . '.' . $file->extension();
         }
 
-        $upload = Storage::disk('s3')->putFileAs(
+        $upload = Storage::disk('default')->putFileAs(
             'temp',
             new File($file),
             $filename,
@@ -233,7 +234,7 @@ class FileManagerService
 
     public function moveTempVideo($filename, $to)
     {
-        Storage::disk('s3')->move('temp/'.$filename, $to.$filename);
+        Storage::disk('default')->move('temp/' . $filename, $to . $filename);
 
         return true;
     }

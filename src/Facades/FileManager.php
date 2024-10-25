@@ -5,6 +5,7 @@ namespace Kirantimsina\FileManager\Facades;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Str;
+use Kirantimsina\FileManager\FileManagerService;
 
 /**
  * @see \Kirantimsina\FileManager\FileManager
@@ -13,7 +14,7 @@ class FileManager extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Kirantimsina\FileManager\FileManagerService::class;
+        return FileManagerService::class;
     }
 
     public static function mainMediaUrl()
