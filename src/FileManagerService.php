@@ -14,7 +14,7 @@ use Kirantimsina\FileManager\Facades\FileManager as FacadesFileManager;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
-class FileManager
+class FileManagerService
 {
     const MAX_UPLOAD_SIZE = 4096; //4096 or 4 MB
 
@@ -93,7 +93,7 @@ class FileManager
 
     public static function getUploadDirectory($model)
     {
-        return config('file-manager.'.$model);
+        return config('file-manager.model.'.$model);
     }
 
     // This method is being used by API only, and not the Filament Backend
