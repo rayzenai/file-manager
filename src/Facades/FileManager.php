@@ -4,6 +4,8 @@ namespace Kirantimsina\FileManager\Facades;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\Str;
+use Kirantimsina\FileManager\FileManagerService;
 
 /**
  * @see \Kirantimsina\FileManager\FileManager
@@ -12,48 +14,44 @@ class FileManager extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Kirantimsina\FileManager\FileManager::class;
+        return FileManagerService::class;
     }
 
-    public static function getMediaPath(?string $file = null, ?string $size = null, ?string $disk = 'default'): ?string
+    public static function mainMediaUrl()
     {
+        $path = config('file-manager.cdn');
 
-        if (is_null($file)) {
+        if (Str::endsWith($path, '/')) {
+            return $path;
+        }
+
+        return "{$path}/";
+    }
+
+    public static function getMediaPath($filename = null, $size = null)
+    {
+        if ($filename == null) {
             return null;
         }
 
-        $ext = static::getExtensionFromName($file);
+        $main = static::mainMediaUrl();
+        // $main has a '/' at the end already
 
-        if (in_array($ext, ['gif']) || is_null($size)) {
-
-            return $disk === 's3'
-            ? static::s3Url().$file
-            : $file;
+        // If this is a gif, we have not resized it so send the main file
+        $size = Str::endsWith($filename, '.gif') ? null : $size;
+        if (! $size) {
+            return "{$main}{$filename}";
         }
 
-        $model = Arr::first(explode('/', $file));
-        $fileName = Arr::last(explode('/', $file));
+        $exploded = explode('/', $filename);
+        $filename = Arr::last($exploded);
+        $model = Arr::first($exploded);
 
-        return $disk === 's3'
-            ? static::s3Url()."{$model}/{$size}/{$fileName}"
-            : env('APP_URL')."/storage/{$model}/{$size}/{$fileName}";
+        return "{$main}/{$model}/{$size}/{$filename}";
     }
 
     public static function getExtensionFromName(string $filename): string
     {
         return Arr::last(explode('.', $filename));
-    }
-
-    public static function publicUrl(): string
-    {
-        return env('APP_URL').'storage/';
-    }
-
-    public static function s3Url(): string
-    {
-        $region = config('filesystems.disks.s3.region');
-        $bucket = config('filesystems.disks.s3.bucket');
-
-        return "https://{$bucket}.s3.{$region}.amazonaws.com/";
     }
 }

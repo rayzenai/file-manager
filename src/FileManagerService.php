@@ -5,6 +5,7 @@ namespace Kirantimsina\FileManager;
 use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Gif\Exceptions\NotReadableException;
@@ -14,7 +15,7 @@ use Kirantimsina\FileManager\Facades\FileManager as FacadesFileManager;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
-class FileManager
+class FileManagerService
 {
     const MAX_UPLOAD_SIZE = 4096; //4096 or 4 MB
 
@@ -46,14 +47,14 @@ class FileManager
 
     public static function filename($file, $tag = null, $ext = null)
     {
-        if (auth()->check()) {
-            $filename = auth()->id().time().'-'.Str::random(10);
+        if (Auth::check()) {
+            $filename = Auth::id() . time() . '-' . Str::random(10);
         } else {
-            $filename = time().'-'.Str::random(10);
+            $filename = time() . '-' . Str::random(10);
         }
 
         if (! empty($tag)) {
-            $filename = Str::slug($tag).'-'.$filename;
+            $filename = Str::slug($tag) . '-' . $filename;
         }
 
         $orginalName = $file->getClientOriginalName();
@@ -65,7 +66,7 @@ class FileManager
         if (Str::contains($orginalName, '.apk')) {
             $ext = 'apk';
         }
-        $filename = $filename.'.'.$ext;
+        $filename = $filename . '.' . $ext;
 
         return $filename;
     }
@@ -74,7 +75,7 @@ class FileManager
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Image)) {
             $fileData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64Image));
-            $tmpFilePath = sys_get_temp_dir().'/'.Str::uuid()->toString();
+            $tmpFilePath = sys_get_temp_dir() . '/' . Str::uuid()->toString();
             file_put_contents($tmpFilePath, $fileData);
             $tmpFile = new File($tmpFilePath);
             $file = new UploadedFile(
@@ -93,7 +94,7 @@ class FileManager
 
     public static function getUploadDirectory($model)
     {
-        return config('file-manager.'.$model);
+        return config('file-manager.model.' . $model);
     }
 
     // This method is being used by API only, and not the Filament Backend
@@ -110,7 +111,7 @@ class FileManager
             $img = ImageManager::gd()->read($file);
             $img = $img->toWebp(100)->toFilePointer();
             $ext = 'webp';
-            $filename = \explode('.', $filename)[0].'.'.$ext;
+            $filename = \explode('.', $filename)[0] . '.' . $ext;
         }
 
         $uploadedFilename = $file->storeAs($path, $filename);
@@ -185,7 +186,7 @@ class FileManager
 
         $path = static::getUploadDirectory($model);
 
-        $newFile = $path.'/'.Arr::last(explode('/', $tempFile));
+        $newFile = $path . '/' . Arr::last(explode('/', $tempFile));
 
         $status = Storage::disk('default')->move($tempFile, $newFile);
 
@@ -205,10 +206,10 @@ class FileManager
 
     public function uploadTempVideo($file)
     {
-        if (auth()->check()) {
-            $filename = auth()->id().time().'-'.Str::random(5).'.'.$file->extension();
+        if (Auth::check()) {
+            $filename = Auth::id() . time() . '-' . Str::random(5) . '.' . $file->extension();
         } else {
-            $filename = time().'-'.Str::random(10).'.'.$file->extension();
+            $filename = time() . '-' . Str::random(10) . '.' . $file->extension();
         }
 
         $upload = Storage::disk('default')->putFileAs(
@@ -233,7 +234,7 @@ class FileManager
 
     public function moveTempVideo($filename, $to)
     {
-        Storage::disk('default')->move('temp/'.$filename, $to.$filename);
+        Storage::disk('default')->move('temp/' . $filename, $to . $filename);
 
         return true;
     }
