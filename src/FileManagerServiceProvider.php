@@ -2,7 +2,6 @@
 
 namespace Kirantimsina\FileManager;
 
-use Kirantimsina\FileManager\Commands\FileManagerCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -18,7 +17,6 @@ class FileManagerServiceProvider extends PackageServiceProvider
         $package
             ->name('file-manager')
             ->hasConfigFile()
-            ->hasViews()
-            ->hasCommand(FileManagerCommand::class);
+            ->hasViews();
     }
 }
