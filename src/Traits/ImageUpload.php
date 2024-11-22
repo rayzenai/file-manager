@@ -25,17 +25,22 @@ abstract class ImageUpload
             ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) {
                 //class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
-
+                $extension = $file->getClientOriginalExtension();
                 $filename = (string) FileManagerService::filename($file, $get('slug') ?: $get('name'), 'webp');
 
-                $img = ImageManager::gd()->read(\file_get_contents($file->path()));
+                if (in_array($extension, ['jpg', 'jpeg', 'png', 'webp'])) {
+                    $img = ImageManager::gd()->read(\file_get_contents($file->path()));
+                    $image = $img->toWebp(100)->toFilePointer();
 
-                $image = $img->toWebp(100)->toFilePointer();
+                    $filename = "{$directory}/{$filename}";
+                    Storage::disk('public')->put($filename, $image);
 
-                $filename = "{$directory}/{$filename}";
-                Storage::disk('public')->put($filename, $image);
+                    return $filename;
+                }
+                if (in_array($extension, ['mp4', 'mpeg'])) {
+                    return $file->storeAs($directory, "{$filename}.{$extension}", 'public');
 
-                return $filename;
+                }
             })
             ->getUploadedFileNameForStorageUsing(function (TemporaryUploadedFile $file, $get): string {
                 $filename = (string) FileManagerService::filename($file, $get('slug') ?: $get('name'), 'webp');
