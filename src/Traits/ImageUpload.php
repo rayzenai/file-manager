@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kirantimsina\FileManager\Traits;
 
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
+use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -14,8 +17,8 @@ abstract class ImageUpload
     {
         return FileUpload::make($field, $hintLabel = null)
             ->image()
-            ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png'])
-            ->imagePreviewHeight(200)
+            ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml'])
+            ->imagePreviewHeight('200')
             ->imageResizeTargetHeight(FileManagerService::ORIGINAL_SIZE)
             ->imageResizeTargetWidth(FileManagerService::ORIGINAL_SIZE)
             ->imageResizeMode('contain')
@@ -28,12 +31,12 @@ abstract class ImageUpload
 
                 $filename = (string) FileManagerService::filename($file, $get('slug') ?: $get('name'), 'webp');
 
-                $img = ImageManager::gd()->read(\file_get_contents($file->path()));
+                $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
 
                 $image = $img->toWebp(100)->toFilePointer();
 
                 $filename = "{$directory}/{$filename}";
-                Storage::disk('public')->put($filename, $image);
+                Storage::put($filename, $image);
 
                 return $filename;
             })

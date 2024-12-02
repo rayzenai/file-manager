@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 use Intervention\Gif\Exceptions\NotReadableException;
 use Intervention\Image\Exceptions\NotSupportedException;
 use Intervention\Image\ImageManager;
-use Kirantimsina\FileManager\Facades\FileManager as FacadesFileManager;
+use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
@@ -124,7 +124,7 @@ class FileManagerService
             return [
                 'status' => true,
                 'file' => $uploadedFilename,
-                'link' => FacadesFileManager::getMediaPath($uploadedFilename),
+                'link' => FileManager::getMediaPath($uploadedFilename),
                 'mime' => $mime,
             ];
         } else {
@@ -144,7 +144,7 @@ class FileManagerService
         $path = Arr::first($exploded);
 
         try {
-            $img = ImageManager::gd()->read(\file_get_contents(FacadesFileManager::getMediaPath($file)));
+            $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file)));
             foreach (static::SIZE_ARR as $key => $val) {
                 if ($fit) {
                     $img->coverDown(width: $val, height: $val);
@@ -162,7 +162,7 @@ class FileManagerService
 
                 $image = $img->toWebp(85)->toFilePointer();
 
-                $status = Storage::disk('default')->put(
+                $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
                     'public'
@@ -188,7 +188,7 @@ class FileManagerService
 
         $newFile = $path . '/' . Arr::last(explode('/', $tempFile));
 
-        $status = Storage::disk('default')->move($tempFile, $newFile);
+        $status = Storage::disk()->move($tempFile, $newFile);
 
         if ($status) {
             ResizeImages::dispatch([$newFile]);
@@ -212,7 +212,7 @@ class FileManagerService
             $filename = time() . '-' . Str::random(10) . '.' . $file->extension();
         }
 
-        $upload = Storage::disk('default')->putFileAs(
+        $upload = Storage::disk()->putFileAs(
             'temp',
             new File($file),
             $filename,
@@ -223,7 +223,7 @@ class FileManagerService
             return [
                 'status' => true,
                 'file' => explode('/', $upload)[1],
-                'link' => FacadesFileManager::getMediaPath($upload),
+                'link' => FileManager::getMediaPath($upload),
             ];
         } else {
             return [
@@ -234,7 +234,7 @@ class FileManagerService
 
     public function moveTempVideo($filename, $to)
     {
-        Storage::disk('default')->move('temp/' . $filename, $to . $filename);
+        Storage::disk()->move('temp/' . $filename, $to . $filename);
 
         return true;
     }

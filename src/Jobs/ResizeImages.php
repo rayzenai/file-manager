@@ -7,7 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Kirantimsina\FileManager\FileManager;
+use Kirantimsina\FileManager\FileManagerService;
 
 class ResizeImages implements ShouldQueue
 {
@@ -33,7 +33,7 @@ class ResizeImages implements ShouldQueue
     public function handle()
     {
         foreach ($this->filesArr as $file) {
-            FileManager::resizeImage($file, false);
+            FileManagerService::resizeImage($file, false);
         }
     }
 }
