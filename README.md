@@ -49,13 +49,13 @@ Follow these steps to install the package in your Filament-powered Laravel appli
 
 ## Usage in Model
 
-To use the **RayzenAI File Manager** in your Filament project, you need to implement the `HasImages` interface in the models that handle file management. Here's how:
+To use the **RayzenAI File Manager** in your Filament project, you need to use the trait `HasImages`.
 
 1. **Use the `HasImages` Trait:**
 
-   In the model where you want to manage files, use the `HasImages` trait. This allows your model to manage file uploads and retrievals easily.
+    In the model where you want to manage files, use the `HasImages` trait. This allows your model to manage file uploads and retrievals easily.
 
-   Example:
+    Example:
 
     ```php
 
@@ -72,7 +72,7 @@ To use the **RayzenAI File Manager** in your Filament project, you need to imple
             'images' => 'array',
         ];
 
-        // Specify which fields in this model will handle images
+        // Specify which fields in this model will handle images. This is used for resizing
         protected function hasImagesTraitFields(): array
         {
             return ['images'];
@@ -82,10 +82,9 @@ To use the **RayzenAI File Manager** in your Filament project, you need to imple
 
 ### Explanation:
 
-- **`HasImages Interface`**: This interface tells the package that this model will manage images or files.
-- **`HasImages Trait`**: This trait provides the actual methods for uploading, retrieving, and storing images.
-- **`$casts`**: We cast the `images` field to an array so you can easily store multiple image paths in one field.
-- **`hasImagesTraitFields`**: This method defines which fields (in this case, `images`) will be used to handle images.
+-   **`HasImages Trait`**: This trait provides the actual methods for uploading, retrieving, and storing images.
+-   **`$casts`**: We cast the `images` field to an array so you can easily store multiple image paths in one field.
+-   **`hasImagesTraitFields`**: This method defines which fields (in this case, `images`) will be used to handle images resizing.
 
 After setting this up, your Filament-powered model will be ready to handle file uploads, organize them efficiently, and ensure everything is SEO-friendly.
 
@@ -103,8 +102,8 @@ ImageUpload::make('images')
 ```
 
 ### S3Image
-The `S3Image` is an enhanced version of the `ImageColumn`. It displays images in a table, and when an image is clicked, a larger view opens in a side modal. Like ImageColumn, it is built on top of Filament but includes additional customization features to improve the user experience.
 
+The `S3Image` is an enhanced version of the `ImageColumn`. It displays images in a table, and when an image is clicked, a larger view opens in a side modal. Like ImageColumn, it is built on top of Filament but includes additional customization features to improve the user experience.
 
 ```php
 S3Image::make('images')
@@ -125,12 +124,9 @@ Please review [our security policy](../../security/policy) on how to report secu
 
 ## Credits
 
-- [kirantimsina](https://github.com/rayzenai)
-- [All Contributors](../../contributors)
+-   [kirantimsina](https://github.com/rayzenai)
+-   [All Contributors](../../contributors)
 
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
-
-
-

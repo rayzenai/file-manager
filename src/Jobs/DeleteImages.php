@@ -7,7 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Kirantimsina\FileManager\FileManager;
+use Kirantimsina\FileManager\FileManagerService;
 
 class DeleteImages implements ShouldQueue
 {
@@ -32,6 +32,6 @@ class DeleteImages implements ShouldQueue
      */
     public function handle()
     {
-        FileManager::deleteImagesArray($this->filesArr);
+        FileManagerService::deleteImagesArray($this->filesArr);
     }
 }
