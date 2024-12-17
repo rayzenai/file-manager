@@ -144,6 +144,7 @@ class FileManagerService
         $path = Arr::first($exploded);
 
         try {
+
             $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file)));
             foreach (static::SIZE_ARR as $key => $val) {
                 if ($fit) {
@@ -165,7 +166,6 @@ class FileManagerService
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
-                    'public'
                 );
 
                 if ($status) {
@@ -206,7 +206,7 @@ class FileManagerService
 
     public static function deleteImage($filename): void
     {
-        $s3 = Storage::disk('s3');
+        $s3 = Storage::disk();
         $s3->delete($filename);
 
         $name = Arr::last(explode('/', $filename));
