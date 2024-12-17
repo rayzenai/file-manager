@@ -47,7 +47,7 @@ class FileManager extends Facade
         $filename = Arr::last($exploded);
         $model = Arr::first($exploded);
 
-        return "{$main}/{$model}/{$size}/{$filename}";
+        return "{$main}{$model}/{$size}/{$filename}";
     }
 
     public static function getExtensionFromName(string $filename): string
