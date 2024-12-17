@@ -204,6 +204,18 @@ class FileManagerService
         }
     }
 
+    public static function deleteImage($filename): void
+    {
+        $s3 = Storage::disk('s3');
+        $s3->delete($filename);
+
+        $name = Arr::last(explode('/', $filename));
+        $model = Arr::first(explode('/', $filename));
+        foreach (static::SIZE_ARR as $key => $val) {
+            $s3->delete("{$model}/{$key}/{$name}");
+        }
+    }
+
     public function uploadTempVideo($file)
     {
         if (Auth::check()) {
