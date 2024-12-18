@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kirantimsina\FileManager;
 
+use Exception;
 use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -20,10 +23,10 @@ class FileManagerService
     const MAX_UPLOAD_SIZE = 4096; //4096 or 4 MB
 
     const SIZE_ARR = [
-        'full' => '1080',
-        'card' => '640',
-        'thumb' => '360',
-        'icon' => '120',
+        'full' => 1080,
+        'card' => 640,
+        'thumb' => 360,
+        'icon' => 120,
     ];
 
     const ORIGINAL_SIZE = '1920';
@@ -145,8 +148,17 @@ class FileManagerService
 
         try {
 
-            $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file)));
+            $disk = config('filesystems.default');
+
+            if ($disk === 'local') {
+                throw new Exception('Local disk is not supported for resizing images. Please use s3.');
+            } else {
+                $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file)));
+
+            }
+
             foreach (static::SIZE_ARR as $key => $val) {
+                $val = intval($val);
                 if ($fit) {
                     $img->coverDown(width: $val, height: $val);
                 } else {

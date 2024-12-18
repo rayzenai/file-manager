@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Traits;
 
+use Exception;
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
@@ -26,6 +27,11 @@ abstract class ImageUpload
             ->openable()
             ->maxSize(FileManagerService::MAX_UPLOAD_SIZE)
             ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) {
+
+                if (config('filesystems.default') === 'local') {
+                    throw new Exception('Please set the default disk to s3 to use this package.');
+                }
+
                 //class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
 

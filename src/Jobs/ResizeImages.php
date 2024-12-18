@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kirantimsina\FileManager\Jobs;
 
 use Illuminate\Bus\Queueable;
