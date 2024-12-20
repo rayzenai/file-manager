@@ -3,7 +3,7 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/rayzenai/file-manager/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/rayzenai/file-manager/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/rayzenai/file-manager.svg?style=flat-square)](https://packagist.org/packages/rayzenai/file-manager)
 
-# RayzenAI File Manager for Filament
+# RayzenAI File Manager for Filament with S3
 
 The **RayzenAI File Manager** is a Laravel package built specifically for **Filament**, providing a user-friendly, SEO-optimized way to manage images and files in your application. It integrates seamlessly with Filament, making it easy to handle file uploads, retrieval, and organization, all while ensuring SEO best practices.
 
