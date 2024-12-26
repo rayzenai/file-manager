@@ -35,7 +35,8 @@ abstract class ImageUpload
                 //class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
 
-                $filename = (string) FileManagerService::filename($file, $get('slug') ?: $get('name'), 'webp');
+             
+                $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
 
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
 
@@ -47,9 +48,19 @@ abstract class ImageUpload
                 return $filename;
             })
             ->getUploadedFileNameForStorageUsing(function (TemporaryUploadedFile $file, $get): string {
-                $filename = (string) FileManagerService::filename($file, $get('slug') ?: $get('name'), 'webp');
+
+                $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
 
                 return $filename;
             })->hint('Might not work with Safari, use another browser!');
+    }
+
+    private static function tag(callable $get)
+    {
+        if ($get('slug') && is_string($get('slug'))) {
+            return $get('slug');
+        } else {
+            return $get('name');
+        }
     }
 }
