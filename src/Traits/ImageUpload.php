@@ -35,7 +35,6 @@ abstract class ImageUpload
                 //class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
 
-             
                 $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
 
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
