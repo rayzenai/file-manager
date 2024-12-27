@@ -97,7 +97,7 @@ class FileManagerService
         return config('file-manager.model.' . $model);
     }
 
-    public static function upload($model, $file, $tag = null, $fit = false, $resize = true)
+    public static function upload($model, $file, $tag = null, $fit = false, $resize = true, $webp = false)
     {
         $mime = $file->getMimeType();
         $path = static::getUploadDirectory($model);
@@ -107,8 +107,15 @@ class FileManagerService
         // Forcing all images to webp
         if (in_array($mime, ['image/jpg', 'image/jpeg', 'image/png', 'image/webp', 'image/avif'])) {
             $img = ImageManager::gd()->read($file);
-            $img = $img->toWebp(100)->toFilePointer();
-            $ext = 'webp';
+
+            if ($webp) {
+                $img = $img->toWebp(100)->toFilePointer();
+                $ext = 'webp';
+
+            } else {
+                $img = $img->encode()->toFilePointer();
+                $ext = Arr::last(explode('.', $filename));
+            }
             $filename = \explode('.', $filename)[0] . '.' . $ext;
         }
 
