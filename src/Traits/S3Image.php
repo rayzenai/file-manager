@@ -22,13 +22,30 @@ abstract class S3Image
     ): ImageColumn {
         return ImageColumn::make($field)->label($label)
             ->when(! $showInModal, function (ImageColumn $column) use ($field) {
-                $column->url(function ($record) use ($field) {
-                    $images = static::getImages($field, $record, null);
 
-                    return '/media-page/' . $record->{$field};
+                $column->url(function ($record) use ($field) {
+                    $images = static::getImagesWithoutUrl($field, $record, null);
+                    $slug = $images[0] ?? null;
+
+                    if ($slug) {
+                        return '/media-page/' . $slug;
+                    }
+
+                    return '#';
+                });
+            })->when(! $showInModal, function (ImageColumn $column) use ($field) {
+
+                $column->openUrlInNewTab(function ($record) use ($field) {
+                    $images = static::getImagesWithoutUrl($field, $record, null);
+                    $slug = $images[0] ?? null;
+
+                    if ($slug) {
+                        return true;
+                    }
+
+                    return false;
                 });
             })
-            ->openUrlInNewTab()
             ->getStateUsing(function ($record) use ($field, $size) {
 
                 $keys = explode('.', $field);
@@ -71,6 +88,31 @@ abstract class S3Image
                     ->modalHeading($heading ?: fn ($record) => $record->name ?: ($record->title ?: 'Image!'))
                     ->modalWidth('2xl')
             );
+    }
+
+    private static function getImagesWithoutUrl($field, $record, ?string $modalSize = null): ?array
+    {
+        $keys = explode('.', $field);
+        $temp = $record;
+
+        // Iterate through nested keys to get to the final value
+        foreach ($keys as $key) {
+            if ($temp instanceof Collection) {
+                $temp = $temp->map(fn ($item) => $item->{$key});
+            } else {
+                $temp = $temp->{$key};
+            }
+        }
+
+        if ($temp instanceof Collection) {
+            return $temp->toArray();
+        } elseif (is_array($temp)) {
+            return $temp;
+        } elseif (! is_null($temp)) {
+            return [$temp];
+        } else {
+            return null;
+        }
     }
 
     private static function getImages($field, $record, ?string $modalSize = null): ?array
