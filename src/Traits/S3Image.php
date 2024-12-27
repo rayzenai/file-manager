@@ -7,7 +7,6 @@ namespace Kirantimsina\FileManager\Traits;
 use Closure;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Kirantimsina\FileManager\Facades\FileManager;
 
@@ -15,25 +14,18 @@ abstract class S3Image
 {
     public static function make(
         string|array $field,
-        ?string $size = null,
-        ?bool $showModal = true,
+        ?string $size = 'thumb',
+        ?bool $showInModal = false,
         ?string $modalSize = null, // null means full size
         string $label = 'Image',
         string|Closure $heading = 'Image!'
     ): ImageColumn {
         return ImageColumn::make($field)->label($label)
-            ->when(! $showModal, function (ImageColumn $column) use ($field) {
+            ->when(! $showInModal, function (ImageColumn $column) use ($field) {
                 $column->url(function ($record) use ($field) {
                     $images = static::getImages($field, $record, null);
 
-                    return '/mockup-preview/' . $record->slug ?: $record->id;
-
-                    return view('mockup')->with(
-                        [
-                            'img' => Arr::first($images),
-                            'mockup' => $record,
-                        ]
-                    );
+                    return '/media-page/' . $record->{$field};
                 });
             })
             ->openUrlInNewTab()
@@ -71,7 +63,7 @@ abstract class S3Image
                         $temp = static::getImages($field, $record, $modalSize);
 
                         // Return the view from your package
-                        return view('file-manager::image-display', [
+                        return view('file-manager::media-modal', [
                             'images' => $temp,
                         ]);
                     })->slideOver()

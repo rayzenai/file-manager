@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kirantimsina\FileManager;
 
 use Spatie\LaravelPackageTools\Package;
@@ -17,6 +19,7 @@ class FileManagerServiceProvider extends PackageServiceProvider
         $package
             ->name('file-manager')
             ->hasConfigFile()
+            ->hasRoute('web')
             ->hasViews();
     }
 }
