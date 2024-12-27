@@ -14,19 +14,19 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 abstract class ImageUpload
 {
-    public static function make($field): FileUpload
+    public static function make(string $field, bool $convertToWebp = true, ?int $webpQuality = 100): FileUpload
     {
         return FileUpload::make($field, $hintLabel = null)
             ->image()
             ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml'])
             ->imagePreviewHeight('200')
-            ->imageResizeTargetHeight(FileManagerService::ORIGINAL_SIZE)
-            ->imageResizeTargetWidth(FileManagerService::ORIGINAL_SIZE)
+            ->imageResizeTargetHeight(strval(config('file-manager.max-upload-height')))
+            ->imageResizeTargetWidth(strval(config('file-manager.max-upload-width')))
             ->imageResizeMode('contain')
             ->imageResizeUpscale(false)
             ->openable()
-            ->maxSize(FileManagerService::MAX_UPLOAD_SIZE)
-            ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) {
+            ->maxSize(intval(config('file-manager.max-upload-size')))
+            ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) use ($convertToWebp, $webpQuality) {
 
                 if (config('filesystems.default') === 'local') {
                     throw new Exception('Please set the default disk to s3 to use this package.');
@@ -35,11 +35,15 @@ abstract class ImageUpload
                 //class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
 
-                $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+                $filename = (string) FileManagerService::filename($file, static::tag($get), $convertToWebp ? 'webp' : $file->extension());
 
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
 
-                $image = $img->toWebp(100)->toFilePointer();
+                if ($convertToWebp) {
+                    $image = $img->toWebp($webpQuality)->toFilePointer();
+                } else {
+                    $image = $img->encode()->toFilePointer();
+                }
 
                 $filename = "{$directory}/{$filename}";
                 Storage::put($filename, $image);

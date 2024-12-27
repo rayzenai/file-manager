@@ -70,9 +70,11 @@ abstract class S3Image
                 }
 
                 return FileManager::getMediaPath($temp, $size);
-            })->circular()
+            })
+            // ->circular()
+            // ->height(40)
+
             ->stacked()
-            ->height(35)
             ->limitedRemainingText()
             ->action(
                 Action::make($field)

@@ -1,12 +1,17 @@
 <?php
 
-// write all the Models names according to their path names.
-
 return [
     'cdn' => env('CDN_URL', env('AWS_URL', env('APP_URL'))),
 
+    'max-upload-height' => '5120', // in pixels
+
+    'max-upload-width' => '5120', // in pixels
+
+    'max-upload-size' => '8192', // in KB
+
+    // The ModelName => path syntax is used to store the uploaded files in the respective folder
     'model' => [
-        //Write like this others according to your project
         'User' => 'users',
+        'Mockup' => 'mockups'
     ],
 ];

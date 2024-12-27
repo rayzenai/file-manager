@@ -20,16 +20,13 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 
 class FileManagerService
 {
-    const MAX_UPLOAD_SIZE = 4096; //4096 or 4 MB
-
     const SIZE_ARR = [
+        'ultra' => 1920,
         'full' => 1080,
         'card' => 640,
         'thumb' => 360,
         'icon' => 120,
     ];
-
-    const ORIGINAL_SIZE = '1920';
 
     public static function uploadImages($model, $files, $tag = null, $fit = false, $resize = true)
     {
@@ -100,8 +97,6 @@ class FileManagerService
         return config('file-manager.model.' . $model);
     }
 
-    // This method is being used by API only, and not the Filament Backend
-    // ImageUpload triat handles all this for Filament Backend
     public static function upload($model, $file, $tag = null, $fit = false, $resize = true)
     {
         $mime = $file->getMimeType();
