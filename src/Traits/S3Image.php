@@ -14,11 +14,11 @@ abstract class S3Image
 {
     public static function make(
         string|array $field,
-        ?string $size = 'thumb',
+        ?string $size = 'icon',
         ?bool $showInModal = false,
         ?string $modalSize = null, // null means full size
         string $label = 'Image',
-        string|Closure $heading = 'Image!'
+        string|Closure $heading = ''
     ): ImageColumn {
         return ImageColumn::make($field)->label($label)
             ->when(! $showInModal, function (ImageColumn $column) use ($field) {
@@ -78,16 +78,17 @@ abstract class S3Image
             ->limitedRemainingText()
             ->action(
                 Action::make($field)
-                    ->modalContent(function ($record) use ($field, $modalSize) {
+                    ->modalContent(function ($record, Action $action) use ($field, $modalSize) {
                         $temp = static::getImages($field, $record, $modalSize);
 
                         // Return the view from your package
                         return view('file-manager::media-modal', [
-                            'images' => $temp,
+                            'images' => $temp ?? [],
                         ]);
                     })->slideOver()
                     ->modalSubmitActionLabel('Close')
-                    ->modalHeading($heading ?: fn ($record) => $record->name ?: ($record->title ?: 'Image!'))
+                    ->modalHeading($heading ?:
+                        fn ($record) => isset($record->name) ? $record->name : (isset($record->title) ? $record->title : 'Image!'))
                     ->modalWidth('2xl')
             );
     }
