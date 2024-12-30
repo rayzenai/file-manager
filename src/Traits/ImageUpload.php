@@ -14,19 +14,21 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 abstract class ImageUpload
 {
-    public static function make(string $field, bool $convertToWebp = true, ?int $webpQuality = 100): FileUpload
+    public static function make(string $field, bool $uploadOriginal = true, bool $convertToWebp = true, ?int $quality = 100): FileUpload
     {
         return FileUpload::make($field, $hintLabel = null)
             ->image()
             ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml'])
             ->imagePreviewHeight('200')
-            ->imageResizeTargetHeight(strval(config('file-manager.max-upload-height')))
-            ->imageResizeTargetWidth(strval(config('file-manager.max-upload-width')))
-            ->imageResizeMode('contain')
-            ->imageResizeUpscale(false)
+            ->when(! $uploadOriginal, function (FileUpload $fileUpload) {
+                $fileUpload->imageResizeTargetHeight(strval(config('file-manager.max-upload-height')))
+                    ->imageResizeTargetWidth(strval(config('file-manager.max-upload-width')))
+                    ->imageResizeMode('contain')
+                    ->imageResizeUpscale(false);
+            })
             ->openable()
             ->maxSize(intval(config('file-manager.max-upload-size')))
-            ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) use ($convertToWebp, $webpQuality) {
+            ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) use ($convertToWebp, $quality) {
 
                 if (config('filesystems.default') === 'local') {
                     throw new Exception('Please set the default disk to s3 to use this package.');
@@ -40,9 +42,9 @@ abstract class ImageUpload
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
 
                 if ($convertToWebp) {
-                    $image = $img->toWebp($webpQuality)->toFilePointer();
+                    $image = $img->toWebp($quality)->toFilePointer();
                 } else {
-                    $image = $img->encode()->toFilePointer();
+                    $image = file_get_contents(FileManager::getMediaPath($file->path()));
                 }
 
                 $filename = "{$directory}/{$filename}";
