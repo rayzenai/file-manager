@@ -57,7 +57,7 @@ abstract class ImageUpload
                 $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
 
                 return $filename;
-            })->hint('Might not work with Safari, use another browser!');
+            })->hint('Might not work with Safari!');
     }
 
     private static function tag(callable $get)

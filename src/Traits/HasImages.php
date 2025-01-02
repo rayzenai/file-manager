@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kirantimsina\FileManager\Traits;
 
 use Kirantimsina\FileManager\Jobs\DeleteImages;
@@ -35,5 +37,10 @@ trait HasImages
                 }
             }
         });
+    }
+
+    public function getViewRoute($field)
+    {
+        return route('media.page', $field);
     }
 }
