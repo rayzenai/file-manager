@@ -34,7 +34,7 @@ abstract class ImageUpload
                     throw new Exception('Please set the default disk to s3 to use this package.');
                 }
 
-                //class name is predefined laravel method to get the class name
+                // class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
 
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $convertToWebp ? 'webp' : $file->extension());
