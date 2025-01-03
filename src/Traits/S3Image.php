@@ -69,6 +69,10 @@ abstract class S3Image
                     return array_map(fn ($file) => FileManager::getMediaPath($file, $size), $temp);
                 }
 
+                if (empty($temp)) {
+                    return null;
+                }
+
                 return FileManager::getMediaPath($temp, $size);
             })
             // ->circular()
@@ -78,6 +82,19 @@ abstract class S3Image
             ->limitedRemainingText()
             ->action(
                 Action::make($field)
+                    ->form(function ($record) use ($field) {
+                        return [
+                            ImageUpload::make($field, uploadOriginal: true, convertToWebp: false)
+                                ->columnSpanFull()
+                                ->downloadable()
+                                ->previewable()
+                                ->required(),
+                        ];
+                    })->action(function ($record, $data) {
+                        $record->update([
+                            'image' => $data['image'],
+                        ]);
+                    })
                     ->modalContent(function ($record, Action $action) use ($field, $modalSize) {
                         $temp = static::getImages($field, $record, $modalSize);
 
@@ -86,7 +103,7 @@ abstract class S3Image
                             'images' => $temp ?? [],
                         ]);
                     })->slideOver()
-                    ->modalSubmitActionLabel('Close')
+                    ->modalSubmitActionLabel('Save')
                     ->modalHeading($heading ?:
                         fn ($record) => isset($record->name) ? $record->name : (isset($record->title) ? $record->title : 'Image!'))
                     ->modalWidth('2xl')
