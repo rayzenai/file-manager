@@ -28,7 +28,7 @@ abstract class S3Image
                     $slug = $images[0] ?? null;
 
                     if ($slug) {
-                        return '/media-page/' . $slug;
+                        return '/media-page/'.$slug;
                     }
 
                     return '#';
@@ -83,16 +83,22 @@ abstract class S3Image
             ->action(
                 Action::make($field)
                     ->form(function ($record) use ($field) {
+                        // dd($record, $field, $record->{$field}, is_array($record->{$field}));
+
                         return [
                             ImageUpload::make($field, uploadOriginal: true, convertToWebp: false)
                                 ->columnSpanFull()
                                 ->downloadable()
+                                ->when(is_array($record->{$field}), function ($imageUpload) {
+                                    $imageUpload->multiple();
+                                })
+                                ->hint('Warning: This will replace the image/images.')
                                 ->previewable()
                                 ->required(),
                         ];
-                    })->action(function ($record, $data) {
+                    })->action(function ($record, $data) use ($field) {
                         $record->update([
-                            'image' => $data['image'],
+                            $field => $data[$field],
                         ]);
                     })
                     ->modalContent(function ($record, Action $action) use ($field, $modalSize) {
