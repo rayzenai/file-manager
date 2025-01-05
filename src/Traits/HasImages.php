@@ -18,25 +18,48 @@ trait HasImages
             foreach ($fieldsToWatch as $field) {
                 if ($model->{$field}) {
                     $newFilename = $model->{$field};
-                    ResizeImages::dispatch([$newFilename]);
+                    if (is_array($newFilename)) {
+                        foreach ($newFilename as $filename) {
+                            ResizeImages::dispatch([$filename]);
+                        }
+                    } else {
+                        ResizeImages::dispatch([$newFilename]);
+                    }
                 }
             }
         });
 
         self::updating(function (self $model) {
             $fieldsToWatch = $model->hasImagesTraitFields();
+
             foreach ($fieldsToWatch as $field) {
                 if ($model->isDirty($field)) {
                     $oldFilename = $model->getOriginal($field);
                     $newFilename = $model->{$field};
-                    ResizeImages::dispatch([$newFilename]);
-                    if ($oldFilename) {
-                        // Fire Delete images job only if oldFilename exists
+
+                    // Handle resizing new images
+                    if (is_array($newFilename)) {
+                        foreach ($newFilename as $filename) {
+                            ResizeImages::dispatch([$filename]);
+                        }
+                    } elseif ($newFilename) {
+                        ResizeImages::dispatch([$newFilename]);
+                    }
+
+                    // Handle deleting old images
+                    if (is_array($oldFilename)) {
+                        $toDelete = array_diff($oldFilename, (array) $newFilename);
+                        foreach ($toDelete as $filename) {
+                            DeleteImages::dispatch([$filename]);
+                        }
+                    } elseif ($oldFilename && $oldFilename !== $newFilename) {
+                        // Only delete if the old file is different from the new one
                         DeleteImages::dispatch([$oldFilename]);
                     }
                 }
             }
         });
+
     }
 
     public function getViewRoute($field)

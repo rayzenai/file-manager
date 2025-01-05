@@ -16,7 +16,7 @@ abstract class ImageUpload
 {
     public static function make(string $field, bool $uploadOriginal = true, bool $convertToWebp = true, ?int $quality = 100): FileUpload
     {
-        return FileUpload::make($field, $hintLabel = null)
+        return FileUpload::make($field, $hintLabel = '')
             ->image()
             ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml'])
             ->imagePreviewHeight('200')
@@ -57,7 +57,7 @@ abstract class ImageUpload
                 $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
 
                 return $filename;
-            })->hint('Might not work with Safari!');
+            })->hint($hintLabel);
     }
 
     private static function tag(callable $get)
