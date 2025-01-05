@@ -83,7 +83,6 @@ abstract class S3Image
             ->action(
                 Action::make($field)
                     ->form(function ($record) use ($field) {
-                        // dd($record, $field, $record->{$field}, is_array($record->{$field}));
 
                         return [
                             ImageUpload::make($field, uploadOriginal: true, convertToWebp: false)
