@@ -6,6 +6,7 @@ namespace Kirantimsina\FileManager\Traits;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteImages;
@@ -75,11 +76,11 @@ trait HasImages
     {
         $content = Http::get($url)->body();
 
-        $tempFileName = uniqid().'_'.basename($url);
+        $tempFileName = uniqid() . '_' . basename($url);
 
-        $tempFilePath = sys_get_temp_dir().DIRECTORY_SEPARATOR.$tempFileName;
+        $tempFilePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $tempFileName;
 
-        \Illuminate\Support\Facades\File::put($tempFilePath, $content);
+        File::put($tempFilePath, $content);
 
         $mimeType = mime_content_type($tempFilePath) ?: 'application/octet-stream';
 
