@@ -48,13 +48,13 @@ class FileManagerService
     public static function filename($file, $tag = null, $ext = null)
     {
         if (Auth::check()) {
-            $filename = Auth::id() . time() . '-' . Str::random(10);
+            $filename = Auth::id().time().'-'.Str::random(10);
         } else {
-            $filename = time() . '-' . Str::random(10);
+            $filename = time().'-'.Str::random(10);
         }
 
         if (! empty($tag)) {
-            $filename = Str::slug($tag) . '-' . $filename;
+            $filename = Str::slug($tag).'-'.$filename;
         }
 
         $orginalName = $file->getClientOriginalName();
@@ -66,7 +66,7 @@ class FileManagerService
         if (Str::contains($orginalName, '.apk')) {
             $ext = 'apk';
         }
-        $filename = $filename . '.' . $ext;
+        $filename = $filename.'.'.$ext;
 
         return $filename;
     }
@@ -75,7 +75,7 @@ class FileManagerService
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Image)) {
             $fileData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $base64Image));
-            $tmpFilePath = sys_get_temp_dir() . '/' . Str::uuid()->toString();
+            $tmpFilePath = sys_get_temp_dir().'/'.Str::uuid()->toString();
             file_put_contents($tmpFilePath, $fileData);
             $tmpFile = new File($tmpFilePath);
             $file = new UploadedFile(
@@ -94,7 +94,7 @@ class FileManagerService
 
     public static function getUploadDirectory($model)
     {
-        return config('file-manager.model.' . $model);
+        return config('file-manager.model.'.$model);
     }
 
     public static function upload($model, $file, $tag = null, $fit = false, $resize = true, $webp = false, $reencode = false)
@@ -116,7 +116,7 @@ class FileManagerService
                 $img = $img->encode()->toFilePointer();
                 $ext = Arr::last(explode('.', $filename));
             }
-            $filename = \explode('.', $filename)[0] . '.' . $ext;
+            $filename = \explode('.', $filename)[0].'.'.$ext;
         }
 
         $uploadedFilename = $file->storeAs($path, $filename);
@@ -200,7 +200,7 @@ class FileManagerService
 
         $path = static::getUploadDirectory($model);
 
-        $newFile = $path . '/' . Arr::last(explode('/', $tempFile));
+        $newFile = $path.'/'.Arr::last(explode('/', $tempFile));
 
         $status = Storage::disk()->move($tempFile, $newFile);
 
@@ -233,9 +233,9 @@ class FileManagerService
     public function uploadTempVideo($file)
     {
         if (Auth::check()) {
-            $filename = Auth::id() . time() . '-' . Str::random(5) . '.' . $file->extension();
+            $filename = Auth::id().time().'-'.Str::random(5).'.'.$file->extension();
         } else {
-            $filename = time() . '-' . Str::random(10) . '.' . $file->extension();
+            $filename = time().'-'.Str::random(10).'.'.$file->extension();
         }
 
         $upload = Storage::disk()->putFileAs(
@@ -260,7 +260,7 @@ class FileManagerService
 
     public function moveTempVideo($filename, $to)
     {
-        Storage::disk()->move('temp/' . $filename, $to . $filename);
+        Storage::disk()->move('temp/'.$filename, $to.$filename);
 
         return true;
     }

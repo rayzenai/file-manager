@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Traits;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteImages;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 
@@ -65,5 +69,43 @@ trait HasImages
     public function getViewRoute($field)
     {
         return route('media.page', $field);
+    }
+
+    public function uploadFromUrl(string $url, Model $record, string $field): string
+    {
+        $content = Http::get($url)->body();
+
+        $tempFileName = uniqid().'_'.basename($url);
+
+        $tempFilePath = sys_get_temp_dir().DIRECTORY_SEPARATOR.$tempFileName;
+
+        \Illuminate\Support\Facades\File::put($tempFilePath, $content);
+
+        $mimeType = mime_content_type($tempFilePath) ?: 'application/octet-stream';
+
+        // Create the UploadedFile instance
+        $uploadedFile = new UploadedFile(
+            $tempFilePath,
+            basename($tempFilePath),
+            $mimeType,
+            null,
+            true
+        );
+
+        $model = class_basename($record);
+
+        $upload = FileManagerService::upload(
+            model: $model,
+            file: $uploadedFile,
+            tag: isset($record->name) ? $record->name : null,
+        );
+
+        if ($upload['status']) {
+            $record->update([
+                $field => $upload['file'],
+            ]);
+        }
+
+        return $upload['file'];
     }
 }
