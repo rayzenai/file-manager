@@ -18,7 +18,7 @@ abstract class ImageUpload
     {
         return FileUpload::make($field, $hintLabel = '')
             ->image()
-            ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml'])
+            ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'])
             ->imagePreviewHeight('200')
             ->when(! $uploadOriginal, function (FileUpload $fileUpload) {
                 $fileUpload->imageResizeTargetHeight(strval(config('file-manager.max-upload-height')))

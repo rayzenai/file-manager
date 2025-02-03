@@ -15,6 +15,7 @@ class MediaController extends Controller
     {
         $img = FileManager::getMediaPath($slug);
 
+        // Write the code to update views
         return view('file-manager::media-page')->with(
             [
                 'img' => $img,
