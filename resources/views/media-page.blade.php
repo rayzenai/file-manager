@@ -4,21 +4,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <title>{{ $title }}</title>
+    @vite('resources/css/app.css')
 </head>
 
-<body>
-    <div class="flex  justify-center w-full">
-        <img style="
-                /* Center and scale the image nicely */
-                background-position: center;
-                background-repeat: no-repeat;
-                object-fit: cover;
-                background-size: contain;"
-            class="sm:w-full md:w-[1600px]" src="{{ $img }}" />
+<body class="h-screen w-screen m-0 p-0">
+    <div class="flex justify-center items-center h-full w-full">
+        <img src="{{ $img }}" class="w-full h-full object-cover" alt="Full screen image" />
     </div>
-
 </body>
 
 </html>
