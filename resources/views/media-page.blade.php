@@ -8,9 +8,9 @@
     @vite('resources/css/app.css')
 </head>
 
-<body class="h-screen w-screen m-0 p-0">
-    <div class="flex justify-center items-center h-full w-full">
-        <img src="{{ $img }}" class="w-full h-full object-cover" alt="Full screen image" />
+<body class="m-0 p-0">
+    <div class="flex justify-center w-full">
+        <img src="{{ $img }}" class="w-full h-auto object-cover" alt="Scrollable full width image" />
     </div>
 </body>
 
