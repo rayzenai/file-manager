@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteImages;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
@@ -67,9 +68,21 @@ trait HasImages
 
     }
 
-    public function getViewRoute($field)
+    public function viewPageUrl(string $field = 'file'): ?string
     {
-        return route('media.page', $field);
+        $modelKey = class_basename($this);
+
+        $modelAlias = config("file-manager.model.{$modelKey}", Str::plural(Str::lower($modelKey)));
+
+        if ($this->{$field}) {
+            // Generate a URL matching your route: /media-page/{model}/{slug}
+            return route('media.page', [
+                'directory' => $modelAlias,
+                'slug' => $this->slug,
+            ]);
+        }
+
+        return null;
     }
 
     public function uploadFromUrl(string $url, Model $record, string $field): string
