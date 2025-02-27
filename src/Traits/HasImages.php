@@ -68,7 +68,7 @@ trait HasImages
 
     }
 
-    public function viewPageUrl(string $field = 'file'): ?string
+    public function viewPageUrl(string $field = 'file', string $counter = ''): ?string
     {
         $modelKey = class_basename($this);
 
@@ -76,10 +76,19 @@ trait HasImages
 
         if ($this->{$field}) {
             // Generate a URL matching your route: /media-page/{model}/{slug}
+            if ($this->{$counter}) {
+                return route('media.page', [
+                    'directory' => $modelAlias,
+                    'slug' => $this->slug,
+                    'counter' => $counter,
+                ]);
+            }
+
             return route('media.page', [
                 'directory' => $modelAlias,
                 'slug' => $this->slug,
             ]);
+
         }
 
         return null;

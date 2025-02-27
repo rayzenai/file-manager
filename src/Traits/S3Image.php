@@ -18,16 +18,22 @@ abstract class S3Image
         ?bool $showInModal = false,
         ?string $modalSize = null, // null means full size
         string $label = 'Image',
-        string|Closure $heading = ''
+        string|Closure $heading = '',
+        string $viewCountField = ''
     ): ImageColumn {
         return ImageColumn::make($field)->label($label)
-            ->when(! $showInModal, function (ImageColumn $column) use ($field) {
+            ->when(! $showInModal, function (ImageColumn $column) use ($field, $viewCountField) {
 
-                $column->url(function ($record) use ($field) {
+                $column->url(function ($record) use ($field, $viewCountField) {
                     $images = static::getImagesWithoutUrl($field, $record, null);
                     $slug = $images[0] ?? null;
 
                     if ($slug) {
+                        if ($viewCountField) {
+
+                            return $record->viewPageUrl(field: $field, counter: $viewCountField);
+                        }
+
                         return $record->viewPageUrl($field);
                     }
 
@@ -83,7 +89,6 @@ abstract class S3Image
             ->action(
                 Action::make($field)
                     ->form(function ($record) use ($field) {
-
                         return [
                             ImageUpload::make($field, uploadOriginal: true, convertToWebp: false)
                                 ->columnSpanFull()
@@ -103,10 +108,7 @@ abstract class S3Image
                     ->modalContent(function ($record, Action $action) use ($field, $modalSize) {
                         $temp = static::getImages($field, $record, $modalSize);
 
-                        // Return the view from your package
-                        return view('file-manager::media-modal', [
-                            'images' => $temp ?? [],
-                        ]);
+                        return view('file-manager::livewire.media-modal', ['images' => $temp ?? []]);
                     })->slideOver()
                     ->modalSubmitActionLabel('Save')
                     ->modalHeading($heading ?:
