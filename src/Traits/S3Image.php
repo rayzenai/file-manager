@@ -28,7 +28,7 @@ abstract class S3Image
                     $slug = $images[0] ?? null;
 
                     if ($slug) {
-                        return $record->viewPageUrl();
+                        return $record->viewPageUrl($field);
                     }
 
                     return '#';
