@@ -76,7 +76,7 @@ trait HasImages
 
         if ($this->{$field}) {
             // Generate a URL matching your route: /media-page/{model}/{slug}
-            if ($this->{$counter}) {
+            if ($counter) {
                 return route('media.page', [
                     'directory' => $modelAlias,
                     'slug' => $this->slug,
