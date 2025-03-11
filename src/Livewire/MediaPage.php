@@ -27,9 +27,6 @@ class MediaPage extends Component
         $this->directory = $directory;
         $this->slug = $slug;
 
-        // Retrieve the field name from the query parameters, defaulting to 'file'
-        $this->field = request('field', 'file');
-
         // Get the model mapping from your config.
         $modelMapping = config('file-manager.model');
 
@@ -49,6 +46,13 @@ class MediaPage extends Component
 
         // Fetch the record based on the slug.
         $record = $modelClass::where('slug', $slug)->firstOrFail();
+
+        if (request('field')) {
+            $this->field = request('field');
+        } else {
+            $this->field = Arr::first($record->hasImagesTraitFields());
+            // TODO: Right now, we are showing only one image. Instead, we need to show all by fetching all the fields.
+        }
 
         // Get the image/media file from the record.
         $this->img = FileManager::getMediaPath($record->{$this->field});
