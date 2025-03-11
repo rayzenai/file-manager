@@ -39,11 +39,19 @@ abstract class ImageUpload
 
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $convertToWebp ? 'webp' : $file->extension());
 
-                if ($convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif'])) {
-                    $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
-                    $image = $img->toWebp($quality)->toFilePointer();
-                } else {
+                if(in_array($file->extension(),['mp4'])){
                     $image = file_get_contents(FileManager::getMediaPath($file->path()));
+                }elseif($convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif'])) {
+                   
+                    $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
+
+                    $image = $img->toWebp($quality)->toFilePointer();
+
+                    
+                } else {
+                   
+                    $image = file_get_contents(FileManager::getMediaPath($file->path()));
+                    
                 }
 
                 $filename = "{$directory}/{$filename}";
