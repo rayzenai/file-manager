@@ -48,14 +48,18 @@ class MediaPage extends Component
         $record = $modelClass::where('slug', $slug)->firstOrFail();
 
         if (request('field')) {
-            $this->field = request('field');
+            $this->field = [request('field')];
         } else {
-            $this->field = Arr::first($record->hasImagesTraitFields());
+            $this->field = $record->hasImagesTraitFields();
             // TODO: Right now, we are showing only one image. Instead, we need to show all by fetching all the fields.
         }
 
         // Get the image/media file from the record.
-        $this->img = FileManager::getMediaPath($record->{$this->field});
+        $images = [];
+        foreach ($this->field as $field) {
+            $images[] = FileManager::getMediaPath($record->{$field});
+        }
+        $this->img = $images;
 
         // Set the title using the slug.
         $this->title = Str::title(Str::singular(Arr::first(explode('/', $slug))));
@@ -67,6 +71,10 @@ class MediaPage extends Component
 
     public function render()
     {
-        return view('file-manager::livewire.media-page')->layout('file-manager::layouts.blank');
+        if (count($this->img) === 1) {
+            return view('file-manager::livewire.single-media-page')->layout('file-manager::layouts.blank');
+        }
+
+        return view('file-manager::livewire.multi-media-page')->layout('file-manager::layouts.blank');
     }
 }

@@ -11,7 +11,7 @@
 
 <body class="m-0 p-0">
     <div class="flex justify-center w-full">
-        <img src="{{ $img }}" class="w-full h-auto object-cover" alt="Scrollable full width image" />
+        <img src="{{ $img[0] }}" class="w-full h-auto object-cover" alt="Scrollable full width image" />
     </div>
     @livewireScripts
 </body>
