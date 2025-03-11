@@ -57,7 +57,10 @@ class MediaPage extends Component
         // Get the image/media file from the record.
         $images = [];
         foreach ($this->field as $field) {
-            $images[] = FileManager::getMediaPath($record->{$field});
+            foreach (collect($record->{$field}) as $image) {
+                // We are collecting again since this can also be an json type field
+                $images[] = FileManager::getMediaPath($image);
+            }
         }
         $this->img = $images;
 
