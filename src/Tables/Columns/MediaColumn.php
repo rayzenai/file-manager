@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Kirantimsina\FileManager\Traits;
+namespace Kirantimsina\FileManager\Tables\Columns;
 
 use Closure;
 use Filament\Tables\Actions\Action;
@@ -10,7 +10,8 @@ use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Support\Collection;
 use Kirantimsina\FileManager\Facades\FileManager;
 
-abstract class S3Image
+// TODO: This works with Image type only for now
+abstract class MediaColumn
 {
     public static function make(
         string|array $field,

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Traits;
 
+use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteImages;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
@@ -19,9 +21,19 @@ trait HasImages
 
     protected static function bootHasImages()
     {
+
         self::creating(function (self $model) {
+            if (! method_exists($model, 'hasImagesTraitFields')) {
+                throw new Exception('You must define a `hasImagesTraitFields` method in your model.');
+            }
+
             $fieldsToWatch = $model->hasImagesTraitFields();
             foreach ($fieldsToWatch as $field) {
+
+                if (static::shouldExcludeConversion($model, $field)) {
+                    continue;
+                }
+
                 if ($model->{$field}) {
                     $newFilename = $model->{$field};
                     if (is_array($newFilename)) {
@@ -36,9 +48,18 @@ trait HasImages
         });
 
         self::updating(function (self $model) {
+            if (! method_exists($model, 'hasImagesTraitFields')) {
+                throw new Exception('You must define a `hasImagesTraitFields` method in your model.');
+            }
+
             $fieldsToWatch = $model->hasImagesTraitFields();
 
             foreach ($fieldsToWatch as $field) {
+                // TODO: Auto Deleting non-images is no longer working since we are skipping the whole process here
+                if (static::shouldExcludeConversion($model, $field)) {
+                    continue;
+                }
+
                 if ($model->isDirty($field)) {
                     $oldFilename = $model->getOriginal($field);
                     $newFilename = $model->{$field};
@@ -130,5 +151,18 @@ trait HasImages
         }
 
         return $upload['file'];
+    }
+
+    private static function shouldExcludeConversion(Model $model, string $field)
+    {
+        $ext = FileManager::getExtensionFromName($model->{$field});
+
+        return in_array($ext, [
+            'mp4',
+            'mpeg',
+            'mov',
+            'avi',
+            'webm',
+        ]);
     }
 }
