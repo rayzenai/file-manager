@@ -6,7 +6,9 @@ namespace Kirantimsina\FileManager\Traits;
 
 use Exception;
 use Filament\Forms\Components\FileUpload;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
@@ -18,7 +20,7 @@ abstract class ImageUpload
     {
         return FileUpload::make($field, $hintLabel = '')
             ->image()
-            ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'])
+            ->acceptedFileTypes(['image/webp', 'image/avif  ', 'image/jpg', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon', 'video/mp4', 'video/webm', 'video/mpeg', 'video/quicktime'])
             ->imagePreviewHeight('200')
             ->when(! $uploadOriginal, function (FileUpload $fileUpload) {
                 $fileUpload->imageResizeTargetHeight(strval(config('file-manager.max-upload-height')))
@@ -37,25 +39,28 @@ abstract class ImageUpload
                 // class name is predefined laravel method to get the class name
                 $directory = FileManagerService::getUploadDirectory(class_basename($model));
 
-                $filename = (string) FileManagerService::filename($file, static::tag($get), $convertToWebp ? 'webp' : $file->extension());
+                $isVideo = Str::lower((Arr::first(explode('/', $file->getMimeType())))) === 'video';
 
-                if ($convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif'])) {
+                $filename = (string) FileManagerService::filename($file, static::tag($get), ($convertToWebp && ! $isVideo) ? 'webp' : $file->extension());
+
+                if ($convertToWebp && ! $isVideo && ! in_array($file->extension(), ['ico', 'svg', 'avif', 'webp'])) {
                     $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
-                    $image = $img->toWebp($quality)->toFilePointer();
+                    $media = $img->toWebp($quality)->toFilePointer();
+                    Storage::put($filename, $media);
+
                 } else {
-                    $image = file_get_contents(FileManager::getMediaPath($file->path()));
+                    // $media = file_get_contents(FileManager::getMediaPath($file->path()));
+                    $file->storeAs($directory, $filename, 's3'); // Save any non-image to S3 as it was uploaded
                 }
 
-                $filename = "{$directory}/{$filename}";
-                Storage::put($filename, $image);
-
-                return $filename;
+                return "{$directory}/{$filename}";
             })
-            ->getUploadedFileNameForStorageUsing(function (TemporaryUploadedFile $file, $get): string {
+            ->getUploadedFileNameForStorageUsing(function (TemporaryUploadedFile $file, $get) use ($convertToWebp): string {
 
-                $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+                $isVideo = Str::lower((Arr::first(explode('/', $file->getMimeType())))) === 'video';
 
-                return $filename;
+                return (string) FileManagerService::filename($file, static::tag($get), ($convertToWebp && ! $isVideo) ? 'webp' : $file->extension());
+
             })->hint($hintLabel);
     }
 
