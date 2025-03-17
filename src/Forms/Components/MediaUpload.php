@@ -40,10 +40,8 @@ class MediaUpload extends FileUpload
         bool $convertToWebp = true,
         int $quality = 100
     ): static {
-        // 1) Create the component through the parent `make()`.
         $static = parent::make($name);
 
-        // 2) Store extra arguments as properties (or call custom setters).
         $static->uploadOriginal = $uploadOriginal;
         $static->convertToWebp = $convertToWebp;
         $static->quality = $quality;
