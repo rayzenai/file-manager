@@ -119,9 +119,9 @@ trait HasImages
     {
         $content = Http::get($url)->body();
 
-        $tempFileName = uniqid() . '_' . basename($url);
+        $tempFileName = uniqid().'_'.basename($url);
 
-        $tempFilePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $tempFileName;
+        $tempFilePath = sys_get_temp_dir().DIRECTORY_SEPARATOR.$tempFileName;
 
         File::put($tempFilePath, $content);
 
@@ -155,14 +155,22 @@ trait HasImages
 
     private static function shouldExcludeConversion(Model $model, string $field)
     {
-        $ext = FileManager::getExtensionFromName($model->{$field});
+        $filenames = $model->{$field};
+        if (is_string($model->{$field})) {
+            $filenames = [$model->{$field}];
+        }
 
-        return in_array($ext, [
-            'mp4',
-            'mpeg',
-            'mov',
-            'avi',
-            'webm',
-        ]);
+        foreach ($filenames as $filename) {
+            $ext = FileManager::getExtensionFromName($filename);
+
+            return in_array($ext, [
+                'mp4',
+                'mpeg',
+                'mov',
+                'avi',
+                'webm',
+            ]);
+        }
+
     }
 }
