@@ -119,9 +119,9 @@ trait HasImages
     {
         $content = Http::get($url)->body();
 
-        $tempFileName = uniqid().'_'.basename($url);
+        $tempFileName = uniqid() . '_' . basename($url);
 
-        $tempFilePath = sys_get_temp_dir().DIRECTORY_SEPARATOR.$tempFileName;
+        $tempFilePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $tempFileName;
 
         File::put($tempFilePath, $content);
 
