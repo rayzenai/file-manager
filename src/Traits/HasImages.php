@@ -156,6 +156,11 @@ trait HasImages
     private static function shouldExcludeConversion(Model $model, string $field)
     {
         $filenames = $model->{$field};
+
+        if (empty($filesname)) {
+            return false;
+        }
+        
         if (is_string($model->{$field})) {
             $filenames = [$model->{$field}];
         }
