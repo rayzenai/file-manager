@@ -160,7 +160,7 @@ trait HasImages
         if (empty($filesname)) {
             return false;
         }
-        
+
         if (is_string($model->{$field})) {
             $filenames = [$model->{$field}];
         }
