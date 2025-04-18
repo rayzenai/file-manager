@@ -9,6 +9,7 @@ use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Support\Collection;
 use Kirantimsina\FileManager\Facades\FileManager;
+use Kirantimsina\FileManager\Forms\Components\MediaUpload;
 
 // TODO: This works with Image type only for now
 abstract class MediaColumn
@@ -91,11 +92,11 @@ abstract class MediaColumn
                 Action::make($field)
                     ->form(function ($record) use ($field) {
                         return [
-                            ImageUpload::make($field, uploadOriginal: true, convertToWebp: false)
+                            MediaUpload::make($field, uploadOriginal: true, convertToWebp: false)
                                 ->columnSpanFull()
-                                ->downloadable()
-                                ->when(is_array($record->{$field}), function ($imageUpload) {
-                                    $imageUpload->multiple();
+                                ->downloadable
+                                ->when(is_array($record->{$field}), function ($mediaUpload) {
+                                    $mediaUpload->multiple();
                                 })
                                 ->hint('Warning: This will replace the image/images.')
                                 ->previewable()
