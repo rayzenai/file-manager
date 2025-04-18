@@ -94,7 +94,7 @@ abstract class MediaColumn
                         return [
                             MediaUpload::make($field, uploadOriginal: true, convertToWebp: false)
                                 ->columnSpanFull()
-                                ->downloadable
+                                ->downloadable()
                                 ->when(is_array($record->{$field}), function ($mediaUpload) {
                                     $mediaUpload->multiple();
                                 })
