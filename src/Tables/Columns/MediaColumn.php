@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Kirantimsina\FileManager\Tables\Columns;
 
 use Closure;
-use Filament\Tables\Actions\Action;
+use Filament\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Support\Collection;
 use Kirantimsina\FileManager\Facades\FileManager;
