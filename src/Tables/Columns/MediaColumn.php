@@ -90,9 +90,11 @@ abstract class MediaColumn
             ->limitedRemainingText()
             ->action(
                 Action::make($field)
-                    ->form(function ($record) use ($field) {
+                    ->schema(function ($record) use ($field) {
                         return [
-                            MediaUpload::make($field, uploadOriginal: true, convertToWebp: false)
+                            MediaUpload::make($field)
+                                ->uploadOriginal()
+                                ->convertToWebp(false)
                                 ->columnSpanFull()
                                 ->downloadable()
                                 ->when(is_array($record->{$field}), function ($mediaUpload) {

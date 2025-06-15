@@ -32,21 +32,49 @@ class MediaUpload extends FileUpload
     protected int $quality = 100;
 
     /**
-     * Custom "make()" that can receive extra arguments.
+     * Set whether to upload original or resize.
      */
-    public static function make(
-        string $name,
-        bool $uploadOriginal = true,
-        bool $convertToWebp = true,
-        int $quality = 100
-    ): static {
-        $static = parent::make($name);
+    public function uploadOriginal(bool $uploadOriginal = true): static
+    {
+        $this->uploadOriginal = $uploadOriginal;
 
-        $static->uploadOriginal = $uploadOriginal;
-        $static->convertToWebp = $convertToWebp;
-        $static->quality = $quality;
+        return $this;
+    }
 
-        return $static;
+    /**
+     * Set whether to convert images to WebP.
+     */
+    public function convertToWebp(bool $convertToWebp = true): static
+    {
+        $this->convertToWebp = $convertToWebp;
+
+        return $this;
+    }
+
+    /**
+     * Set the WebP quality.
+     */
+    public function quality(int $quality): static
+    {
+        $this->quality = $quality;
+
+        return $this;
+    }
+
+    /**
+     * Convenience method to disable original upload (enable resizing).
+     */
+    public function resize(): static
+    {
+        return $this->uploadOriginal(false);
+    }
+
+    /**
+     * Convenience method to disable WebP conversion.
+     */
+    public function keepOriginalFormat(): static
+    {
+        return $this->convertToWebp(false);
     }
 
     /**
