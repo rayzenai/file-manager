@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Kirantimsina\FileManager\Actions;
 
 use Closure;
+use Filament\Actions\Action;
 use Filament\Actions\Concerns\CanCustomizeProcess;
-use Filament\Tables\Actions\Action;
 
 class ViewMediaAction extends Action
 {
