@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Forms\Components;
 
+use App\Jobs\ResizeImages;
 use Exception;
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Support\Arr;
@@ -42,7 +43,7 @@ class MediaUpload extends FileUpload
      * Whether to track media metadata
      */
     protected bool $trackMetadata = true;
-    
+
     /**
      * Whether compression was used for the upload
      */
@@ -163,34 +164,34 @@ class MediaUpload extends FileUpload
 
             $directory = FileManagerService::getUploadDirectory(class_basename($model));
             $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
-            
+
             // Videos are handled normally
             if ($isVideo) {
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
                 $fullPath = "{$directory}/{$filename}";
                 $file->storeAs($directory, $filename, 's3');
-                
+
                 $this->createMetadata($model, $this->getName(), $fullPath, $file);
-                
+
                 return $fullPath;
             }
 
             // Check if we should use compression service
             $shouldUseCompression = $this->shouldUseCompression($file);
-            
+
             if ($shouldUseCompression) {
                 $fullPath = $this->handleCompressedUpload($file, $get, $model, $directory);
-                
+
                 // Dispatch resize job to create different sizes
                 if (class_exists('\App\Jobs\ResizeImages')) {
-                    \App\Jobs\ResizeImages::dispatch([$fullPath]);
+                    ResizeImages::dispatch([$fullPath]);
                 }
-                
+
                 return $fullPath;
             }
 
             // Regular image upload with potential WebP conversion
-            $extension = ($this->convertToWebp && !in_array($file->extension(), ['ico', 'svg', 'avif', 'webp']))
+            $extension = ($this->convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif', 'webp']))
                 ? 'webp'
                 : $file->extension();
 
@@ -198,7 +199,7 @@ class MediaUpload extends FileUpload
             $fullPath = "{$directory}/{$filename}";
 
             // If converting to webp, use Intervention
-            if ($this->convertToWebp && !in_array($file->extension(), ['ico', 'svg', 'avif', 'webp'])) {
+            if ($this->convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif', 'webp'])) {
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
                 $media = $img->toWebp($this->quality)->toFilePointer();
                 Storage::disk('s3')->put($fullPath, $media);
@@ -207,10 +208,10 @@ class MediaUpload extends FileUpload
             }
 
             $this->createMetadata($model, $this->getName(), $fullPath, $file);
-            
+
             // Dispatch resize job to create different sizes
             if (class_exists('\App\Jobs\ResizeImages')) {
-                \App\Jobs\ResizeImages::dispatch([$fullPath]);
+                ResizeImages::dispatch([$fullPath]);
             }
 
             return $fullPath;
@@ -245,17 +246,17 @@ class MediaUpload extends FileUpload
      */
     protected function shouldUseCompression(TemporaryUploadedFile $file): bool
     {
-        if (!$this->useCompression || !config('file-manager.compression.enabled')) {
+        if (! $this->useCompression || ! config('file-manager.compression.enabled')) {
             return false;
         }
 
-        if (!config('file-manager.compression.auto_compress')) {
+        if (! config('file-manager.compression.auto_compress')) {
             return false;
         }
 
         $fileSize = $file->getSize();
         $threshold = config('file-manager.compression.threshold', 500 * 1024);
-        
+
         return $fileSize > $threshold;
     }
 
@@ -268,8 +269,8 @@ class MediaUpload extends FileUpload
         $model,
         string $directory
     ): string {
-        $compressionService = new ImageCompressionService();
-        
+        $compressionService = new ImageCompressionService;
+
         // Always use webp for compressed images
         $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
         $fullPath = "{$directory}/{$filename}";
@@ -289,11 +290,11 @@ class MediaUpload extends FileUpload
         if ($result['success']) {
             // Mark that compression was used
             $this->compressionUsed = true;
-            
+
             // Create metadata with compression info
             if ($this->trackMetadata && config('file-manager.media_metadata.enabled') && $model) {
                 $metadata = $this->createMetadata($model, $this->getName(), $fullPath, $file);
-                
+
                 if ($metadata) {
                     $metadata->update([
                         'file_size' => $result['data']['compressed_size'] ?? $file->getSize(),
@@ -316,12 +317,12 @@ class MediaUpload extends FileUpload
         // Fallback to regular upload if compression fails
         $file->storeAs($directory, $filename, 's3');
         $this->createMetadata($model, $this->getName(), $fullPath, $file);
-        
+
         // Dispatch resize job to create different sizes
         if (class_exists('\App\Jobs\ResizeImages')) {
-            \App\Jobs\ResizeImages::dispatch([$fullPath]);
+            ResizeImages::dispatch([$fullPath]);
         }
-        
+
         return $fullPath;
     }
 
@@ -330,13 +331,13 @@ class MediaUpload extends FileUpload
      */
     protected function createMetadata($model, string $field, string $fullPath, TemporaryUploadedFile $file): ?MediaMetadata
     {
-        if (!$this->trackMetadata || !config('file-manager.media_metadata.enabled')) {
+        if (! $this->trackMetadata || ! config('file-manager.media_metadata.enabled')) {
             return null;
         }
-        
+
         // Skip metadata creation if model is not a valid instance with an ID
         // This happens during creation of new records
-        if (!$model || is_string($model) || !isset($model->id)) {
+        if (! $model || is_string($model) || ! isset($model->id)) {
             return null;
         }
 

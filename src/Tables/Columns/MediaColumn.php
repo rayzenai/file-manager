@@ -38,9 +38,10 @@ abstract class MediaColumn
                             if ($viewCountField) {
                                 return $record->viewPageUrl(field: $field, counter: $viewCountField);
                             }
+
                             return $record->viewPageUrl($field);
                         }
-                        
+
                         // Return the full image URL as fallback
                         return FileManager::getMediaPath($slug);
                     }
@@ -97,8 +98,8 @@ abstract class MediaColumn
             ->when($showMetadata && config('file-manager.media_metadata.enabled'), function (ImageColumn $column) use ($field) {
                 $column->tooltip(function ($record) use ($field) {
                     $metadata = static::getMetadataForField($record, $field);
-                    
-                    if (!$metadata) {
+
+                    if (! $metadata) {
                         return null;
                     }
 
@@ -198,7 +199,7 @@ abstract class MediaColumn
      */
     protected static function getMetadataForField($record, string $field): ?MediaMetadata
     {
-        if (!config('file-manager.media_metadata.enabled')) {
+        if (! config('file-manager.media_metadata.enabled')) {
             return null;
         }
 
@@ -214,13 +215,13 @@ abstract class MediaColumn
     protected static function formatBytes(int $bytes): string
     {
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        
+
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
-        
+
         $bytes /= pow(1024, $pow);
-        
+
         return round($bytes, 2) . ' ' . $units[$pow];
     }
 }
