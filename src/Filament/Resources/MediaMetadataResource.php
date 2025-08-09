@@ -245,16 +245,17 @@ class MediaMetadataResource extends Resource
                     ->color('gray')
                     ->visible(function (MediaMetadata $record): bool {
                         $resources = static::findResourcesForModel($record->mediable_type);
+
                         return count($resources) > 0;
                     })
                     ->action(function (MediaMetadata $record): void {
                         $resources = static::findResourcesForModel($record->mediable_type);
-                        
+
                         if (count($resources) === 1) {
                             // Single resource - navigate directly
                             $resource = $resources[0];
                             $url = null;
-                            
+
                             try {
                                 $url = $resource::getUrl('edit', ['record' => $record->mediable_id]);
                             } catch (\Exception $e) {
@@ -264,7 +265,7 @@ class MediaMetadataResource extends Resource
                                     $url = $resource::getUrl('index');
                                 }
                             }
-                            
+
                             if ($url) {
                                 redirect($url);
                             }
@@ -274,16 +275,16 @@ class MediaMetadataResource extends Resource
                     ->modalDescription(fn (MediaMetadata $record) => "Multiple resources found for {$record->mediable_type}")
                     ->form(function (MediaMetadata $record): array {
                         $resources = static::findResourcesForModel($record->mediable_type);
-                        
+
                         if (count($resources) <= 1) {
                             return [];
                         }
-                        
+
                         $options = [];
                         foreach ($resources as $resource) {
                             $resourceName = class_basename($resource);
                             $panelId = null;
-                            
+
                             // Try to identify which panel this resource belongs to
                             try {
                                 $url = $resource::getUrl('index');
@@ -297,12 +298,12 @@ class MediaMetadataResource extends Resource
                             } catch (\Exception $e) {
                                 // Ignore
                             }
-                            
+
                             $label = $resourceName;
                             if ($panelId) {
                                 $label .= " ({$panelId} Panel)";
                             }
-                            
+
                             // Try to get the URL for this specific record
                             try {
                                 $recordUrl = $resource::getUrl('edit', ['record' => $record->mediable_id]);
@@ -313,10 +314,10 @@ class MediaMetadataResource extends Resource
                                     $recordUrl = $resource::getUrl('index');
                                 }
                             }
-                            
+
                             $options[$recordUrl] = $label;
                         }
-                        
+
                         return [
                             Radio::make('resource_url')
                                 ->label('Select which resource to open')
@@ -326,7 +327,7 @@ class MediaMetadataResource extends Resource
                     })
                     ->modalSubmitActionLabel('Open')
                     ->action(function (MediaMetadata $record, array $data): void {
-                        if (!empty($data['resource_url'])) {
+                        if (! empty($data['resource_url'])) {
                             redirect($data['resource_url']);
                         }
                     }),
@@ -504,24 +505,24 @@ class MediaMetadataResource extends Resource
     {
         return parent::getEloquentQuery();
     }
-    
+
     /**
      * Find all Filament resources for a given model class
      */
     protected static function findResourcesForModel(string $modelClass): array
     {
         $foundResources = [];
-        
+
         // Get all registered resources from the current panel
         $resources = Filament::getResources();
-        
+
         // Look for resources that handle this model
         foreach ($resources as $resource) {
             if ($resource::getModel() === $modelClass) {
                 $foundResources[] = $resource;
             }
         }
-        
+
         // If not found in registered resources, try common naming conventions
         if (empty($foundResources)) {
             $modelName = class_basename($modelClass);
@@ -529,7 +530,7 @@ class MediaMetadataResource extends Resource
                 "App\\Filament\\Resources\\{$modelName}Resource",
                 "App\\Filament\\Resources\\{$modelName}\\{$modelName}Resource",
             ];
-            
+
             foreach ($possibleResources as $resourceClass) {
                 if (class_exists($resourceClass) && method_exists($resourceClass, 'getModel')) {
                     if ($resourceClass::getModel() === $modelClass) {
@@ -538,7 +539,7 @@ class MediaMetadataResource extends Resource
                 }
             }
         }
-        
+
         return $foundResources;
     }
 }
