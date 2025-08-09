@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
+use Kirantimsina\FileManager\Models\MediaMetadata;
+use Kirantimsina\FileManager\Services\ImageCompressionService;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MediaUpload extends FileUpload
@@ -30,6 +32,21 @@ class MediaUpload extends FileUpload
      * Quality to use if converting to WebP.
      */
     protected int $quality = 100;
+
+    /**
+     * Whether to use compression service
+     */
+    protected bool $useCompression = true;
+
+    /**
+     * Whether to track media metadata
+     */
+    protected bool $trackMetadata = true;
+    
+    /**
+     * Whether compression was used for the upload
+     */
+    protected bool $compressionUsed = false;
 
     /**
      * Set whether to upload original or resize.
@@ -75,6 +92,26 @@ class MediaUpload extends FileUpload
     public function keepOriginalFormat(): static
     {
         return $this->convertToWebp(false);
+    }
+
+    /**
+     * Set whether to use compression service
+     */
+    public function useCompression(bool $useCompression = true): static
+    {
+        $this->useCompression = $useCompression;
+
+        return $this;
+    }
+
+    /**
+     * Set whether to track media metadata
+     */
+    public function trackMetadata(bool $trackMetadata = true): static
+    {
+        $this->trackMetadata = $trackMetadata;
+
+        return $this;
     }
 
     /**
@@ -124,32 +161,59 @@ class MediaUpload extends FileUpload
                 throw new Exception('Please set the default disk to s3 to use this package.');
             }
 
-            // Deduce the directory from your service
             $directory = FileManagerService::getUploadDirectory(class_basename($model));
             $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
+            
+            // Videos are handled normally
+            if ($isVideo) {
+                $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
+                $fullPath = "{$directory}/{$filename}";
+                $file->storeAs($directory, $filename, 's3');
+                
+                $this->createMetadata($model, $this->getName(), $fullPath, $file);
+                
+                return $fullPath;
+            }
 
-            // If converting to webp (and NOT a video), override the extension
-            $extension = ($this->convertToWebp && ! $isVideo)
+            // Check if we should use compression service
+            $shouldUseCompression = $this->shouldUseCompression($file);
+            
+            if ($shouldUseCompression) {
+                $fullPath = $this->handleCompressedUpload($file, $get, $model, $directory);
+                
+                // Dispatch resize job to create different sizes
+                if (class_exists('\App\Jobs\ResizeImages')) {
+                    \App\Jobs\ResizeImages::dispatch([$fullPath]);
+                }
+                
+                return $fullPath;
+            }
+
+            // Regular image upload with potential WebP conversion
+            $extension = ($this->convertToWebp && !in_array($file->extension(), ['ico', 'svg', 'avif', 'webp']))
                 ? 'webp'
                 : $file->extension();
 
-            $filename = (string) FileManagerService::filename(
-                $file,
-                static::tag($get),
-                $extension
-            );
+            $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
+            $fullPath = "{$directory}/{$filename}";
 
-            // If an image we can convert, do so. Otherwise, just store the file
-            if ($this->convertToWebp && ! $isVideo && ! in_array($file->extension(), ['ico', 'svg', 'avif', 'webp'])) {
+            // If converting to webp, use Intervention
+            if ($this->convertToWebp && !in_array($file->extension(), ['ico', 'svg', 'avif', 'webp'])) {
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
                 $media = $img->toWebp($this->quality)->toFilePointer();
-                Storage::disk('s3')->put("{$directory}/{$filename}", $media);
+                Storage::disk('s3')->put($fullPath, $media);
             } else {
-                // Just store any file that doesn't need special image handling
                 $file->storeAs($directory, $filename, 's3');
             }
 
-            return "{$directory}/{$filename}";
+            $this->createMetadata($model, $this->getName(), $fullPath, $file);
+            
+            // Dispatch resize job to create different sizes
+            if (class_exists('\App\Jobs\ResizeImages')) {
+                \App\Jobs\ResizeImages::dispatch([$fullPath]);
+            }
+
+            return $fullPath;
         });
 
         // Determine the stored name for the file
@@ -174,5 +238,128 @@ class MediaUpload extends FileUpload
         }
 
         return $get('name');
+    }
+
+    /**
+     * Check if we should use compression service
+     */
+    protected function shouldUseCompression(TemporaryUploadedFile $file): bool
+    {
+        if (!$this->useCompression || !config('file-manager.compression.enabled')) {
+            return false;
+        }
+
+        if (!config('file-manager.compression.auto_compress')) {
+            return false;
+        }
+
+        $fileSize = $file->getSize();
+        $threshold = config('file-manager.compression.threshold', 500 * 1024);
+        
+        return $fileSize > $threshold;
+    }
+
+    /**
+     * Handle compressed upload using ImageCompressionService
+     */
+    protected function handleCompressedUpload(
+        TemporaryUploadedFile $file,
+        $get,
+        $model,
+        string $directory
+    ): string {
+        $compressionService = new ImageCompressionService();
+        
+        // Always use webp for compressed images
+        $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+        $fullPath = "{$directory}/{$filename}";
+
+        // Compress the image
+        $result = $compressionService->compressAndSave(
+            $file->getRealPath(),
+            $fullPath,
+            config('file-manager.compression.quality'),
+            config('file-manager.compression.height'),
+            config('file-manager.compression.width'),
+            config('file-manager.compression.format'),
+            config('file-manager.compression.mode'),
+            's3'
+        );
+
+        if ($result['success']) {
+            // Mark that compression was used
+            $this->compressionUsed = true;
+            
+            // Create metadata with compression info
+            if ($this->trackMetadata && config('file-manager.media_metadata.enabled') && $model) {
+                $metadata = $this->createMetadata($model, $this->getName(), $fullPath, $file);
+                
+                if ($metadata) {
+                    $metadata->update([
+                        'file_size' => $result['data']['compressed_size'] ?? $file->getSize(),
+                        'metadata' => array_merge($metadata->metadata ?? [], [
+                            'compression' => [
+                                'original_size' => $result['data']['original_size'] ?? null,
+                                'compressed_size' => $result['data']['compressed_size'] ?? null,
+                                'compression_ratio' => $result['data']['compression_ratio'] ?? null,
+                                'method' => config('file-manager.compression.method'),
+                                'compressed_at' => now()->toIso8601String(),
+                            ],
+                        ]),
+                    ]);
+                }
+            }
+
+            return $fullPath;
+        }
+
+        // Fallback to regular upload if compression fails
+        $file->storeAs($directory, $filename, 's3');
+        $this->createMetadata($model, $this->getName(), $fullPath, $file);
+        
+        // Dispatch resize job to create different sizes
+        if (class_exists('\App\Jobs\ResizeImages')) {
+            \App\Jobs\ResizeImages::dispatch([$fullPath]);
+        }
+        
+        return $fullPath;
+    }
+
+    /**
+     * Create media metadata
+     */
+    protected function createMetadata($model, string $field, string $fullPath, TemporaryUploadedFile $file): ?MediaMetadata
+    {
+        if (!$this->trackMetadata || !config('file-manager.media_metadata.enabled')) {
+            return null;
+        }
+        
+        // Skip metadata creation if model is not a valid instance with an ID
+        // This happens during creation of new records
+        if (!$model || is_string($model) || !isset($model->id)) {
+            return null;
+        }
+
+        $fileSize = $file->getSize();
+        $mimeType = $file->getMimeType();
+        $metadata = [
+            'uploaded_at' => now()->toIso8601String(),
+            'uploaded_via' => 'file-manager',
+        ];
+
+        // Add compression info if available
+        if ($this->compressionUsed) {
+            $metadata['compression'] = [
+                'method' => config('file-manager.compression.method', 'gd'),
+                'quality' => $this->quality ?? config('file-manager.compression.quality', 85),
+            ];
+        }
+
+        return MediaMetadata::updateOrCreateFor($model, $field, [
+            'file_name' => $fullPath,
+            'file_size' => $fileSize,
+            'mime_type' => $mimeType,
+            'metadata' => $metadata,
+        ]);
     }
 }

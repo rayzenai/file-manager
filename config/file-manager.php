@@ -12,6 +12,79 @@ return [
     // The ModelName => path syntax is used to store the uploaded files in the respective folder
     'model' => [
         'User' => 'users',
-        'Mockup' => 'mockups'
+        'Mockup' => 'mockups',
+        'Product' => 'products',
+    ],
+
+    /**
+     * Image Compression Settings
+     */
+    'compression' => [
+        'enabled' => env('FILE_MANAGER_COMPRESSION_ENABLED', true),
+        
+        // Compression method: 'gd' or 'api'
+        'method' => env('FILE_MANAGER_COMPRESSION_METHOD', 'gd'),
+        
+        // Automatically compress on upload
+        'auto_compress' => env('FILE_MANAGER_AUTO_COMPRESS', true),
+        
+        // Compression quality (1-100)
+        'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85),
+        
+        // Output format: webp, jpeg, png, avif
+        'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'),
+        
+        // Resize mode: contain, crop, cover
+        'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'),
+        
+        // Default dimensions
+        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 1080),
+        'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
+        
+        // Files larger than this will be compressed (in bytes)
+        'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 500 * 1024), // 500KB
+        
+        // API settings (if using external compression API)
+        'api' => [
+            'url' => env('FILE_MANAGER_COMPRESSION_API_URL', ''),
+            'token' => env('FILE_MANAGER_COMPRESSION_API_TOKEN', ''),
+            'timeout' => env('FILE_MANAGER_COMPRESSION_API_TIMEOUT', 30),
+        ],
+    ],
+
+    /**
+     * Media Metadata Settings
+     */
+    'media_metadata' => [
+        'enabled' => env('FILE_MANAGER_METADATA_ENABLED', true),
+        
+        // Track file size
+        'track_file_size' => env('FILE_MANAGER_TRACK_FILE_SIZE', true),
+        
+        // Track image dimensions
+        'track_dimensions' => env('FILE_MANAGER_TRACK_DIMENSIONS', true),
+        
+        // Track MIME type
+        'track_mime_type' => env('FILE_MANAGER_TRACK_MIME_TYPE', true),
+        
+        // Model to use for metadata
+        'model' => \Kirantimsina\FileManager\Models\MediaMetadata::class,
+    ],
+
+    /**
+     * Image Resize Settings
+     * Define the sizes that should be created when an image is uploaded
+     * Format: 'size_name' => height in pixels
+     * The width will be calculated automatically to maintain aspect ratio
+     */
+    'image_sizes' => [
+        'icon' => 64,       // 64px height for small icons
+        'small' => 120,     // 120px height for small thumbnails
+        'thumb' => 240,     // 240px height for thumbnails
+        'card' => 360,      // 360px height for card images
+        'medium' => 480,    // 480px height for medium images
+        'large' => 720,     // 720px height for large images
+        'full' => 1080,     // 1080px height for full size
+        'ultra' => 2160,    // 2160px height for ultra HD
     ],
 ];
