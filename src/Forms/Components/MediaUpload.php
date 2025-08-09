@@ -47,6 +47,11 @@ class MediaUpload extends FileUpload
      * Whether compression was used for the upload
      */
     protected bool $compressionUsed = false;
+    
+    /**
+     * Whether to process image resizing synchronously during upload
+     */
+    protected ?bool $processResizingSync = null;
 
     /**
      * Set whether to upload original or resize.
@@ -110,6 +115,16 @@ class MediaUpload extends FileUpload
     public function trackMetadata(bool $trackMetadata = true): static
     {
         $this->trackMetadata = $trackMetadata;
+
+        return $this;
+    }
+    
+    /**
+     * Set whether to process image resizing synchronously during upload
+     */
+    public function processResizingSync(bool $processResizingSync = true): static
+    {
+        $this->processResizingSync = $processResizingSync;
 
         return $this;
     }
@@ -181,10 +196,8 @@ class MediaUpload extends FileUpload
             if ($shouldUseCompression) {
                 $fullPath = $this->handleCompressedUpload($file, $get, $model, $directory);
                 
-                // Dispatch resize job to create different sizes
-                if (class_exists('\App\Jobs\ResizeImages')) {
-                    \App\Jobs\ResizeImages::dispatch([$fullPath]);
-                }
+                // Handle image resizing
+                $this->handleImageResizing($fullPath);
                 
                 return $fullPath;
             }
@@ -208,10 +221,8 @@ class MediaUpload extends FileUpload
 
             $this->createMetadata($model, $this->getName(), $fullPath, $file);
             
-            // Dispatch resize job to create different sizes
-            if (class_exists('\App\Jobs\ResizeImages')) {
-                \App\Jobs\ResizeImages::dispatch([$fullPath]);
-            }
+            // Handle image resizing
+            $this->handleImageResizing($fullPath);
 
             return $fullPath;
         });
@@ -317,14 +328,39 @@ class MediaUpload extends FileUpload
         $file->storeAs($directory, $filename, 's3');
         $this->createMetadata($model, $this->getName(), $fullPath, $file);
         
-        // Dispatch resize job to create different sizes
-        if (class_exists('\App\Jobs\ResizeImages')) {
-            \App\Jobs\ResizeImages::dispatch([$fullPath]);
-        }
+        // Handle image resizing
+        $this->handleImageResizing($fullPath);
         
         return $fullPath;
     }
 
+    /**
+     * Handle image resizing either synchronously or asynchronously
+     */
+    protected function handleImageResizing(string $fullPath): void
+    {
+        // Use config as default if not explicitly set
+        $shouldProcessSync = $this->processResizingSync ?? config('file-manager.image_processing.sync_resize', false);
+        
+        if ($shouldProcessSync) {
+            // Process synchronously - this runs immediately during upload
+            try {
+                // Use the package's resize job
+                $job = new \Kirantimsina\FileManager\Jobs\ResizeImages([$fullPath]);
+                $job->handle();
+            } catch (\Exception $e) {
+                // Log error but don't fail the upload
+                \Log::error('Failed to resize image synchronously: ' . $e->getMessage());
+                
+                // Fallback to async processing
+                \Kirantimsina\FileManager\Jobs\ResizeImages::dispatch([$fullPath]);
+            }
+        } else {
+            // Process asynchronously - this queues the job
+            \Kirantimsina\FileManager\Jobs\ResizeImages::dispatch([$fullPath]);
+        }
+    }
+    
     /**
      * Create media metadata
      */

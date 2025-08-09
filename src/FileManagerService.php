@@ -20,13 +20,21 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 
 class FileManagerService
 {
-    const SIZE_ARR = [
-        'ultra' => 1920,
-        'full' => 1080,
-        'card' => 640,
-        'thumb' => 360,
-        'icon' => 120,
-    ];
+    /**
+     * Get image sizes from config with fallback defaults
+     * 
+     * @return array
+     */
+    public static function getImageSizes(): array
+    {
+        return config('file-manager.image_sizes', [
+            'icon' => 120,
+            'thumb' => 360,
+            'card' => 640,
+            'full' => 1080,
+            'ultra' => 1920,
+        ]);
+    }
 
     public static function uploadImages($model, $files, $tag = null, $fit = false, $resize = true)
     {
@@ -159,7 +167,10 @@ class FileManagerService
 
             }
 
-            foreach (static::SIZE_ARR as $key => $val) {
+            // Get sizes from config
+            $sizes = static::getImageSizes();
+            
+            foreach ($sizes as $key => $val) {
                 $val = intval($val);
                 if ($fit) {
                     $img->coverDown(width: $val, height: $val);
@@ -225,7 +236,11 @@ class FileManagerService
 
         $name = Arr::last(explode('/', $filename));
         $model = Arr::first(explode('/', $filename));
-        foreach (static::SIZE_ARR as $key => $val) {
+        
+        // Get sizes from config
+        $sizes = static::getImageSizes();
+        
+        foreach ($sizes as $key => $val) {
             $s3->delete("{$model}/{$key}/{$name}");
         }
     }
