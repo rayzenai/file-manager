@@ -12,7 +12,6 @@ use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
-use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
