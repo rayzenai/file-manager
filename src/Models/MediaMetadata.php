@@ -48,12 +48,12 @@ class MediaMetadata extends Model
             // This happens during creation before the model is saved
             return new self($data);
         }
-        
+
         // Ensure we have a valid model with an ID
-        if (!$model || !isset($model->id)) {
+        if (! $model || ! isset($model->id)) {
             return new self($data);
         }
-        
+
         return self::updateOrCreate(
             [
                 'mediable_type' => get_class($model),
@@ -70,10 +70,10 @@ class MediaMetadata extends Model
     public static function getFor($model, string $field): ?self
     {
         // Handle both model instances and class name strings
-        if (is_string($model) || !$model || !isset($model->id)) {
+        if (is_string($model) || ! $model || ! isset($model->id)) {
             return null;
         }
-        
+
         return self::where('mediable_type', get_class($model))
             ->where('mediable_id', $model->id)
             ->where('mediable_field', $field)
@@ -87,13 +87,13 @@ class MediaMetadata extends Model
     {
         $bytes = $this->file_size;
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        
+
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
-        
+
         $bytes /= pow(1024, $pow);
-        
+
         return round($bytes, 2) . ' ' . $units[$pow];
     }
 
@@ -114,7 +114,7 @@ class MediaMetadata extends Model
             if ($mediaMetadata->isDirty('file_size')) {
                 $oldSize = $mediaMetadata->getOriginal('file_size');
                 $newSize = $mediaMetadata->file_size;
-                
+
                 if ($oldSize > 500 * 1024 || $newSize > 500 * 1024) {
                     static::clearLargeFilesCountCache();
                 }

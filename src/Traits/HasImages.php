@@ -37,9 +37,7 @@ trait HasImages
                 if ($model->{$field}) {
                     $newFilename = $model->{$field};
                     if (is_array($newFilename)) {
-                        foreach ($newFilename as $filename) {
-                            ResizeImages::dispatch([$filename]);
-                        }
+                        ResizeImages::dispatch($newFilename);
                     } else {
                         ResizeImages::dispatch([$newFilename]);
                     }
@@ -64,20 +62,26 @@ trait HasImages
                     $oldFilename = $model->getOriginal($field);
                     $newFilename = $model->{$field};
 
-                    // Handle resizing new images
-                    if (is_array($newFilename)) {
-                        foreach ($newFilename as $filename) {
-                            ResizeImages::dispatch([$filename]);
+                    // Handle resizing ONLY truly new images
+                    if (is_array($newFilename) && is_array($oldFilename)) {
+                        // Find images that are in new but not in old (newly added images)
+                        $newlyAdded = array_diff($newFilename, $oldFilename);
+                        if (!empty($newlyAdded)) {
+                            ResizeImages::dispatch(array_values($newlyAdded));
                         }
-                    } elseif ($newFilename) {
+                    } elseif (is_array($newFilename) && !$oldFilename) {
+                        // All images are new if there was no old value
+                        ResizeImages::dispatch($newFilename);
+                    } elseif ($newFilename && $newFilename !== $oldFilename) {
+                        // Single new image that's different from the old one
                         ResizeImages::dispatch([$newFilename]);
                     }
 
                     // Handle deleting old images
                     if (is_array($oldFilename)) {
                         $toDelete = array_diff($oldFilename, (array) $newFilename);
-                        foreach ($toDelete as $filename) {
-                            DeleteImages::dispatch([$filename]);
+                        if (!empty($toDelete)) {
+                            DeleteImages::dispatch(array_values($toDelete));
                         }
                     } elseif ($oldFilename && $oldFilename !== $newFilename) {
                         // Only delete if the old file is different from the new one

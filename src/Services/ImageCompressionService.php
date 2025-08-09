@@ -5,18 +5,23 @@ namespace Kirantimsina\FileManager\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Throwable;
 
 class ImageCompressionService
 {
     private string $compressionMethod;
+
     private string $apiUrl;
+
     private string $apiToken;
+
     private int $defaultQuality;
+
     private string $defaultFormat;
+
     private string $defaultMode;
+
     private int $timeout;
 
     public function __construct()
@@ -45,7 +50,7 @@ class ImageCompressionService
         $format = $format ?? $this->defaultFormat;
         $mode = $mode ?? $this->defaultMode;
 
-        if ($this->compressionMethod === 'api' && !empty($this->apiUrl)) {
+        if ($this->compressionMethod === 'api' && ! empty($this->apiUrl)) {
             return $this->compressViaApi($image, $quality, $height, $width, $format, $mode);
         }
 
@@ -65,15 +70,15 @@ class ImageCompressionService
     ): array {
         try {
             $fileContent = $this->getFileContent($image);
-            if (!$fileContent['success']) {
+            if (! $fileContent['success']) {
                 return $fileContent;
             }
 
             $originalSize = strlen($fileContent['data']['content']);
-            
+
             // Use Intervention Image with GD
             $img = ImageManager::gd()->read($fileContent['data']['content']);
-            
+
             // Resize if dimensions provided
             if ($height || $width) {
                 if ($mode === 'contain') {
@@ -143,7 +148,7 @@ class ImageCompressionService
     ): array {
         try {
             $fileContent = $this->getFileContent($image);
-            if (!$fileContent['success']) {
+            if (! $fileContent['success']) {
                 return $fileContent;
             }
 
@@ -174,7 +179,7 @@ class ImageCompressionService
                 )
                 ->post($url);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 // Fallback to GD if API fails
                 return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
             }
@@ -219,7 +224,7 @@ class ImageCompressionService
         try {
             $result = $this->compress($image, $quality, $height, $width, $format, $mode);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 return $result;
             }
 
@@ -229,7 +234,7 @@ class ImageCompressionService
                 'public'
             );
 
-            if (!$saved) {
+            if (! $saved) {
                 return [
                     'success' => false,
                     'message' => 'Failed to save compressed image',
