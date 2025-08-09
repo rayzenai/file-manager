@@ -6,6 +6,8 @@ namespace Kirantimsina\FileManager\Filament\Resources;
 
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select as FormSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle as FormToggle;
@@ -157,8 +159,7 @@ class MediaMetadataResource extends Resource
                 TextColumn::make('mediable_id')
                     ->label('Model ID')
                     ->sortable()
-                    ->searchable()
-                    ->copyable(),
+                    ->searchable(),
                 TextColumn::make('mediable_field')
                     ->label('Field')
                     ->searchable()
@@ -238,6 +239,97 @@ class MediaMetadataResource extends Resource
             ], layout: FiltersLayout::AboveContent)
             ->recordActions([
                 ViewAction::make(),
+                Action::make('open_in_panel')
+                    ->label('Open in Panel')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('gray')
+                    ->visible(function (MediaMetadata $record): bool {
+                        $resources = static::findResourcesForModel($record->mediable_type);
+                        return count($resources) > 0;
+                    })
+                    ->action(function (MediaMetadata $record): void {
+                        $resources = static::findResourcesForModel($record->mediable_type);
+                        
+                        if (count($resources) === 1) {
+                            // Single resource - navigate directly
+                            $resource = $resources[0];
+                            $url = null;
+                            
+                            try {
+                                $url = $resource::getUrl('edit', ['record' => $record->mediable_id]);
+                            } catch (\Exception $e) {
+                                try {
+                                    $url = $resource::getUrl('view', ['record' => $record->mediable_id]);
+                                } catch (\Exception $e) {
+                                    $url = $resource::getUrl('index');
+                                }
+                            }
+                            
+                            if ($url) {
+                                redirect($url);
+                            }
+                        }
+                    })
+                    ->modalHeading('Select Resource')
+                    ->modalDescription(fn (MediaMetadata $record) => "Multiple resources found for {$record->mediable_type}")
+                    ->form(function (MediaMetadata $record): array {
+                        $resources = static::findResourcesForModel($record->mediable_type);
+                        
+                        if (count($resources) <= 1) {
+                            return [];
+                        }
+                        
+                        $options = [];
+                        foreach ($resources as $resource) {
+                            $resourceName = class_basename($resource);
+                            $panelId = null;
+                            
+                            // Try to identify which panel this resource belongs to
+                            try {
+                                $url = $resource::getUrl('index');
+                                if (str_contains($url, '/admin/')) {
+                                    $panelId = 'Admin';
+                                } elseif (str_contains($url, '/baker/')) {
+                                    $panelId = 'Baker';
+                                } elseif (str_contains($url, '/partner/')) {
+                                    $panelId = 'Partner';
+                                }
+                            } catch (\Exception $e) {
+                                // Ignore
+                            }
+                            
+                            $label = $resourceName;
+                            if ($panelId) {
+                                $label .= " ({$panelId} Panel)";
+                            }
+                            
+                            // Try to get the URL for this specific record
+                            try {
+                                $recordUrl = $resource::getUrl('edit', ['record' => $record->mediable_id]);
+                            } catch (\Exception $e) {
+                                try {
+                                    $recordUrl = $resource::getUrl('view', ['record' => $record->mediable_id]);
+                                } catch (\Exception $e) {
+                                    $recordUrl = $resource::getUrl('index');
+                                }
+                            }
+                            
+                            $options[$recordUrl] = $label;
+                        }
+                        
+                        return [
+                            Radio::make('resource_url')
+                                ->label('Select which resource to open')
+                                ->options($options)
+                                ->required(),
+                        ];
+                    })
+                    ->modalSubmitActionLabel('Open')
+                    ->action(function (MediaMetadata $record, array $data): void {
+                        if (!empty($data['resource_url'])) {
+                            redirect($data['resource_url']);
+                        }
+                    }),
                 Action::make('resize')
                     ->label('Resize')
                     ->icon('heroicon-o-arrows-pointing-out')
@@ -411,5 +503,42 @@ class MediaMetadataResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery();
+    }
+    
+    /**
+     * Find all Filament resources for a given model class
+     */
+    protected static function findResourcesForModel(string $modelClass): array
+    {
+        $foundResources = [];
+        
+        // Get all registered resources from the current panel
+        $resources = Filament::getResources();
+        
+        // Look for resources that handle this model
+        foreach ($resources as $resource) {
+            if ($resource::getModel() === $modelClass) {
+                $foundResources[] = $resource;
+            }
+        }
+        
+        // If not found in registered resources, try common naming conventions
+        if (empty($foundResources)) {
+            $modelName = class_basename($modelClass);
+            $possibleResources = [
+                "App\\Filament\\Resources\\{$modelName}Resource",
+                "App\\Filament\\Resources\\{$modelName}\\{$modelName}Resource",
+            ];
+            
+            foreach ($possibleResources as $resourceClass) {
+                if (class_exists($resourceClass) && method_exists($resourceClass, 'getModel')) {
+                    if ($resourceClass::getModel() === $modelClass) {
+                        $foundResources[] = $resourceClass;
+                    }
+                }
+            }
+        }
+        
+        return $foundResources;
     }
 }
