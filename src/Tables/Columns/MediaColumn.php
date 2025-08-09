@@ -10,6 +10,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Support\Collection;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\Forms\Components\MediaUpload;
+use Kirantimsina\FileManager\Models\MediaMetadata;
 
 // TODO: This works with Image type only for now
 abstract class MediaColumn
@@ -21,7 +22,8 @@ abstract class MediaColumn
         ?string $modalSize = null, // null means full size
         string $label = 'Image',
         string|Closure $heading = '',
-        string $viewCountField = ''
+        string $viewCountField = '',
+        bool $showMetadata = false
     ): ImageColumn {
         return ImageColumn::make($field)->label($label)
             ->when(! $showInModal, function (ImageColumn $column) use ($field, $viewCountField) {
@@ -31,12 +33,17 @@ abstract class MediaColumn
                     $slug = $images[0] ?? null;
 
                     if ($slug) {
-                        if ($viewCountField) {
+                        // Check if viewPageUrl method exists on the model
+                        if (method_exists($record, 'viewPageUrl')) {
+                            if ($viewCountField) {
+                                return $record->viewPageUrl(field: $field, counter: $viewCountField);
+                            }
 
-                            return $record->viewPageUrl(field: $field, counter: $viewCountField);
+                            return $record->viewPageUrl($field);
                         }
 
-                        return $record->viewPageUrl($field);
+                        // Return the full image URL as fallback
+                        return FileManager::getMediaPath($slug);
                     }
 
                     return '#';
@@ -88,6 +95,20 @@ abstract class MediaColumn
 
             ->stacked()
             ->limitedRemainingText()
+            ->when($showMetadata && config('file-manager.media_metadata.enabled'), function (ImageColumn $column) use ($field) {
+                $column->tooltip(function ($record) use ($field) {
+                    $metadata = static::getMetadataForField($record, $field);
+
+                    if (! $metadata) {
+                        return null;
+                    }
+
+                    $size = static::formatBytes($metadata->file_size);
+                    $mimeType = $metadata->mime_type ?? 'Unknown type';
+
+                    return "Size: {$size} | Type: {$mimeType}";
+                });
+            })
             ->action(
                 Action::make($field)
                     ->schema(function ($record) use ($field) {
@@ -171,5 +192,36 @@ abstract class MediaColumn
         }
 
         return $temp;
+    }
+
+    /**
+     * Get metadata for a field
+     */
+    protected static function getMetadataForField($record, string $field): ?MediaMetadata
+    {
+        if (! config('file-manager.media_metadata.enabled')) {
+            return null;
+        }
+
+        return MediaMetadata::where('mediable_type', get_class($record))
+            ->where('mediable_id', $record->id)
+            ->where('mediable_field', $field)
+            ->first();
+    }
+
+    /**
+     * Format bytes to human readable
+     */
+    protected static function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+
+        $bytes /= pow(1024, $pow);
+
+        return round($bytes, 2) . ' ' . $units[$pow];
     }
 }

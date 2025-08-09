@@ -20,6 +20,7 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->name('file-manager')
             ->hasConfigFile()
             ->hasRoute('web')
-            ->hasViews();
+            ->hasViews()
+            ->hasMigration('2025_01_09_000001_create_media_metadata_table');
     }
 }

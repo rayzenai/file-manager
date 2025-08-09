@@ -20,13 +20,19 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 
 class FileManagerService
 {
-    const SIZE_ARR = [
-        'ultra' => 1920,
-        'full' => 1080,
-        'card' => 640,
-        'thumb' => 360,
-        'icon' => 120,
-    ];
+    /**
+     * Get image sizes from config with fallback defaults
+     */
+    public static function getImageSizes(): array
+    {
+        return config('file-manager.image_sizes', [
+            'icon' => 120,
+            'thumb' => 360,
+            'card' => 640,
+            'full' => 1080,
+            'ultra' => 1920,
+        ]);
+    }
 
     public static function uploadImages($model, $files, $tag = null, $fit = false, $resize = true)
     {
@@ -159,7 +165,10 @@ class FileManagerService
 
             }
 
-            foreach (static::SIZE_ARR as $key => $val) {
+            // Get sizes from config
+            $sizes = static::getImageSizes();
+
+            foreach ($sizes as $key => $val) {
                 $val = intval($val);
                 if ($fit) {
                     $img->coverDown(width: $val, height: $val);
@@ -197,16 +206,22 @@ class FileManagerService
 
     public static function moveTempImage($model, $tempFile)
     {
+        $newFile = static::moveTempImageWithoutResize($model, $tempFile);
 
+        if ($newFile) {
+            ResizeImages::dispatch([$newFile]);
+        }
+
+        return $newFile;
+    }
+
+    public static function moveTempImageWithoutResize($model, $tempFile)
+    {
         $path = static::getUploadDirectory($model);
 
         $newFile = $path . '/' . Arr::last(explode('/', $tempFile));
 
         $status = Storage::disk()->move($tempFile, $newFile);
-
-        if ($status) {
-            ResizeImages::dispatch([$newFile]);
-        }
 
         return $status ? $newFile : null;
     }
@@ -225,7 +240,11 @@ class FileManagerService
 
         $name = Arr::last(explode('/', $filename));
         $model = Arr::first(explode('/', $filename));
-        foreach (static::SIZE_ARR as $key => $val) {
+
+        // Get sizes from config
+        $sizes = static::getImageSizes();
+
+        foreach ($sizes as $key => $val) {
             $s3->delete("{$model}/{$key}/{$name}");
         }
     }
@@ -263,5 +282,52 @@ class FileManagerService
         Storage::disk()->move('temp/' . $filename, $to . $filename);
 
         return true;
+    }
+
+    /**
+     * Get the main media URL with trailing slash
+     */
+    public static function mainMediaUrl(): string
+    {
+        $path = config('file-manager.cdn');
+
+        if (Str::endsWith($path, '/')) {
+            return $path;
+        }
+
+        return "{$path}/";
+    }
+
+    /**
+     * Get the full media path for a file with optional size
+     */
+    public static function getMediaPath($filename = null, $size = null): ?string
+    {
+        if ($filename == null) {
+            return null;
+        }
+
+        $main = static::mainMediaUrl();
+
+        // If this is a gif, we have not resized it so send the main file
+        $size = Str::endsWith($filename, '.gif') ? null : $size;
+
+        if (! $size) {
+            return "{$main}{$filename}";
+        }
+
+        $exploded = explode('/', $filename);
+        $filename = Arr::last($exploded);
+        $model = Arr::first($exploded);
+
+        return "{$main}{$model}/{$size}/{$filename}";
+    }
+
+    /**
+     * Get file extension from filename
+     */
+    public static function getExtensionFromName(string $filename): string
+    {
+        return Arr::last(explode('.', $filename));
     }
 }
