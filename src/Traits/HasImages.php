@@ -66,10 +66,10 @@ trait HasImages
                     if (is_array($newFilename) && is_array($oldFilename)) {
                         // Find images that are in new but not in old (newly added images)
                         $newlyAdded = array_diff($newFilename, $oldFilename);
-                        if (!empty($newlyAdded)) {
+                        if (! empty($newlyAdded)) {
                             ResizeImages::dispatch(array_values($newlyAdded));
                         }
-                    } elseif (is_array($newFilename) && !$oldFilename) {
+                    } elseif (is_array($newFilename) && ! $oldFilename) {
                         // All images are new if there was no old value
                         ResizeImages::dispatch($newFilename);
                     } elseif ($newFilename && $newFilename !== $oldFilename) {
@@ -80,7 +80,7 @@ trait HasImages
                     // Handle deleting old images
                     if (is_array($oldFilename)) {
                         $toDelete = array_diff($oldFilename, (array) $newFilename);
-                        if (!empty($toDelete)) {
+                        if (! empty($toDelete)) {
                             DeleteImages::dispatch(array_values($toDelete));
                         }
                     } elseif ($oldFilename && $oldFilename !== $newFilename) {

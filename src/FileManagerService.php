@@ -22,8 +22,6 @@ class FileManagerService
 {
     /**
      * Get image sizes from config with fallback defaults
-     * 
-     * @return array
      */
     public static function getImageSizes(): array
     {
@@ -169,7 +167,7 @@ class FileManagerService
 
             // Get sizes from config
             $sizes = static::getImageSizes();
-            
+
             foreach ($sizes as $key => $val) {
                 $val = intval($val);
                 if ($fit) {
@@ -236,10 +234,10 @@ class FileManagerService
 
         $name = Arr::last(explode('/', $filename));
         $model = Arr::first(explode('/', $filename));
-        
+
         // Get sizes from config
         $sizes = static::getImageSizes();
-        
+
         foreach ($sizes as $key => $val) {
             $s3->delete("{$model}/{$key}/{$name}");
         }
