@@ -47,7 +47,6 @@ class MediaUpload extends FileUpload
      * Whether compression was used for the upload
      */
     protected bool $compressionUsed = false;
-    
 
     /**
      * Set whether to upload original or resize.
@@ -114,7 +113,6 @@ class MediaUpload extends FileUpload
 
         return $this;
     }
-    
 
     /**
      * This is called automatically by Filament when the component is constructed.
@@ -306,7 +304,7 @@ class MediaUpload extends FileUpload
         // Fallback to regular upload if compression fails
         $file->storeAs($directory, $filename, 's3');
         $this->createMetadata($model, $this->getName(), $fullPath, $file);
-        
+
         return $fullPath;
     }
 
