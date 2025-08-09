@@ -207,7 +207,7 @@ class FileManagerService
     public static function moveTempImage($model, $tempFile)
     {
         $newFile = static::moveTempImageWithoutResize($model, $tempFile);
-        
+
         if ($newFile) {
             ResizeImages::dispatch([$newFile]);
         }
