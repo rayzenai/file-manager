@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
+use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -161,7 +162,20 @@ class MediaUpload extends FileUpload
                 throw new Exception('Please set the default disk to s3 to use this package.');
             }
 
-            $directory = FileManagerService::getUploadDirectory(class_basename($model));
+            // Check if a custom directory was set via directory() method
+            $directory = $this->getDirectory();
+            
+            if ($directory === null) {
+                // Handle both model instance and string (class name)
+                $modelName = is_string($model) ? $model : class_basename($model);
+                $directory = FileManagerService::getUploadDirectory($modelName);
+                
+                // If directory is still null, use a default
+                if ($directory === null) {
+                    $directory = 'uploads';
+                }
+            }
+            
             $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
 
             // Videos are handled normally
