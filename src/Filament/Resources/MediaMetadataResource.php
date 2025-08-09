@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Filament\Resources;
 
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select as FormSelect;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle as FormToggle;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
@@ -15,9 +20,11 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages;
+use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
-use Filament\Actions\ViewAction;
+use Kirantimsina\FileManager\Services\ImageCompressionService;
 
 class MediaMetadataResource extends Resource
 {
@@ -231,6 +238,166 @@ class MediaMetadataResource extends Resource
             ], layout: FiltersLayout::AboveContent)
             ->recordActions([
                 ViewAction::make(),
+                Action::make('resize')
+                    ->label('Resize')
+                    ->icon('heroicon-o-arrows-pointing-out')
+                    ->color('info')
+                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                    ->modalHeading('Resize Image')
+                    ->modalDescription(fn (MediaMetadata $record): string => "Resize all versions of: {$record->file_name}")
+                    ->action(function (MediaMetadata $record): void {
+                        try {
+                            // Dispatch resize job for this image
+                            ResizeImages::dispatch([$record->file_name]);
+
+                            Notification::make()
+                                ->title('Image resize queued')
+                                ->body('The image will be resized to all configured sizes.')
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Resize failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->requiresConfirmation(),
+
+                Action::make('compress')
+                    ->label('Compress')
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->color('warning')
+                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                    ->modalHeading('Compress Image')
+                    ->modalDescription(fn (MediaMetadata $record): string => "Compress and replace: {$record->file_name}")
+                    ->form([
+                        FormSelect::make('quality')
+                            ->label('Compression Quality')
+                            ->options([
+                                '100' => 'Maximum (100%)',
+                                '95' => 'Very High (95%)',
+                                '85' => 'High (85%) - Recommended',
+                                '75' => 'Medium (75%)',
+                                '65' => 'Low (65%)',
+                                '50' => 'Very Low (50%)',
+                            ])
+                            ->default('85')
+                            ->required(),
+                        FormToggle::make('replace_original')
+                            ->label('Replace original file')
+                            ->helperText('This will permanently replace the original file with the compressed version')
+                            ->default(true),
+                        FormToggle::make('resize_after')
+                            ->label('Resize all versions after compression')
+                            ->default(true),
+                    ])
+                    ->action(function (MediaMetadata $record, array $data): void {
+                        try {
+                            $compressionService = new ImageCompressionService;
+                            $fileName = $record->file_name;
+
+                            // Download the original file from S3
+                            $originalContent = Storage::disk('s3')->get($fileName);
+                            $tempPath = sys_get_temp_dir() . '/' . uniqid('compress_') . '.tmp';
+                            file_put_contents($tempPath, $originalContent);
+
+                            // Compress the image
+                            $result = $compressionService->compressAndSave(
+                                $tempPath,
+                                $fileName,
+                                (int) $data['quality'],
+                                null, // No height limit
+                                null, // No width limit
+                                'webp',
+                                'contain',
+                                's3'
+                            );
+
+                            // Clean up temp file
+                            @unlink($tempPath);
+
+                            if ($result['success']) {
+                                // Update metadata with new file size
+                                $record->update([
+                                    'file_size' => $result['data']['compressed_size'] ?? $record->file_size,
+                                    'metadata' => array_merge($record->metadata ?? [], [
+                                        'compression' => [
+                                            'original_size' => $result['data']['original_size'] ?? null,
+                                            'compressed_size' => $result['data']['compressed_size'] ?? null,
+                                            'compression_ratio' => $result['data']['compression_ratio'] ?? null,
+                                            'quality' => (int) $data['quality'],
+                                            'compressed_at' => now()->toIso8601String(),
+                                        ],
+                                    ]),
+                                ]);
+
+                                // Resize all versions if requested
+                                if ($data['resize_after']) {
+                                    ResizeImages::dispatch([$fileName]);
+                                }
+
+                                $savedKb = round(($result['data']['original_size'] - $result['data']['compressed_size']) / 1024, 2);
+
+                                Notification::make()
+                                    ->title('Image compressed successfully')
+                                    ->body("Saved {$savedKb} KB ({$result['data']['compression_ratio']}% reduction)")
+                                    ->success()
+                                    ->send();
+                            } else {
+                                throw new \Exception($result['message'] ?? 'Compression failed');
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Compression failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
+                Action::make('delete_resized')
+                    ->label('Delete Resized')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                    ->modalHeading('Delete Resized Versions')
+                    ->modalDescription(fn (MediaMetadata $record): string => "Delete all resized versions of: {$record->file_name}")
+                    ->modalContent(fn () => view('file-manager::actions.delete-resized-warning'))
+                    ->action(function (MediaMetadata $record): void {
+                        try {
+                            $fileName = $record->file_name;
+                            $pathParts = explode('/', $fileName);
+                            $name = array_pop($pathParts);
+                            $directory = implode('/', $pathParts);
+
+                            // Get configured image sizes
+                            $sizes = config('file-manager.image_sizes', []);
+                            $deletedCount = 0;
+
+                            foreach (array_keys($sizes) as $size) {
+                                $resizedPath = "{$directory}/{$size}/{$name}";
+                                if (Storage::disk('s3')->exists($resizedPath)) {
+                                    Storage::disk('s3')->delete($resizedPath);
+                                    $deletedCount++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->title('Resized versions deleted')
+                                ->body("Deleted {$deletedCount} resized versions")
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Deletion failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->requiresConfirmation(),
             ]);
     }
 
