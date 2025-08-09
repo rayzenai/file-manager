@@ -206,16 +206,22 @@ class FileManagerService
 
     public static function moveTempImage($model, $tempFile)
     {
+        $newFile = static::moveTempImageWithoutResize($model, $tempFile);
+        
+        if ($newFile) {
+            ResizeImages::dispatch([$newFile]);
+        }
 
+        return $newFile;
+    }
+
+    public static function moveTempImageWithoutResize($model, $tempFile)
+    {
         $path = static::getUploadDirectory($model);
 
         $newFile = $path . '/' . Arr::last(explode('/', $tempFile));
 
         $status = Storage::disk()->move($tempFile, $newFile);
-
-        if ($status) {
-            ResizeImages::dispatch([$newFile]);
-        }
 
         return $status ? $newFile : null;
     }
