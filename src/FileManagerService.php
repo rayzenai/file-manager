@@ -283,4 +283,51 @@ class FileManagerService
 
         return true;
     }
+
+    /**
+     * Get the main media URL with trailing slash
+     */
+    public static function mainMediaUrl(): string
+    {
+        $path = config('file-manager.cdn');
+
+        if (Str::endsWith($path, '/')) {
+            return $path;
+        }
+
+        return "{$path}/";
+    }
+
+    /**
+     * Get the full media path for a file with optional size
+     */
+    public static function getMediaPath($filename = null, $size = null): ?string
+    {
+        if ($filename == null) {
+            return null;
+        }
+
+        $main = static::mainMediaUrl();
+        
+        // If this is a gif, we have not resized it so send the main file
+        $size = Str::endsWith($filename, '.gif') ? null : $size;
+        
+        if (! $size) {
+            return "{$main}{$filename}";
+        }
+
+        $exploded = explode('/', $filename);
+        $filename = Arr::last($exploded);
+        $model = Arr::first($exploded);
+
+        return "{$main}{$model}/{$size}/{$filename}";
+    }
+
+    /**
+     * Get file extension from filename
+     */
+    public static function getExtensionFromName(string $filename): string
+    {
+        return Arr::last(explode('.', $filename));
+    }
 }

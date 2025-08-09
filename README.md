@@ -231,46 +231,68 @@ The package includes a built-in Filament resource for managing media metadata:
 
 ## Service Methods
 
-### FileManagerService
+### Using the FileManager Facade
 
 ```php
-use Kirantimsina\FileManager\FileManagerService;
+use Kirantimsina\FileManager\Facades\FileManager;
 
 // Upload a file
-$path = FileManagerService::upload(
+$path = FileManager::upload(
     model: 'Product',
     file: $uploadedFile,
     tag: 'summer-sale'
 );
 
-// Upload from URL
-$path = FileManagerService::uploadFromUrl(
-    url: 'https://example.com/image.jpg',
+// Upload multiple files
+$paths = FileManager::uploadImages(
     model: 'Product',
-    tag: 'imported'
+    files: $uploadedFiles,
+    tag: 'gallery'
+);
+
+// Upload base64 encoded image
+$path = FileManager::uploadBase64(
+    model: 'Product',
+    base64Image: $base64String,
+    tag: 'user-upload'
 );
 
 // Move temp file without resizing
-$path = FileManagerService::moveTempImageWithoutResize(
+$path = FileManager::moveTempImageWithoutResize(
     model: 'Product',
     tempFile: 'temp/abc123.jpg'
 );
 
 // Move temp file with automatic resizing
-$path = FileManagerService::moveTempImage(
+$path = FileManager::moveTempImage(
     model: 'Product',
     tempFile: 'temp/abc123.jpg'
 );
 
 // Delete image and all its sizes
-FileManagerService::deleteImage('products/image.jpg');
+FileManager::deleteImage('products/image.jpg');
+
+// Delete multiple images
+FileManager::deleteImagesArray(['products/img1.jpg', 'products/img2.jpg']);
 
 // Get SEO-friendly filename
-$filename = FileManagerService::filename(
+$filename = FileManager::filename(
     file: $uploadedFile,
     tag: 'product-name',
     extension: 'webp'
 );
+
+// Get image URL with specific size
+$url = FileManager::getMediaPath('products/image.jpg', 'medium');
+
+// Get CDN URL
+$cdnUrl = FileManager::mainMediaUrl();
+
+// Get upload directory for a model
+$directory = FileManager::getUploadDirectory('Product');
+
+// Get configured image sizes
+$sizes = FileManager::getImageSizes();
 ```
 
 ### Image Compression Service
