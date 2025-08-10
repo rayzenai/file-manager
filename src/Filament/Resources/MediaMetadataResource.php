@@ -66,7 +66,7 @@ class MediaMetadataResource extends Resource
      */
     protected static function getLargeFilesCount(): int
     {
-        return Cache::remember(
+        return (int) Cache::remember(
             'media_metadata_large_files_count',
             5 * 60, // Cache for 5 minutes
             fn () => MediaMetadata::where('file_size', '>', 500 * 1024)->count()
