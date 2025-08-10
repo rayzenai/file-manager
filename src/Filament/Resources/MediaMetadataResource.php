@@ -369,7 +369,19 @@ class MediaMetadataResource extends Resource
                     ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
                     ->modalHeading('Compress Image')
                     ->modalDescription(fn (MediaMetadata $record): string => "Compress and replace: {$record->file_name}")
-                    ->form([
+                    ->schema([
+                        FormSelect::make('format')
+                            ->label('Output Format')
+                            ->options([
+                                'preserve' => 'Preserve Original Format',
+                                'webp' => 'WebP (Best compression)',
+                                'avif' => 'AVIF (Smaller files, newer format)',
+                                'jpg' => 'JPEG (Universal compatibility)',
+                                'png' => 'PNG (Lossless)',
+                            ])
+                            ->default('webp')
+                            ->helperText('WebP provides excellent compression with good quality. AVIF provides even better compression but has limited browser support.')
+                            ->required(),
                         FormSelect::make('quality')
                             ->label('Compression Quality')
                             ->options([
@@ -400,14 +412,44 @@ class MediaMetadataResource extends Resource
                             $tempPath = sys_get_temp_dir() . '/' . uniqid('compress_') . '.tmp';
                             file_put_contents($tempPath, $originalContent);
 
+                            // Determine the output format
+                            $outputFormat = $data['format'];
+                            if ($outputFormat === 'preserve') {
+                                // Get the original file extension
+                                $extension = pathinfo($fileName, PATHINFO_EXTENSION);
+                                $outputFormat = match (strtolower($extension)) {
+                                    'jpg', 'jpeg' => 'jpg',
+                                    'png' => 'png',
+                                    'webp' => 'webp',
+                                    'avif' => 'avif',
+                                    default => 'webp', // Default to webp if unknown
+                                };
+                            }
+
+                            // Build the new file name with the correct extension
+                            $pathInfo = pathinfo($fileName);
+                            $directory = $pathInfo['dirname'];
+                            $filenameWithoutExt = $pathInfo['filename'];
+
+                            // Map format to extension
+                            $newExtension = match ($outputFormat) {
+                                'jpg' => 'jpg',
+                                'png' => 'png',
+                                'webp' => 'webp',
+                                'avif' => 'avif',
+                                default => 'webp'
+                            };
+
+                            $newFileName = $directory . '/' . $filenameWithoutExt . '.' . $newExtension;
+
                             // Compress the image
                             $result = $compressionService->compressAndSave(
                                 $tempPath,
-                                $fileName,
+                                $newFileName,
                                 (int) $data['quality'],
                                 null, // No height limit
                                 null, // No width limit
-                                'webp',
+                                $outputFormat,
                                 'contain',
                                 's3'
                             );
@@ -416,8 +458,29 @@ class MediaMetadataResource extends Resource
                             @unlink($tempPath);
 
                             if ($result['success']) {
-                                // Update metadata with new file size
-                                $record->update([
+                                // If the format changed and we're replacing, delete the old file and all resized versions
+                                if ($data['replace_original'] && $newFileName !== $fileName) {
+                                    // Delete the original file
+                                    Storage::disk('s3')->delete($fileName);
+
+                                    // Delete all resized versions of the old file
+                                    $pathParts = explode('/', $fileName);
+                                    $oldFilename = array_pop($pathParts);
+                                    $directory = implode('/', $pathParts);
+
+                                    // Get configured image sizes
+                                    $sizes = config('file-manager.image_sizes', []);
+
+                                    foreach (array_keys($sizes) as $size) {
+                                        $resizedPath = "{$directory}/{$size}/{$oldFilename}";
+                                        if (Storage::disk('s3')->exists($resizedPath)) {
+                                            Storage::disk('s3')->delete($resizedPath);
+                                        }
+                                    }
+                                }
+
+                                // Update metadata with new file size and potentially new filename
+                                $updateData = [
                                     'file_size' => $result['data']['compressed_size'] ?? $record->file_size,
                                     'metadata' => array_merge($record->metadata ?? [], [
                                         'compression' => [
@@ -425,14 +488,47 @@ class MediaMetadataResource extends Resource
                                             'compressed_size' => $result['data']['compressed_size'] ?? null,
                                             'compression_ratio' => $result['data']['compression_ratio'] ?? null,
                                             'quality' => (int) $data['quality'],
+                                            'format' => $outputFormat,
                                             'compressed_at' => now()->toIso8601String(),
                                         ],
                                     ]),
-                                ]);
+                                ];
 
-                                // Resize all versions if requested
+                                // If filename changed, update it
+                                if ($newFileName !== $fileName) {
+                                    $updateData['file_name'] = $newFileName;
+
+                                    // Also update the model's field if we're replacing
+                                    if ($data['replace_original']) {
+                                        $model = $record->mediable_type::find($record->mediable_id);
+                                        if ($model) {
+                                            $field = $record->mediable_field;
+
+                                            // Handle array fields
+                                            if (is_array($model->{$field})) {
+                                                $values = $model->{$field};
+                                                $key = array_search($fileName, $values);
+                                                if ($key !== false) {
+                                                    $values[$key] = $newFileName;
+                                                    // Use updateQuietly to avoid triggering model events
+                                                    $model->updateQuietly([$field => $values]);
+                                                }
+                                            } else {
+                                                // Single value field
+                                                if ($model->{$field} === $fileName) {
+                                                    // Use updateQuietly to avoid triggering model events
+                                                    $model->updateQuietly([$field => $newFileName]);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                $record->update($updateData);
+
+                                // Resize all versions if requested (use new filename)
                                 if ($data['resize_after']) {
-                                    ResizeImages::dispatch([$fileName]);
+                                    ResizeImages::dispatch([$newFileName]);
                                 }
 
                                 $savedKb = round(($result['data']['original_size'] - $result['data']['compressed_size']) / 1024, 2);

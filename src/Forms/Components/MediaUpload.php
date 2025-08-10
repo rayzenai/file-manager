@@ -246,18 +246,35 @@ class MediaUpload extends FileUpload
      */
     protected function shouldUseCompression(TemporaryUploadedFile $file): bool
     {
-        if (! $this->useCompression || ! config('file-manager.compression.enabled')) {
+        // Skip compression for videos
+        $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
+        if ($isVideo) {
             return false;
         }
 
+        // Skip compression for certain formats that shouldn't be compressed
+        if (in_array($file->extension(), ['ico', 'svg', 'gif'])) {
+            return false;
+        }
+
+        // If compression is disabled at component level
+        if (! $this->useCompression) {
+            return false;
+        }
+
+        // If compression is disabled globally
+        if (! config('file-manager.compression.enabled')) {
+            return false;
+        }
+
+        // If auto_compress is disabled, don't compress on upload
+        // (but manual compress action in MediaMetadataResource will still work)
         if (! config('file-manager.compression.auto_compress')) {
             return false;
         }
 
-        $fileSize = $file->getSize();
-        $threshold = config('file-manager.compression.threshold', 500 * 1024);
-
-        return $fileSize > $threshold;
+        // Always compress when enabled (ignore threshold)
+        return true;
     }
 
     /**
