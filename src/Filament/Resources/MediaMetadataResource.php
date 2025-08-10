@@ -273,7 +273,7 @@ class MediaMetadataResource extends Resource
                     })
                     ->modalHeading('Select Resource')
                     ->modalDescription(fn (MediaMetadata $record) => "Multiple resources found for {$record->mediable_type}")
-                    ->form(function (MediaMetadata $record): array {
+                    ->schema(function (MediaMetadata $record): array {
                         $resources = static::findResourcesForModel($record->mediable_type);
 
                         if (count($resources) <= 1) {

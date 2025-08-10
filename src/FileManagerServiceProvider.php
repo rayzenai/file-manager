@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager;
 
+use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -21,6 +22,7 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasRoute('web')
             ->hasViews()
-            ->hasMigration('2025_01_09_000001_create_media_metadata_table');
+            ->hasMigration('2025_01_09_000001_create_media_metadata_table')
+            ->hasCommand(PopulateMediaMetadataCommand::class);
     }
 }
