@@ -60,9 +60,9 @@ trait HasImages
                 }
 
                 $images = is_array($model->{$field}) ? $model->{$field} : [$model->{$field}];
-                
+
                 foreach ($images as $image) {
-                    if (empty($image) || !is_string($image)) {
+                    if (empty($image) || ! is_string($image)) {
                         continue;
                     }
 
@@ -79,8 +79,8 @@ trait HasImages
 
                     // Get file info from storage
                     $fileInfo = static::getFileInfoForMetadata($image);
-                    
-                    if (!$fileInfo) {
+
+                    if (! $fileInfo) {
                         continue;
                     }
 
@@ -161,7 +161,7 @@ trait HasImages
 
             $fieldsToWatch = $model->hasImagesTraitFields();
             foreach ($fieldsToWatch as $field) {
-                if (!$model->wasChanged($field)) {
+                if (! $model->wasChanged($field)) {
                     continue;
                 }
 
@@ -181,7 +181,7 @@ trait HasImages
                 }
 
                 foreach ($newImages as $image) {
-                    if (empty($image) || !is_string($image)) {
+                    if (empty($image) || ! is_string($image)) {
                         continue;
                     }
 
@@ -198,8 +198,8 @@ trait HasImages
 
                     // Get file info from storage
                     $fileInfo = static::getFileInfoForMetadata($image);
-                    
-                    if (!$fileInfo) {
+
+                    if (! $fileInfo) {
                         continue;
                     }
 
@@ -349,42 +349,42 @@ trait HasImages
     {
         try {
             $disk = Storage::disk();
-            
-            if (!$disk->exists($path)) {
+
+            if (! $disk->exists($path)) {
                 return null;
             }
-            
+
             $size = $disk->size($path);
             $mimeType = $disk->mimeType($path);
-            
+
             // Get dimensions if it's an image
             $width = null;
             $height = null;
-            
+
             if (str_starts_with($mimeType, 'image/')) {
                 try {
                     // Download file temporarily to get dimensions
                     $tempPath = tempnam(sys_get_temp_dir(), 'img');
                     file_put_contents($tempPath, $disk->get($path));
-                    
+
                     if ($imageInfo = getimagesize($tempPath)) {
                         $width = $imageInfo[0];
                         $height = $imageInfo[1];
                     }
-                    
+
                     unlink($tempPath);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     // Ignore dimension errors
                 }
             }
-            
+
             return [
                 'size' => $size,
                 'mime_type' => $mimeType,
                 'width' => $width,
                 'height' => $height,
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
     }
