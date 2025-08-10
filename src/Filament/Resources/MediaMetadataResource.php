@@ -32,6 +32,8 @@ class MediaMetadataResource extends Resource
 {
     protected static ?string $model = MediaMetadata::class;
 
+    protected static ?string $pluralLabel = 'Media Metadata';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-photo';
 
     protected static ?string $navigationLabel = 'Media Metadata';
@@ -248,11 +250,11 @@ class MediaMetadataResource extends Resource
 
                         return count($resources) > 0;
                     })
-                    ->action(function (MediaMetadata $record): void {
+                    ->action(function (MediaMetadata $record) use ($table): void {
                         $resources = static::findResourcesForModel($record->mediable_type);
 
                         if (count($resources) === 1) {
-                            // Single resource - navigate directly
+                            // Single resource - open directly in new tab
                             $resource = $resources[0];
                             $url = null;
 
@@ -267,13 +269,15 @@ class MediaMetadataResource extends Resource
                             }
 
                             if ($url) {
-                                redirect($url);
+                                // Use JavaScript to open in new tab
+                                $table->getLivewire()->js("window.open('{$url}', '_blank')");
                             }
                         }
                     })
                     ->modalHeading('Select Resource')
                     ->modalDescription(fn (MediaMetadata $record) => "Multiple resources found for {$record->mediable_type}")
-                    ->form(function (MediaMetadata $record): array {
+                    ->modalSubmitActionLabel('Open in New Tab')
+                    ->schema(function (MediaMetadata $record): array {
                         $resources = static::findResourcesForModel($record->mediable_type);
 
                         if (count($resources) <= 1) {
@@ -325,10 +329,10 @@ class MediaMetadataResource extends Resource
                                 ->required(),
                         ];
                     })
-                    ->modalSubmitActionLabel('Open')
-                    ->action(function (MediaMetadata $record, array $data): void {
+                    ->action(function (MediaMetadata $record, array $data) use ($table): void {
                         if (! empty($data['resource_url'])) {
-                            redirect($data['resource_url']);
+                            // Use JavaScript to open in new tab
+                            $table->getLivewire()->js("window.open('{$data['resource_url']}', '_blank')");
                         }
                     }),
                 Action::make('resize')

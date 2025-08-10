@@ -336,6 +336,40 @@ php artisan queue:monitor
 **Available Jobs:**
 - `ResizeImages` - Generate multiple sizes for uploaded images
 - `DeleteImages` - Clean up images and all their sizes
+- `PopulateMediaMetadataJob` - Populate media metadata for existing images
+
+## Artisan Commands
+
+### Populate Media Metadata
+
+If you have existing images in your database before installing this package, you can populate their metadata:
+
+```bash
+# Populate metadata for all configured models
+php artisan file-manager:populate-metadata
+
+# Populate metadata for a specific model
+php artisan file-manager:populate-metadata --model=Product
+
+# Populate metadata for a specific field
+php artisan file-manager:populate-metadata --model=Product --field=image_file_name
+
+# Process with custom chunk size (default is 1000)
+php artisan file-manager:populate-metadata --chunk=500
+
+# Process synchronously without queue (good for testing)
+php artisan file-manager:populate-metadata --model=Product --sync --chunk=100
+
+# Dry run to see what would be processed
+php artisan file-manager:populate-metadata --dry-run
+```
+
+This command will:
+1. Scan configured models that use the HasImages trait
+2. Process records in batches to avoid memory issues
+3. Create MediaMetadata records for existing images
+4. Dispatch jobs to handle large datasets efficiently
+5. Extract file information including size, mime type, and dimensions
 
 ## Helper Functions
 
