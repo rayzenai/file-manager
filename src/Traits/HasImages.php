@@ -304,7 +304,7 @@ trait HasImages
     {
         $filenames = $model->{$field};
 
-        if (empty($filesname)) {
+        if (empty($filenames)) {
             return false;
         }
 
