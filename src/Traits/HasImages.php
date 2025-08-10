@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteImages;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
+use Kirantimsina\FileManager\Models\MediaMetadata;
 
 trait HasImages
 {
@@ -41,6 +43,62 @@ trait HasImages
                     } else {
                         ResizeImages::dispatch([$newFilename]);
                     }
+                }
+            }
+        });
+
+        // Create media metadata after the model is created
+        self::created(function (self $model) {
+            if (! config('file-manager.media_metadata.enabled', true)) {
+                return;
+            }
+
+            $fieldsToWatch = $model->hasImagesTraitFields();
+            foreach ($fieldsToWatch as $field) {
+                if (empty($model->{$field})) {
+                    continue;
+                }
+
+                $images = is_array($model->{$field}) ? $model->{$field} : [$model->{$field}];
+                
+                foreach ($images as $image) {
+                    if (empty($image) || !is_string($image)) {
+                        continue;
+                    }
+
+                    // Check if metadata already exists
+                    $exists = MediaMetadata::where('mediable_type', get_class($model))
+                        ->where('mediable_id', $model->id)
+                        ->where('mediable_field', $field)
+                        ->where('file_name', $image)
+                        ->exists();
+
+                    if ($exists) {
+                        continue;
+                    }
+
+                    // Get file info from storage
+                    $fileInfo = static::getFileInfoForMetadata($image);
+                    
+                    if (!$fileInfo) {
+                        continue;
+                    }
+
+                    // Create media metadata record
+                    MediaMetadata::create([
+                        'mediable_type' => get_class($model),
+                        'mediable_id' => $model->id,
+                        'mediable_field' => $field,
+                        'file_name' => $image,
+                        'mime_type' => $fileInfo['mime_type'],
+                        'file_size' => $fileInfo['size'],
+                        'width' => $fileInfo['width'],
+                        'height' => $fileInfo['height'],
+                        'metadata' => [
+                            'created_via' => 'HasImages trait',
+                            'created_at' => now()->toIso8601String(),
+                        ],
+                    ]);
                 }
             }
         });
@@ -87,6 +145,75 @@ trait HasImages
                         // Only delete if the old file is different from the new one
                         DeleteImages::dispatch([$oldFilename]);
                     }
+                }
+            }
+        });
+
+        // Create media metadata after the model is updated
+        self::updated(function (self $model) {
+            if (! config('file-manager.media_metadata.enabled', true)) {
+                return;
+            }
+
+            $fieldsToWatch = $model->hasImagesTraitFields();
+            foreach ($fieldsToWatch as $field) {
+                if (!$model->wasChanged($field)) {
+                    continue;
+                }
+
+                $oldValue = $model->getOriginal($field);
+                $newValue = $model->{$field};
+
+                // Get newly added images
+                $newImages = [];
+                if (is_array($newValue)) {
+                    if (is_array($oldValue)) {
+                        $newImages = array_diff($newValue, $oldValue);
+                    } else {
+                        $newImages = $newValue;
+                    }
+                } elseif ($newValue && $newValue !== $oldValue) {
+                    $newImages = [$newValue];
+                }
+
+                foreach ($newImages as $image) {
+                    if (empty($image) || !is_string($image)) {
+                        continue;
+                    }
+
+                    // Check if metadata already exists
+                    $exists = MediaMetadata::where('mediable_type', get_class($model))
+                        ->where('mediable_id', $model->id)
+                        ->where('mediable_field', $field)
+                        ->where('file_name', $image)
+                        ->exists();
+
+                    if ($exists) {
+                        continue;
+                    }
+
+                    // Get file info from storage
+                    $fileInfo = static::getFileInfoForMetadata($image);
+                    
+                    if (!$fileInfo) {
+                        continue;
+                    }
+
+                    // Create media metadata record
+                    MediaMetadata::create([
+                        'mediable_type' => get_class($model),
+                        'mediable_id' => $model->id,
+                        'mediable_field' => $field,
+                        'file_name' => $image,
+                        'mime_type' => $fileInfo['mime_type'],
+                        'file_size' => $fileInfo['size'],
+                        'width' => $fileInfo['width'],
+                        'height' => $fileInfo['height'],
+                        'metadata' => [
+                            'created_via' => 'HasImages trait (update)',
+                            'created_at' => now()->toIso8601String(),
+                        ],
+                    ]);
                 }
             }
         });
@@ -181,5 +308,52 @@ trait HasImages
             ]);
         }
 
+    }
+
+    /**
+     * Get file info for media metadata
+     */
+    protected static function getFileInfoForMetadata(string $path): ?array
+    {
+        try {
+            $disk = Storage::disk();
+            
+            if (!$disk->exists($path)) {
+                return null;
+            }
+            
+            $size = $disk->size($path);
+            $mimeType = $disk->mimeType($path);
+            
+            // Get dimensions if it's an image
+            $width = null;
+            $height = null;
+            
+            if (str_starts_with($mimeType, 'image/')) {
+                try {
+                    // Download file temporarily to get dimensions
+                    $tempPath = tempnam(sys_get_temp_dir(), 'img');
+                    file_put_contents($tempPath, $disk->get($path));
+                    
+                    if ($imageInfo = getimagesize($tempPath)) {
+                        $width = $imageInfo[0];
+                        $height = $imageInfo[1];
+                    }
+                    
+                    unlink($tempPath);
+                } catch (\Exception $e) {
+                    // Ignore dimension errors
+                }
+            }
+            
+            return [
+                'size' => $size,
+                'mime_type' => $mimeType,
+                'width' => $width,
+                'height' => $height,
+            ];
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }
