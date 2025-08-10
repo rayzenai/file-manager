@@ -308,10 +308,10 @@ class FileManagerService
         }
 
         $main = static::mainMediaUrl();
-        
+
         // If this is a gif, we have not resized it so send the main file
         $size = Str::endsWith($filename, '.gif') ? null : $size;
-        
+
         if (! $size) {
             return "{$main}{$filename}";
         }
