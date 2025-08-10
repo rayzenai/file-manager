@@ -37,11 +37,11 @@ abstract class MediaColumn
                         if (method_exists($record, 'viewPageUrl')) {
                             // Try to access slug - it might be a property, attribute, or accessor
                             try {
-                                $hasSlug = isset($record->slug) && !empty($record->slug);
+                                $hasSlug = isset($record->slug) && ! empty($record->slug);
                             } catch (\Exception $e) {
                                 $hasSlug = false;
                             }
-                            
+
                             if ($hasSlug) {
                                 if ($viewCountField) {
                                     return $record->viewPageUrl(field: $field, counter: $viewCountField);
