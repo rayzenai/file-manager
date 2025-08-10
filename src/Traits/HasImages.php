@@ -140,10 +140,14 @@ trait HasImages
                         $toDelete = array_diff($oldFilename, (array) $newFilename);
                         if (! empty($toDelete)) {
                             DeleteImages::dispatch(array_values($toDelete));
+                            // Delete metadata for removed images
+                            static::deleteMetadataForImages($model, $field, array_values($toDelete));
                         }
                     } elseif ($oldFilename && $oldFilename !== $newFilename) {
                         // Only delete if the old file is different from the new one
                         DeleteImages::dispatch([$oldFilename]);
+                        // Delete metadata for removed image
+                        static::deleteMetadataForImages($model, $field, [$oldFilename]);
                     }
                 }
             }
@@ -216,6 +220,18 @@ trait HasImages
                     ]);
                 }
             }
+        });
+
+        // Delete media metadata when the model is deleted
+        self::deleting(function (self $model) {
+            if (! config('file-manager.media_metadata.enabled', true)) {
+                return;
+            }
+
+            // Delete all metadata for this model
+            MediaMetadata::where('mediable_type', get_class($model))
+                ->where('mediable_id', $model->id)
+                ->delete();
         });
 
     }
@@ -308,6 +324,22 @@ trait HasImages
             ]);
         }
 
+    }
+
+    /**
+     * Delete metadata for specific images
+     */
+    protected static function deleteMetadataForImages($model, string $field, array $images): void
+    {
+        if (! config('file-manager.media_metadata.enabled', true) || empty($images)) {
+            return;
+        }
+
+        MediaMetadata::where('mediable_type', get_class($model))
+            ->where('mediable_id', $model->id)
+            ->where('mediable_field', $field)
+            ->whereIn('file_name', $images)
+            ->delete();
     }
 
     /**
