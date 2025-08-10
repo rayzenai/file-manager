@@ -170,10 +170,15 @@ class FileManagerService
 
             foreach ($sizes as $key => $val) {
                 $val = intval($val);
+
+                // Clone the original image for each size to avoid progressive shrinking
+                $resizedImg = clone $img;
+
                 if ($fit) {
-                    $img->coverDown(width: $val, height: $val);
+                    $resizedImg->coverDown(width: $val, height: $val);
                 } else {
-                    $img->scaleDown(height: $val);
+                    // Scale down by width, not height
+                    $resizedImg->scaleDown(width: $val);
                 }
                 // The below code recreates the image in desired size by placing the image at the center
                 // else {
@@ -184,7 +189,7 @@ class FileManagerService
                 //     $img = $newImage;
                 // }
 
-                $image = $img->toWebp(85)->toFilePointer();
+                $image = $resizedImg->toWebp(85)->toFilePointer();
 
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",

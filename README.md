@@ -9,14 +9,14 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 ## Key Features
 
-- 🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
-- 🗜️ **Smart Compression** - WebP conversion with configurable quality settings
-- 📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
-- ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
-- 🎨 **Custom Filament Components** - MediaUpload and S3Image components
-- 🔍 **Filament Resource** - Built-in media metadata management interface
-- 🚀 **Performance Optimized** - Queue-based processing for large files
-- 🔧 **Highly Configurable** - Extensive configuration options
+-   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
+-   🗜️ **Smart Compression** - WebP conversion with configurable quality settings
+-   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
+-   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
+-   🎨 **Custom Filament Components** - MediaUpload and S3Image components
+-   🔍 **Filament Resource** - Built-in media metadata management interface
+-   🚀 **Performance Optimized** - Queue-based processing for large files
+-   🔧 **Highly Configurable** - Extensive configuration options
 
 ## About the Developers
 
@@ -28,10 +28,10 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 ## Requirements
 
-- PHP 8.1+
-- Laravel 10.0+
-- Filament 4.0+
-- AWS S3 configured (or S3-compatible storage)
+-   PHP 8.1+
+-   Laravel 10.0+
+-   Filament 4.0+
+-   AWS S3 configured (or S3-compatible storage)
 
 ## Installation
 
@@ -62,10 +62,10 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     AWS_DEFAULT_REGION=your-region
     AWS_BUCKET=your-bucket
     AWS_URL=https://your-cdn-url.com
-    
+
     # Optional CDN URL (defaults to AWS_URL)
     CDN_URL=https://your-cdn-url.com
-    
+
     # Compression Settings (Optional)
     FILE_MANAGER_COMPRESSION_ENABLED=true
     FILE_MANAGER_COMPRESSION_QUALITY=85
@@ -76,7 +76,7 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
     ```php
     use Kirantimsina\FileManager\FileManagerPlugin;
-    
+
     public function panel(Panel $panel): Panel
     {
         return $panel
@@ -94,12 +94,12 @@ The configuration file `config/file-manager.php` allows you to customize:
 return [
     // CDN URL for serving files
     'cdn' => env('CDN_URL', env('AWS_URL')),
-    
+
     // Maximum upload dimensions
     'max-upload-height' => '5120', // pixels
     'max-upload-width' => '5120',  // pixels
     'max-upload-size' => '8192',   // KB
-    
+
     // Model to directory mappings
     'model' => [
         'User' => 'users',
@@ -107,7 +107,7 @@ return [
         'Blog' => 'blogs',
         // Add your models here
     ],
-    
+
     // Image sizes to generate
     'image_sizes' => [
         'extra-small' => 60,
@@ -116,7 +116,7 @@ return [
         '640px' => 640,
         'large' => 1080,
     ],
-    
+
     // Compression settings
     'compression' => [
         'enabled' => true,
@@ -126,7 +126,7 @@ return [
         'format' => 'webp',
         'threshold' => 500 * 1024, // 500KB
     ],
-    
+
     // Media metadata tracking
     'media_metadata' => [
         'enabled' => true,
@@ -150,19 +150,19 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
     use HasImages;
-    
+
     protected $fillable = [
         'name',
         'image',        // Single image field
         'gallery',      // Multiple images field
     ];
-    
+
     protected $casts = [
         'gallery' => 'array', // Cast array fields
     ];
-    
-    // Define which fields contain images for automatic resizing
-    protected function hasImagesTraitFields(): array
+
+    // Define which fields contain images for automatic resizing. Use `public` so that this is accessible by view helpers
+    public function hasImagesTraitFields(): array
     {
         return ['image', 'gallery'];
     }
@@ -170,11 +170,12 @@ class Product extends Model
 ```
 
 **Key Features:**
-- Automatically generates multiple sizes when images are saved
-- Handles both single images and arrays of images
-- Smart diffing - only resizes truly new images
-- Automatic cleanup of old images when replaced
-- Queue-based processing for better performance
+
+-   Automatically generates multiple sizes when images are saved
+-   Handles both single images and arrays of images
+-   Smart diffing - only resizes truly new images
+-   Automatic cleanup of old images when replaced
+-   Queue-based processing for better performance
 
 ## Usage in Filament Resources
 
@@ -197,11 +198,12 @@ MediaUpload::make('image')
 ```
 
 **Features:**
-- Automatic WebP conversion for better performance
-- Smart compression for files over threshold
-- Metadata tracking with compression stats
-- Supports both images and videos
-- SEO-friendly file naming
+
+-   Automatic WebP conversion for better performance
+-   Smart compression for files over threshold
+-   Metadata tracking with compression stats
+-   Supports both images and videos
+-   SEO-friendly file naming
 
 ### S3Image Column
 
@@ -223,9 +225,9 @@ The package includes a built-in Filament resource for managing media metadata:
 
 1. **View all uploaded media** with file sizes, dimensions, and compression stats
 2. **Manually trigger operations:**
-   - Resize images to generate missing sizes
-   - Compress images with custom quality
-   - Delete resized versions
+    - Resize images to generate missing sizes
+    - Compress images with custom quality
+    - Delete resized versions
 3. **Navigate to parent resources** directly from media entries
 4. **Search and filter** by model type, field, or file name
 
@@ -334,9 +336,10 @@ php artisan queue:monitor
 ```
 
 **Available Jobs:**
-- `ResizeImages` - Generate multiple sizes for uploaded images
-- `DeleteImages` - Clean up images and all their sizes
-- `PopulateMediaMetadataJob` - Populate media metadata for existing images
+
+-   `ResizeImages` - Generate multiple sizes for uploaded images
+-   `DeleteImages` - Clean up images and all their sizes
+-   `PopulateMediaMetadataJob` - Populate media metadata for existing images
 
 ## Artisan Commands
 
@@ -365,6 +368,7 @@ php artisan file-manager:populate-metadata --dry-run
 ```
 
 This command will:
+
 1. Scan configured models that use the HasImages trait
 2. Process records in batches to avoid memory issues
 3. Create MediaMetadata records for existing images
@@ -418,17 +422,20 @@ $checkout->items = [
 ## Troubleshooting
 
 ### Images not resizing
-- Ensure queue workers are running: `php artisan queue:work`
-- Check that model directories are configured in `config/file-manager.php`
-- Verify S3 permissions allow reading and writing
+
+-   Ensure queue workers are running: `php artisan queue:work`
+-   Check that model directories are configured in `config/file-manager.php`
+-   Verify S3 permissions allow reading and writing
 
 ### Duplicate resize jobs
-- Use `moveTempImageWithoutResize()` when the model has `HasImages` trait
-- The trait automatically handles resizing on create/update
+
+-   Use `moveTempImageWithoutResize()` when the model has `HasImages` trait
+-   The trait automatically handles resizing on create/update
 
 ### WebP conversion failing
-- Ensure GD or ImageMagick PHP extensions are installed
-- Check PHP memory limit for large images
+
+-   Ensure GD or ImageMagick PHP extensions are installed
+-   Check PHP memory limit for large images
 
 ## Performance Tips
 
@@ -452,9 +459,9 @@ If you discover any security issues, please email kirantimsina3@gmail.com instea
 
 ## Credits
 
-- [Kiran Timsina](https://github.com/kirantimsina)
-- [RayzenTech](https://www.rayzentech.com)
-- [All Contributors](../../contributors)
+-   [Kiran Timsina](https://github.com/kirantimsina)
+-   [RayzenTech](https://www.rayzentech.com)
+-   [All Contributors](../../contributors)
 
 ## License
 
