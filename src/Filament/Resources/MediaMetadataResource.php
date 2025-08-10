@@ -188,6 +188,18 @@ class MediaMetadataResource extends Resource
                         return round($bytes, 2) . ' ' . $units[$pow];
                     })
                     ->alignEnd(),
+                TextColumn::make('width')
+                    ->label('Width')
+                    ->sortable()
+                    ->formatStateUsing(fn ($state) => $state ? $state . 'px' : '-')
+                    ->alignEnd()
+                    ->toggleable(),
+                TextColumn::make('height')
+                    ->label('Height')
+                    ->sortable()
+                    ->formatStateUsing(fn ($state) => $state ? $state . 'px' : '-')
+                    ->alignEnd()
+                    ->toggleable(),
                 TextColumn::make('mime_type')
                     ->label('Type')
                     ->searchable()
