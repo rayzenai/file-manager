@@ -30,20 +30,29 @@ abstract class MediaColumn
 
                 $column->url(function ($record) use ($field, $viewCountField) {
                     $images = static::getImagesWithoutUrl($field, $record, null);
-                    $slug = $images[0] ?? null;
+                    $imageFilename = $images[0] ?? null;
 
-                    if ($slug) {
-                        // Check if viewPageUrl method exists on the model
+                    if ($imageFilename) {
+                        // Check if viewPageUrl method exists and if the model has a slug attribute with a value
                         if (method_exists($record, 'viewPageUrl')) {
-                            if ($viewCountField) {
-                                return $record->viewPageUrl(field: $field, counter: $viewCountField);
+                            // Try to access slug - it might be a property, attribute, or accessor
+                            try {
+                                $hasSlug = isset($record->slug) && !empty($record->slug);
+                            } catch (\Exception $e) {
+                                $hasSlug = false;
                             }
+                            
+                            if ($hasSlug) {
+                                if ($viewCountField) {
+                                    return $record->viewPageUrl(field: $field, counter: $viewCountField);
+                                }
 
-                            return $record->viewPageUrl($field);
+                                return $record->viewPageUrl($field);
+                            }
                         }
 
                         // Return the full image URL as fallback
-                        return FileManager::getMediaPath($slug);
+                        return FileManager::getMediaPath($imageFilename);
                     }
 
                     return '#';
@@ -131,7 +140,10 @@ abstract class MediaColumn
                         ]);
                     })
                     ->modalContent(function ($record, Action $action) use ($field, $modalSize) {
-                        $temp = static::getImages($field, $record, $modalSize);
+                        // Use modalSize to determine the image size to display
+                        // null or 'full' means original size, otherwise use the specified size
+                        $displaySize = ($modalSize === null || $modalSize === 'full') ? null : $modalSize;
+                        $temp = static::getImages($field, $record, $displaySize);
 
                         return view('file-manager::livewire.media-modal', ['images' => $temp ?? []]);
                     })->slideOver()
