@@ -12,7 +12,7 @@ class PopulateMediaMetadataCommand extends Command
     protected $signature = 'file-manager:populate-metadata 
                             {--model= : Specific model to process (e.g., Product)}
                             {--field= : Specific field to process (e.g., image_file_name)}
-                            {--chunk=1000 : Number of records to process per job}
+                            {--chunk=200 : Number of records to process per job}
                             {--dry-run : Show what would be processed without actually doing it}
                             {--sync : Process synchronously without using queue}';
 
