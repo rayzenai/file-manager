@@ -202,6 +202,7 @@ class ImageCompressionService
                         'message' => 'Background removal failed: API returned error',
                     ];
                 }
+
                 return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
             }
 
@@ -231,6 +232,7 @@ class ImageCompressionService
                     'message' => 'Background removal failed: ' . $t->getMessage(),
                 ];
             }
+
             return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
         }
     }

@@ -51,7 +51,7 @@ class MediaUpload extends FileUpload
     /**
      * Whether to remove background from images
      */
-    protected bool | \Closure $removeBackground = false;
+    protected bool|\Closure $removeBackground = false;
 
     /**
      * Set whether to upload original or resize.
@@ -122,7 +122,7 @@ class MediaUpload extends FileUpload
     /**
      * Set whether to remove background from images
      */
-    public function removeBg(bool | \Closure $removeBackground = true): static
+    public function removeBg(bool|\Closure $removeBackground = true): static
     {
         $this->removeBackground = $removeBackground;
 
@@ -317,7 +317,7 @@ class MediaUpload extends FileUpload
 
         // Evaluate the removeBackground value if it's a closure
         $shouldRemoveBackground = $this->evaluate($this->removeBackground);
-        
+
         // Compress the image (with optional background removal)
         $result = $compressionService->compressAndSave(
             $file->getRealPath(),
