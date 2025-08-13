@@ -44,14 +44,23 @@ class ImageCompressionService
         ?int $height = null,
         ?int $width = null,
         ?string $format = null,
-        ?string $mode = null
+        ?string $mode = null,
+        bool $removeBg = false
     ): array {
         $quality = $quality ?? $this->defaultQuality;
         $format = $format ?? $this->defaultFormat;
         $mode = $mode ?? $this->defaultMode;
 
         if ($this->compressionMethod === 'api' && ! empty($this->apiUrl)) {
-            return $this->compressViaApi($image, $quality, $height, $width, $format, $mode);
+            return $this->compressViaApi($image, $quality, $height, $width, $format, $mode, $removeBg);
+        }
+
+        // Note: GD library doesn't support background removal, only API does
+        if ($removeBg && $this->compressionMethod !== 'api') {
+            // Try to use API if background removal is requested but GD is configured
+            if (! empty($this->apiUrl)) {
+                return $this->compressViaApi($image, $quality, $height, $width, $format, $mode, $removeBg);
+            }
         }
 
         return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
@@ -144,7 +153,8 @@ class ImageCompressionService
         ?int $height,
         ?int $width,
         string $format,
-        string $mode
+        string $mode,
+        bool $removeBg = false
     ): array {
         try {
             $fileContent = $this->getFileContent($image);
@@ -164,6 +174,11 @@ class ImageCompressionService
                 $params['width'] = $width;
             }
 
+            // Add background removal parameter if requested
+            if ($removeBg) {
+                $params['removebg'] = 'true';
+            }
+
             $queryParams = http_build_query($params);
             $url = $this->apiUrl . '?' . $queryParams;
 
@@ -180,7 +195,13 @@ class ImageCompressionService
                 ->post($url);
 
             if (! $response->successful()) {
-                // Fallback to GD if API fails
+                // Fallback to GD if API fails (but can't do background removal with GD)
+                if ($removeBg) {
+                    return [
+                        'success' => false,
+                        'message' => 'Background removal failed: API returned error',
+                    ];
+                }
                 return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
             }
 
@@ -203,7 +224,13 @@ class ImageCompressionService
             ];
 
         } catch (Throwable $t) {
-            // Fallback to GD if API fails
+            // Fallback to GD if API fails (but can't do background removal with GD)
+            if ($removeBg) {
+                return [
+                    'success' => false,
+                    'message' => 'Background removal failed: ' . $t->getMessage(),
+                ];
+            }
             return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
         }
     }
@@ -219,10 +246,11 @@ class ImageCompressionService
         ?int $width = null,
         ?string $format = null,
         ?string $mode = null,
-        string $disk = 's3'
+        string $disk = 's3',
+        bool $removeBg = false
     ): array {
         try {
-            $result = $this->compress($image, $quality, $height, $width, $format, $mode);
+            $result = $this->compress($image, $quality, $height, $width, $format, $mode, $removeBg);
 
             if (! $result['success']) {
                 return $result;
