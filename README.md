@@ -11,6 +11,7 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 -   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
 -   🗜️ **Smart Compression** - WebP conversion with configurable quality settings
+-   🎭 **AI Background Removal** - Remove backgrounds from images using external API
 -   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
 -   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
 -   🎨 **Custom Filament Components** - MediaUpload and S3Image components
@@ -70,6 +71,11 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     FILE_MANAGER_COMPRESSION_ENABLED=true
     FILE_MANAGER_COMPRESSION_QUALITY=85
     FILE_MANAGER_COMPRESSION_FORMAT=webp
+    
+    # External API Settings (Required for background removal)
+    FILE_MANAGER_COMPRESSION_METHOD=api  # Use 'api' instead of 'gd'
+    FILE_MANAGER_COMPRESSION_API_URL=https://your-api-url.com/process-image
+    FILE_MANAGER_COMPRESSION_API_TOKEN=your-api-token
     ```
 
 5. **Register the plugin in your Filament panel provider:**
@@ -193,6 +199,7 @@ MediaUpload::make('image')
     ->uploadOriginal()          // Upload without resizing (default: true)
     ->useCompression()          // Enable smart compression (default: true)
     ->trackMetadata()           // Track file metadata (default: true)
+    ->removeBg()                // Remove background (requires API, default: false)
     ->multiple()                // Allow multiple files
     ->directory('custom-dir')   // Custom directory (optional)
 ```
@@ -201,9 +208,51 @@ MediaUpload::make('image')
 
 -   Automatic WebP conversion for better performance
 -   Smart compression for files over threshold
+-   AI-powered background removal (API only)
 -   Metadata tracking with compression stats
 -   Supports both images and videos
 -   SEO-friendly file naming
+
+#### Background Removal
+
+The `removeBg()` method enables AI-powered background removal for images. This feature **requires external API configuration** and is not available with the GD library method.
+
+```php
+// Enable background removal with boolean
+MediaUpload::make('image')
+    ->removeBg(true)
+    
+// Or use the convenience method
+MediaUpload::make('image')
+    ->withoutBackground()
+
+// Dynamic background removal with closure
+use Filament\Forms\Components\Toggle;
+
+Toggle::make('remove_bg')
+    ->label('Remove Background')
+    ->dehydrated(false)  // Don't save to database
+
+MediaUpload::make('image')
+    ->removeBg(fn (Get $get) => $get('remove_bg'))
+```
+
+**Important:** When using Toggle fields for background removal control, use `dehydrated(false)` or handle the field in `mutateFormDataBeforeCreate()` and `mutateFormDataBeforeSave()` to prevent database errors:
+
+```php
+// In your Filament Resource
+protected function mutateFormDataBeforeCreate(array $data): array
+{
+    unset($data['remove_bg']);
+    return $data;
+}
+
+protected function mutateFormDataBeforeSave(array $data): array
+{
+    unset($data['remove_bg']);
+    return $data;
+}
+```
 
 ### S3Image Column
 
@@ -313,7 +362,21 @@ $result = $service->compressAndSave(
     width: null,  // Auto-calculate
     format: 'webp',
     mode: 'contain',
-    disk: 's3'
+    disk: 's3',
+    removeBg: false  // Set to true for background removal (API only)
+);
+
+// Compress with background removal (requires API configuration)
+$result = $service->compressAndSave(
+    sourcePath: '/tmp/product.jpg',
+    destinationPath: 'products/product-no-bg.webp',
+    quality: 90,
+    height: 720,
+    width: null,
+    format: 'webp',
+    mode: 'contain',
+    disk: 's3',
+    removeBg: true  // Requires FILE_MANAGER_COMPRESSION_METHOD=api
 );
 
 // Compress existing S3 file
@@ -322,6 +385,11 @@ $result = $service->compressExisting(
     quality: 80
 );
 ```
+
+**Compression Methods:**
+
+- **GD Library (`method: 'gd'`)**: Built-in PHP image processing. Supports resizing, format conversion, and basic compression. Does not support background removal.
+- **External API (`method: 'api'`)**: Uses external image processing service. Supports all GD features plus AI-powered background removal. Requires API configuration.
 
 ## Queue Jobs
 

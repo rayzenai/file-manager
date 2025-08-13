@@ -49,6 +49,11 @@ class MediaUpload extends FileUpload
     protected bool $compressionUsed = false;
 
     /**
+     * Whether to remove background from images
+     */
+    protected bool|\Closure $removeBackground = false;
+
+    /**
      * Set whether to upload original or resize.
      */
     public function uploadOriginal(bool $uploadOriginal = true): static
@@ -112,6 +117,24 @@ class MediaUpload extends FileUpload
         $this->trackMetadata = $trackMetadata;
 
         return $this;
+    }
+
+    /**
+     * Set whether to remove background from images
+     */
+    public function removeBg(bool|\Closure $removeBackground = true): static
+    {
+        $this->removeBackground = $removeBackground;
+
+        return $this;
+    }
+
+    /**
+     * Convenience method to enable background removal
+     */
+    public function withoutBackground(): static
+    {
+        return $this->removeBg(true);
     }
 
     /**
@@ -292,16 +315,20 @@ class MediaUpload extends FileUpload
         $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
         $fullPath = "{$directory}/{$filename}";
 
-        // Compress the image
+        // Evaluate the removeBackground value if it's a closure
+        $shouldRemoveBackground = $this->evaluate($this->removeBackground);
+
+        // Compress the image (with optional background removal)
         $result = $compressionService->compressAndSave(
             $file->getRealPath(),
             $fullPath,
-            config('file-manager.compression.quality'),
-            config('file-manager.compression.height'),
-            config('file-manager.compression.width'),
+            (int) config('file-manager.compression.quality'),
+            config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
+            config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
             config('file-manager.compression.format'),
             config('file-manager.compression.mode'),
-            's3'
+            's3',
+            $shouldRemoveBackground  // Pass the evaluated removeBg flag
         );
 
         if ($result['success']) {
