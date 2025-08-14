@@ -253,7 +253,6 @@ class ImageCompressionService
     ): array {
         try {
             $result = $this->compress($image, $quality, $height, $width, $format, $mode, $removeBg);
-
             if (! $result['success']) {
                 return $result;
             }
