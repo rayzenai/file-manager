@@ -48,9 +48,13 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     php artisan vendor:publish --tag="file-manager-config"
     ```
 
-3. **Run migrations (for media metadata):**
+3. **Publish and run migrations (for media metadata):**
 
     ```bash
+    # Publish migration files to your app
+    php artisan vendor:publish --provider="Kirantimsina\FileManager\FileManagerServiceProvider" --tag="file-manager-migrations"
+    
+    # Run the migrations
     php artisan migrate
     ```
 

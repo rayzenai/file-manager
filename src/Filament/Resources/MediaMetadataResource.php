@@ -562,6 +562,85 @@ class MediaMetadataResource extends Resource
                         }
                     }),
 
+                Action::make('rename')
+                    ->label('Rename')
+                    ->icon('heroicon-o-pencil')
+                    ->color('primary')
+                    ->modalHeading('Rename File')
+                    ->modalDescription(fn (MediaMetadata $record): string => "Current name: {$record->file_name}")
+                    ->schema([
+                        TextInput::make('new_filename')
+                            ->label('New Filename')
+                            ->placeholder('Enter new filename with full path')
+                            ->required()
+                            ->default(fn (MediaMetadata $record): string => $record->file_name)
+                            ->helperText('Enter the full path and filename (e.g., uploads/images/photo.jpg)')
+                            ->rules(fn ($record) => [
+                                'required',
+                                'string',
+                                function (string $attribute, $value, \Closure $fail) use ($record) {
+                                    // Check if file already exists on S3 (only if different from current)
+                                    if ($value !== $record->file_name && Storage::disk('s3')->exists($value)) {
+                                        $fail('A file with this name already exists.');
+                                    }
+                                },
+                            ]),
+                    ])
+                    ->action(function (MediaMetadata $record, array $data): void {
+                        try {
+                            $oldFileName = $record->file_name;
+                            $newFileName = $data['new_filename'];
+
+                            // Skip if same name
+                            if ($newFileName === $oldFileName) {
+                                Notification::make()
+                                    ->title('No changes made')
+                                    ->body('The filename is the same as before.')
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
+                            // Update the parent model's field
+                            $model = $record->mediable_type::find($record->mediable_id);
+                            if ($model) {
+                                $field = $record->mediable_field;
+
+                                // Handle array fields
+                                if (is_array($model->{$field})) {
+                                    $values = $model->{$field};
+                                    $key = array_search($oldFileName, $values);
+                                    if ($key !== false) {
+                                        $values[$key] = $newFileName;
+                                        $model->updateQuietly([$field => $values]);
+                                    }
+                                } else {
+                                    // Single value field
+                                    if ($model->{$field} === $oldFileName) {
+                                        $model->updateQuietly([$field => $newFileName]);
+                                    }
+                                }
+                            }
+
+                            // Update the metadata record
+                            $record->update(['file_name' => $newFileName]);
+
+                            Notification::make()
+                                ->title('File renamed successfully')
+                                ->body("Database updated from '{$oldFileName}' to '{$newFileName}'.")
+                                ->success()
+                                ->send();
+
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Rename failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
                 Action::make('delete_resized')
                     ->label('Delete Resized')
                     ->icon('heroicon-o-trash')

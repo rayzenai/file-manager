@@ -42,7 +42,7 @@ return [
         'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
         
         // Files larger than this will be compressed (in bytes)
-        'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 500 * 1024), // 500KB
+        'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB
         
         // API settings (if using external compression API)
         'api' => [
