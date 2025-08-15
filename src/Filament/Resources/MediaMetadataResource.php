@@ -279,7 +279,7 @@ class MediaMetadataResource extends Resource
 
                             try {
                                 $result = static::compressMediaRecord($record, $data, $compressionService);
-                                
+
                                 if ($result['success']) {
                                     // Store compression details for the notification
                                     $originalKb = round($result['original_size'] / 1024);
@@ -620,7 +620,7 @@ class MediaMetadataResource extends Resource
                         try {
                             $compressionService = new ImageCompressionService;
                             $result = static::compressMediaRecord($record, $data, $compressionService);
-                            
+
                             if ($result['success']) {
                                 $savedKb = round($result['saved'] / 1024, 2);
                                 $compressionRatio = round(($result['saved'] / $result['original_size']) * 100, 1);
