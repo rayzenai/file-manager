@@ -225,6 +225,7 @@ class MediaMetadataResource extends Resource
             ->toolbarActions([
                 BulkAction::make('bulk_compress')
                     ->label('Compress Images')
+                    ->deselectRecordsAfterCompletion()
                     ->icon('heroicon-o-arrows-pointing-in')
                     ->color('warning')
                     ->requiresConfirmation()
@@ -340,6 +341,7 @@ class MediaMetadataResource extends Resource
 
                 BulkAction::make('bulk_resize')
                     ->label('Resize Images')
+                    ->deselectRecordsAfterCompletion()
                     ->icon('heroicon-o-arrows-pointing-out')
                     ->color('info')
                     ->requiresConfirmation()
@@ -377,6 +379,7 @@ class MediaMetadataResource extends Resource
 
                 BulkAction::make('bulk_delete_resized')
                     ->label('Delete Resized Versions')
+                    ->deselectRecordsAfterCompletion()
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
