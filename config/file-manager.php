@@ -11,9 +11,9 @@ return [
 
     // The ModelName => path syntax is used to store the uploaded files in the respective folder
     'model' => [
-        'User' => 'users',
-        'Mockup' => 'mockups',
-        'Product' => 'products',
+        'App\Models\User' => 'users', // Or use User::class
+        'App\Models\Mockup' => 'mockups', // Mockup::class
+        'App\Models\Product' => 'products', // Product::class
     ],
 
     /**
