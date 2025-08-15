@@ -10,7 +10,7 @@ use Kirantimsina\FileManager\Jobs\PopulateMediaMetadataJob;
 class PopulateMediaMetadataCommand extends Command
 {
     protected $signature = 'file-manager:populate-metadata 
-                            {--model= : Specific model to process (e.g., Product)}
+                            {--model= : Specific model to process (e.g., Product or App\\Models\\Product)}
                             {--field= : Specific field to process (e.g., image_file_name)}
                             {--chunk=1000 : Number of records to process per job}
                             {--dry-run : Show what would be processed without actually doing it}
@@ -127,8 +127,31 @@ class PopulateMediaMetadataCommand extends Command
 
         if ($specificModel = $this->option('model')) {
             // Process only the specified model
-            $modelClass = "App\\Models\\{$specificModel}";
-            $directory = $configuredModels[$specificModel] ?? null;
+            // Check if the specific model is already a class name
+            if (class_exists($specificModel)) {
+                $modelClass = $specificModel;
+            } else {
+                // Try with App\Models namespace
+                $modelClass = "App\\Models\\{$specificModel}";
+            }
+
+            // Find the directory for this model
+            $directory = null;
+            foreach ($configuredModels as $key => $dir) {
+                // Skip non-model entries like 'temp'
+                if ($key === 'temp' || is_numeric($key)) {
+                    continue;
+                }
+
+                // Check if key matches our model class
+                if ($key === $modelClass ||
+                    $key === $specificModel ||
+                    (class_exists($key) && $key === $modelClass) ||
+                    (class_exists($key) && class_basename($key) === $specificModel)) {
+                    $directory = $dir;
+                    break;
+                }
+            }
 
             if (! $directory) {
                 $this->error("Model {$specificModel} is not configured in file-manager.model config");
@@ -141,9 +164,22 @@ class PopulateMediaMetadataCommand extends Command
 
         // Process all configured models
         $models = [];
-        foreach ($configuredModels as $modelName => $directory) {
-            $modelClass = "App\\Models\\{$modelName}";
-            $models[$modelClass] = $directory;
+        foreach ($configuredModels as $modelKey => $directory) {
+            // Skip non-model entries like 'temp'
+            if ($modelKey === 'temp' || is_numeric($modelKey)) {
+                continue;
+            }
+
+            // Check if the key is already a class (using ::class syntax in config)
+            if (class_exists($modelKey)) {
+                $models[$modelKey] = $directory;
+            } else {
+                // Legacy support: treat as string model name
+                $modelClass = "App\\Models\\{$modelKey}";
+                if (class_exists($modelClass)) {
+                    $models[$modelClass] = $directory;
+                }
+            }
         }
 
         return $models;
