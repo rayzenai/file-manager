@@ -259,10 +259,10 @@ class MediaMetadataResource extends Resource
                         FormToggle::make('replace_original')
                             ->label('Replace original files')
                             ->helperText('This will permanently replace the original files with compressed versions')
-                            ->default(true),
+                            ->default(false),
                         FormToggle::make('resize_after')
                             ->label('Resize all versions after compression')
-                            ->default(false),
+                            ->default(true),
                     ])
                     ->action(function (Collection $records, array $data): void {
                         $compressionService = new ImageCompressionService;
