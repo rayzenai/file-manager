@@ -33,7 +33,7 @@ class ImageCompressionService
         $this->defaultQuality = config('file-manager.compression.quality', 85);
         $this->defaultFormat = config('file-manager.compression.format', 'webp');
         $this->defaultMode = config('file-manager.compression.mode', 'contain');
-        $this->timeout = config('file-manager.compression.api.timeout', 30);
+        $this->timeout = config('file-manager.compression.api.timeout', 60); // Increased default to 60 seconds
     }
 
     /**
@@ -175,6 +175,18 @@ class ImageCompressionService
             $fileContent = $this->getFileContent($image);
             if (! $fileContent['success']) {
                 return $fileContent;
+            }
+            
+            // Check file size - skip API for files over 5MB to avoid timeouts
+            $fileSizeInMb = strlen($fileContent['data']['content']) / (1024 * 1024);
+            if ($fileSizeInMb > 5 && !$removeBg) {
+                // For large files, fall back to GD unless background removal is required
+                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                if ($gdResult['success']) {
+                    $gdResult['data']['compression_method'] = 'gd_fallback';
+                    $gdResult['data']['api_fallback_reason'] = 'File too large for API (' . round($fileSizeInMb, 2) . ' MB)';
+                }
+                return $gdResult;
             }
 
             // Build API request parameters
