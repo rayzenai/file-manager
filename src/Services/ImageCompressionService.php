@@ -33,7 +33,7 @@ class ImageCompressionService
         $this->defaultQuality = config('file-manager.compression.quality', 85);
         $this->defaultFormat = config('file-manager.compression.format', 'webp');
         $this->defaultMode = config('file-manager.compression.mode', 'contain');
-        $this->timeout = config('file-manager.compression.api.timeout', 30);
+        $this->timeout = config('file-manager.compression.api.timeout', 60); // Increased default to 60 seconds
     }
 
     /**
@@ -121,6 +121,11 @@ class ImageCompressionService
 
             $compressedSize = strlen($compressedContent);
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
+            
+            // Get final dimensions after processing
+            $finalImg = ImageManager::gd()->read($compressedContent);
+            $finalWidth = $finalImg->width();
+            $finalHeight = $finalImg->height();
 
             return [
                 'success' => true,
@@ -131,8 +136,8 @@ class ImageCompressionService
                     'compression_ratio' => $compressionRatio . '%',
                     'filename' => $fileContent['data']['filename'],
                     'format' => $format,
-                    'width' => $img->width(),
-                    'height' => $img->height(),
+                    'width' => $finalWidth,
+                    'height' => $finalHeight,
                     'compression_method' => 'gd',
                 ],
                 'message' => 'Image compressed successfully using GD',
@@ -175,6 +180,18 @@ class ImageCompressionService
             $fileContent = $this->getFileContent($image);
             if (! $fileContent['success']) {
                 return $fileContent;
+            }
+            
+            // Check file size - skip API for files over 5MB to avoid timeouts
+            $fileSizeInMb = strlen($fileContent['data']['content']) / (1024 * 1024);
+            if ($fileSizeInMb > 5 && !$removeBg) {
+                // For large files, fall back to GD unless background removal is required
+                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                if ($gdResult['success']) {
+                    $gdResult['data']['compression_method'] = 'gd_fallback';
+                    $gdResult['data']['api_fallback_reason'] = 'File too large for API (' . round($fileSizeInMb, 2) . ' MB)';
+                }
+                return $gdResult;
             }
 
             // Build API request parameters
@@ -232,6 +249,17 @@ class ImageCompressionService
             $originalSize = strlen($fileContent['data']['content']);
             $compressedSize = strlen($compressedImage);
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
+            
+            // Get dimensions of the compressed image
+            try {
+                $compressedImg = ImageManager::gd()->read($compressedImage);
+                $finalWidth = $compressedImg->width();
+                $finalHeight = $compressedImg->height();
+            } catch (\Exception $e) {
+                // If we can't read dimensions, set to null
+                $finalWidth = $width ?? null;
+                $finalHeight = $height ?? null;
+            }
 
             return [
                 'success' => true,
@@ -242,6 +270,8 @@ class ImageCompressionService
                     'compression_ratio' => $compressionRatio . '%',
                     'filename' => $fileContent['data']['filename'],
                     'format' => $format,
+                    'width' => $finalWidth,
+                    'height' => $finalHeight,
                     'compression_method' => 'api',
                 ],
                 'message' => 'Image compressed successfully using API',

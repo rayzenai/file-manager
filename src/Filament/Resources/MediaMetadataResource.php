@@ -802,6 +802,7 @@ class MediaMetadataResource extends Resource
     {
         return [
             'index' => Pages\ManageMediaMetadata::route('/'),
+            'image-processor' => Pages\ImageProcessor::route('/image-processor'),
         ];
     }
 

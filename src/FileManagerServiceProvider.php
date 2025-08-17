@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Kirantimsina\FileManager;
 
 use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
+use Kirantimsina\FileManager\Commands\TestCompressionApiCommand;
+use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages\ImageProcessor;
+use Livewire\Livewire;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -23,6 +26,15 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasRoute('web')
             ->hasViews()
             ->hasMigration('2025_01_09_000001_create_media_metadata_table')
-            ->hasCommand(PopulateMediaMetadataCommand::class);
+            ->hasCommands([
+                PopulateMediaMetadataCommand::class,
+                TestCompressionApiCommand::class,
+            ]);
+    }
+    
+    public function packageBooted(): void
+    {
+        // Register Livewire components
+        Livewire::component('kirantimsina.file-manager.filament.resources.media-metadata-resource.pages.image-processor', ImageProcessor::class);
     }
 }
