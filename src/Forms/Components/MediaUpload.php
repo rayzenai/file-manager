@@ -53,6 +53,11 @@ class MediaUpload extends FileUpload
      * Whether to remove background from images
      */
     protected bool|\Closure $removeBackground = false;
+    
+    /**
+     * Compression driver to use (overrides config)
+     */
+    protected ?string $compressionDriver = null;
 
     /**
      * Set whether to upload original or resize.
@@ -136,6 +141,20 @@ class MediaUpload extends FileUpload
     public function withoutBackground(): static
     {
         return $this->removeBg(true);
+    }
+    
+    /**
+     * Set the compression driver (gd or api)
+     */
+    public function driver(string $driver): static
+    {
+        if (!in_array($driver, ['gd', 'api'])) {
+            throw new \InvalidArgumentException("Invalid compression driver: {$driver}. Must be 'gd' or 'api'.");
+        }
+        
+        $this->compressionDriver = $driver;
+        
+        return $this;
     }
 
     /**
@@ -326,28 +345,106 @@ class MediaUpload extends FileUpload
         $model,
         string $directory
     ): string {
-        $compressionService = new ImageCompressionService;
+        try {
+            // First, ensure we can access the file
+            $tempPath = null;
+            
+            // Try different methods to get the file path
+            if (method_exists($file, 'getRealPath') && $file->getRealPath() && file_exists($file->getRealPath())) {
+                $tempPath = $file->getRealPath();
+            } elseif (method_exists($file, 'path') && $file->path() && file_exists($file->path())) {
+                $tempPath = $file->path();
+            } else {
+                // Create a temporary copy if we can't access the original
+                $fileContent = null;
+                
+                // Try to get content from the file object
+                if (method_exists($file, 'get')) {
+                    $fileContent = $file->get();
+                } elseif (method_exists($file, 'getContent')) {
+                    $fileContent = $file->getContent();
+                }
+                
+                if ($fileContent) {
+                    $tempPath = sys_get_temp_dir() . '/' . uniqid('media_') . '_' . $file->getClientOriginalName();
+                    file_put_contents($tempPath, $fileContent);
+                } else {
+                    throw new \Exception('Cannot access temporary file content');
+                }
+            }
+            
+            $compressionService = new ImageCompressionService;
+            
+            // Override compression method if driver is specified
+            $originalMethod = null;
+            if ($this->compressionDriver !== null) {
+                $originalMethod = config('file-manager.compression.method');
+                config(['file-manager.compression.method' => $this->compressionDriver]);
+            }
 
-        // Always use webp for compressed images
-        $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
-        $fullPath = "{$directory}/{$filename}";
+            // Always use webp for compressed images
+            $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+            $fullPath = "{$directory}/{$filename}";
 
-        // Evaluate the removeBackground value if it's a closure
-        $shouldRemoveBackground = $this->evaluate($this->removeBackground);
+            // Evaluate the removeBackground value if it's a closure
+            $shouldRemoveBackground = $this->evaluate($this->removeBackground);
 
-        // Compress the image (with optional background removal)
-        // Pass the TemporaryUploadedFile object directly instead of path
-        $result = $compressionService->compressAndSave(
-            $file,
-            $fullPath,
-            (int) config('file-manager.compression.quality'),
-            config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
-            config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
-            config('file-manager.compression.format'),
-            config('file-manager.compression.mode'),
-            's3',
-            $shouldRemoveBackground  // Pass the evaluated removeBg flag
-        );
+            // Compress the image (with optional background removal)
+            // Pass the file path instead of the TemporaryUploadedFile object
+            $result = $compressionService->compressAndSave(
+                $tempPath,
+                $fullPath,
+                (int) config('file-manager.compression.quality'),
+                config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
+                config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
+                config('file-manager.compression.format'),
+                config('file-manager.compression.mode'),
+                's3',
+                $shouldRemoveBackground  // Pass the evaluated removeBg flag
+            );
+            
+            // Restore original compression method if we changed it
+            if ($originalMethod !== null) {
+                config(['file-manager.compression.method' => $originalMethod]);
+            }
+            
+            // Clean up temporary file if we created one
+            if ($tempPath && strpos($tempPath, sys_get_temp_dir()) === 0 && file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+            
+        } catch (\Exception $e) {
+            // If compression fails, try with the original file object
+            $compressionService = new ImageCompressionService;
+            
+            // Apply driver override in fallback too
+            $originalMethod = null;
+            if ($this->compressionDriver !== null) {
+                $originalMethod = config('file-manager.compression.method');
+                config(['file-manager.compression.method' => $this->compressionDriver]);
+            }
+            
+            $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+            $fullPath = "{$directory}/{$filename}";
+            $shouldRemoveBackground = $this->evaluate($this->removeBackground);
+            
+            $result = $compressionService->compressAndSave(
+                $file,
+                $fullPath,
+                (int) config('file-manager.compression.quality'),
+                config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
+                config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
+                config('file-manager.compression.format'),
+                config('file-manager.compression.mode'),
+                's3',
+                $shouldRemoveBackground
+            );
+            
+            // Restore original method after fallback
+            if ($originalMethod !== null) {
+                config(['file-manager.compression.method' => $originalMethod]);
+            }
+        }
 
         if ($result['success']) {
             // Mark that compression was used

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages;
 
+use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -419,6 +420,17 @@ class ImageProcessor extends Page implements HasForms
         };
     }
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('back_to_media')
+                ->label('Media Metadata')
+                ->icon('heroicon-o-arrow-left')
+                ->color('gray')
+                ->url(fn () => MediaMetadataResource::getUrl('index')),
+        ];
+    }
+    
     public static function canAccess(array $parameters = []): bool
     {
         // You can add permission checks here
