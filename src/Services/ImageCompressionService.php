@@ -317,16 +317,28 @@ class ImageCompressionService
                 return $result;
             }
 
-            $saved = Storage::disk($disk)->put(
-                $outputPath,
-                $result['data']['compressed_image'],
-                'public'
-            );
+            // Use putFileAs for more reliable S3 uploads
+            try {
+                $saved = Storage::disk($disk)->put(
+                    $outputPath,
+                    $result['data']['compressed_image']
+                );
+                
+                // Set visibility separately if needed
+                if ($disk === 's3' && $saved) {
+                    Storage::disk($disk)->setVisibility($outputPath, 'public');
+                }
+            } catch (\Exception $e) {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to save compressed image: ' . $e->getMessage(),
+                ];
+            }
 
             if (! $saved) {
                 return [
                     'success' => false,
-                    'message' => 'Failed to save compressed image',
+                    'message' => 'Failed to save compressed image to storage',
                 ];
             }
 
