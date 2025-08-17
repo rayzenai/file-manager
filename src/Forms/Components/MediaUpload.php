@@ -373,14 +373,15 @@ class MediaUpload extends FileUpload
                 }
             }
             
-            $compressionService = new ImageCompressionService;
-            
             // Override compression method if driver is specified
             $originalMethod = null;
             if ($this->compressionDriver !== null) {
                 $originalMethod = config('file-manager.compression.method');
                 config(['file-manager.compression.method' => $this->compressionDriver]);
             }
+            
+            // Create compression service AFTER config override
+            $compressionService = new ImageCompressionService;
 
             // Always use webp for compressed images
             $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
@@ -415,7 +416,6 @@ class MediaUpload extends FileUpload
             
         } catch (\Exception $e) {
             // If compression fails, try with the original file object
-            $compressionService = new ImageCompressionService;
             
             // Apply driver override in fallback too
             $originalMethod = null;
@@ -423,6 +423,9 @@ class MediaUpload extends FileUpload
                 $originalMethod = config('file-manager.compression.method');
                 config(['file-manager.compression.method' => $this->compressionDriver]);
             }
+            
+            // Create compression service AFTER config override
+            $compressionService = new ImageCompressionService;
             
             $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
             $fullPath = "{$directory}/{$filename}";

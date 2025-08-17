@@ -121,6 +121,11 @@ class ImageCompressionService
 
             $compressedSize = strlen($compressedContent);
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
+            
+            // Get final dimensions after processing
+            $finalImg = ImageManager::gd()->read($compressedContent);
+            $finalWidth = $finalImg->width();
+            $finalHeight = $finalImg->height();
 
             return [
                 'success' => true,
@@ -131,8 +136,8 @@ class ImageCompressionService
                     'compression_ratio' => $compressionRatio . '%',
                     'filename' => $fileContent['data']['filename'],
                     'format' => $format,
-                    'width' => $img->width(),
-                    'height' => $img->height(),
+                    'width' => $finalWidth,
+                    'height' => $finalHeight,
                     'compression_method' => 'gd',
                 ],
                 'message' => 'Image compressed successfully using GD',
@@ -244,6 +249,17 @@ class ImageCompressionService
             $originalSize = strlen($fileContent['data']['content']);
             $compressedSize = strlen($compressedImage);
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
+            
+            // Get dimensions of the compressed image
+            try {
+                $compressedImg = ImageManager::gd()->read($compressedImage);
+                $finalWidth = $compressedImg->width();
+                $finalHeight = $compressedImg->height();
+            } catch (\Exception $e) {
+                // If we can't read dimensions, set to null
+                $finalWidth = $width ?? null;
+                $finalHeight = $height ?? null;
+            }
 
             return [
                 'success' => true,
@@ -254,6 +270,8 @@ class ImageCompressionService
                     'compression_ratio' => $compressionRatio . '%',
                     'filename' => $fileContent['data']['filename'],
                     'format' => $format,
+                    'width' => $finalWidth,
+                    'height' => $finalHeight,
                     'compression_method' => 'api',
                 ],
                 'message' => 'Image compressed successfully using API',
