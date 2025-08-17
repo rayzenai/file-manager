@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Throwable;
 
 class ImageCompressionService
@@ -132,14 +133,28 @@ class ImageCompressionService
                     'format' => $format,
                     'width' => $img->width(),
                     'height' => $img->height(),
+                    'compression_method' => 'gd',
                 ],
                 'message' => 'Image compressed successfully using GD',
             ];
 
         } catch (Throwable $t) {
+            // Provide more context about the error
+            $errorMessage = 'GD compression failed: ' . $t->getMessage();
+
+            // Add helpful debugging info
+            if (str_contains($t->getMessage(), 'Unable to decode')) {
+                $errorMessage .= ' - The image file may be corrupted or in an unsupported format.';
+            }
+
             return [
                 'success' => false,
-                'message' => 'GD compression failed: ' . $t->getMessage(),
+                'message' => $errorMessage,
+                'debug' => [
+                    'file_exists' => isset($fileContent['data']['content']),
+                    'file_size' => isset($fileContent['data']['content']) ? strlen($fileContent['data']['content']) : 0,
+                    'exception_class' => get_class($t),
+                ],
             ];
         }
     }
@@ -203,7 +218,14 @@ class ImageCompressionService
                     ];
                 }
 
-                return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                // Fallback to GD and mark it as a fallback
+                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                if ($gdResult['success']) {
+                    $gdResult['data']['compression_method'] = 'gd_fallback';
+                    $gdResult['data']['api_fallback_reason'] = 'API returned status ' . $response->status();
+                }
+
+                return $gdResult;
             }
 
             $compressedImage = $response->body();
@@ -220,6 +242,7 @@ class ImageCompressionService
                     'compression_ratio' => $compressionRatio . '%',
                     'filename' => $fileContent['data']['filename'],
                     'format' => $format,
+                    'compression_method' => 'api',
                 ],
                 'message' => 'Image compressed successfully using API',
             ];
@@ -233,7 +256,14 @@ class ImageCompressionService
                 ];
             }
 
-            return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+            // Fallback to GD and mark it as a fallback
+            $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+            if ($gdResult['success']) {
+                $gdResult['data']['compression_method'] = 'gd_fallback';
+                $gdResult['data']['api_fallback_reason'] = 'API exception: ' . $t->getMessage();
+            }
+
+            return $gdResult;
         }
     }
 
@@ -289,6 +319,31 @@ class ImageCompressionService
     private function getFileContent($image): array
     {
         try {
+            // Handle TemporaryUploadedFile (Livewire)
+            if ($image instanceof TemporaryUploadedFile) {
+                $realPath = $image->getRealPath();
+                if (! file_exists($realPath)) {
+                    // Try to get content from the temporary path
+                    $tempPath = $image->path();
+                    if (file_exists($tempPath)) {
+                        $realPath = $tempPath;
+                    } else {
+                        return [
+                            'success' => false,
+                            'message' => 'Temporary file not found or already moved',
+                        ];
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'content' => file_get_contents($realPath),
+                        'filename' => $image->getClientOriginalName(),
+                    ],
+                ];
+            }
+
             // Handle UploadedFile
             if ($image instanceof UploadedFile) {
                 return [
