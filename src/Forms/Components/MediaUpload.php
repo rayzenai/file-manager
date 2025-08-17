@@ -6,6 +6,7 @@ namespace Kirantimsina\FileManager\Forms\Components;
 
 use Exception;
 use Filament\Forms\Components\FileUpload;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -253,6 +254,22 @@ class MediaUpload extends FileUpload
     }
 
     /**
+     * Format bytes to human readable format
+     */
+    protected function formatBytes(int $bytes, int $precision = 2): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+
+        $bytes /= pow(1024, $pow);
+
+        return round($bytes, $precision) . ' ' . $units[$pow];
+    }
+
+    /**
      * Example of how you pick a 'tag' for the file name.
      */
     private static function tag(callable $get)
@@ -319,8 +336,9 @@ class MediaUpload extends FileUpload
         $shouldRemoveBackground = $this->evaluate($this->removeBackground);
 
         // Compress the image (with optional background removal)
+        // Pass the TemporaryUploadedFile object directly instead of path
         $result = $compressionService->compressAndSave(
-            $file->getRealPath(),
+            $file,
             $fullPath,
             (int) config('file-manager.compression.quality'),
             config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
@@ -335,6 +353,45 @@ class MediaUpload extends FileUpload
             // Mark that compression was used
             $this->compressionUsed = true;
 
+            // Format file sizes for display
+            $originalSizeFormatted = $this->formatBytes($result['data']['original_size'] ?? 0);
+            $compressedSizeFormatted = $this->formatBytes($result['data']['compressed_size'] ?? 0);
+            $compressionRatio = $result['data']['compression_ratio'] ?? '0%';
+
+            // Check compression method and send appropriate notification
+            if (isset($result['data']['compression_method'])) {
+                if ($result['data']['compression_method'] === 'gd_fallback') {
+                    // API failed, used GD as fallback
+                    $reason = $result['data']['api_fallback_reason'] ?? 'Unknown reason';
+                    Notification::make()
+                        ->warning()
+                        ->title('API Compression Failed - Used GD Fallback')
+                        ->body("API Error: {$reason}<br>
+                               Compressed with GD: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                               Saved: {$compressionRatio}")
+                        ->duration(8000)
+                        ->send();
+                } elseif ($result['data']['compression_method'] === 'gd') {
+                    // Direct GD compression
+                    Notification::make()
+                        ->success()
+                        ->title('Image Compressed with GD')
+                        ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                               Saved: {$compressionRatio}")
+                        ->duration(5000)
+                        ->send();
+                } elseif ($result['data']['compression_method'] === 'api') {
+                    // Successful API compression
+                    Notification::make()
+                        ->success()
+                        ->title('Image Compressed via API')
+                        ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                               Saved: {$compressionRatio}")
+                        ->duration(5000)
+                        ->send();
+                }
+            }
+
             // Create metadata with compression info
             if ($this->trackMetadata && config('file-manager.media_metadata.enabled') && $model) {
                 $metadata = $this->createMetadata($model, $this->getName(), $fullPath, $file);
@@ -347,8 +404,9 @@ class MediaUpload extends FileUpload
                                 'original_size' => $result['data']['original_size'] ?? null,
                                 'compressed_size' => $result['data']['compressed_size'] ?? null,
                                 'compression_ratio' => $result['data']['compression_ratio'] ?? null,
-                                'method' => config('file-manager.compression.method'),
+                                'method' => $result['data']['compression_method'] ?? config('file-manager.compression.method'),
                                 'compressed_at' => now()->toIso8601String(),
+                                'api_fallback_reason' => $result['data']['api_fallback_reason'] ?? null,
                             ],
                         ]),
                     ]);
@@ -356,6 +414,15 @@ class MediaUpload extends FileUpload
             }
 
             return $fullPath;
+        } else {
+            // Compression completely failed, show error notification
+            Notification::make()
+                ->danger()
+                ->title('Compression Failed')
+                ->body('Error: ' . ($result['message'] ?? 'Unknown error') . '<br>
+                       Uploading original file without compression.')
+                ->duration(8000)
+                ->send();
         }
 
         // Fallback to regular upload if compression fails

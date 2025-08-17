@@ -614,7 +614,7 @@ class MediaMetadataResource extends Resource
                         FormToggle::make('replace_original')
                             ->label('Replace original file')
                             ->helperText('This will permanently replace the original file with the compressed version')
-                            ->default(true),
+                            ->default(false),
                         FormToggle::make('resize_after')
                             ->label('Resize all versions after compression')
                             ->default(true),
@@ -628,11 +628,41 @@ class MediaMetadataResource extends Resource
                                 $savedKb = round($result['saved'] / 1024, 2);
                                 $compressionRatio = round(($result['saved'] / $result['original_size']) * 100, 1);
 
-                                Notification::make()
-                                    ->title('Image compressed successfully')
-                                    ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                    ->success()
-                                    ->send();
+                                // Check compression method and show appropriate notification
+                                $compressionMethod = $result['compression_method'] ?? 'unknown';
+
+                                if ($compressionMethod === 'gd_fallback') {
+                                    // API failed, used GD as fallback
+                                    $reason = $result['api_fallback_reason'] ?? 'Unknown reason';
+                                    Notification::make()
+                                        ->warning()
+                                        ->title('API Compression Failed - Used GD Fallback')
+                                        ->body("API Error: {$reason}<br>
+                                               Compressed with GD: Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                        ->duration(8000)
+                                        ->send();
+                                } elseif ($compressionMethod === 'gd') {
+                                    // Direct GD compression
+                                    Notification::make()
+                                        ->success()
+                                        ->title('Image Compressed with GD')
+                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                        ->send();
+                                } elseif ($compressionMethod === 'api') {
+                                    // Successful API compression
+                                    Notification::make()
+                                        ->success()
+                                        ->title('Image Compressed via API')
+                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                        ->send();
+                                } else {
+                                    // Fallback for unknown method
+                                    Notification::make()
+                                        ->success()
+                                        ->title('Image compressed successfully')
+                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                        ->send();
+                                }
                             } else {
                                 throw new \Exception($result['message'] ?? 'Compression failed');
                             }
@@ -900,6 +930,8 @@ class MediaMetadataResource extends Resource
                 'original_size' => $result['data']['original_size'],
                 'compressed_size' => $result['data']['compressed_size'],
                 'saved' => $result['data']['original_size'] - $result['data']['compressed_size'],
+                'compression_method' => $result['data']['compression_method'] ?? null,
+                'api_fallback_reason' => $result['data']['api_fallback_reason'] ?? null,
             ];
         }
 
