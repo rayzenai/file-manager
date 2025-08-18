@@ -46,9 +46,17 @@ return [
         
         // API settings (if using external compression API)
         'api' => [
+            // Primary API (AWS Lambda - fast, no background removal)
             'url' => env('FILE_MANAGER_COMPRESSION_API_URL', ''),
             'token' => env('FILE_MANAGER_COMPRESSION_API_TOKEN', ''),
             'timeout' => env('FILE_MANAGER_COMPRESSION_API_TIMEOUT', 30),
+            
+            // Background removal API (Google Cloud Run - slower, supports bg removal)
+            'bg_removal' => [
+                'url' => env('FILE_MANAGER_BG_REMOVAL_API_URL', ''),
+                'token' => env('FILE_MANAGER_BG_REMOVAL_API_TOKEN', ''),
+                'timeout' => env('FILE_MANAGER_BG_REMOVAL_API_TIMEOUT', 60),
+            ],
         ],
     ],
 

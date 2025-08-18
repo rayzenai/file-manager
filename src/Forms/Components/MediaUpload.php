@@ -481,12 +481,23 @@ class MediaUpload extends FileUpload
                         ->duration(5000)
                         ->send();
                 } elseif ($result['data']['compression_method'] === 'api') {
-                    // Successful API compression
+                    // Successful Lambda API compression
                     Notification::make()
                         ->success()
-                        ->title('Image Compressed via API')
+                        ->title('Image Compressed via Lambda API')
                         ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
-                               Saved: {$compressionRatio}")
+                               Saved: {$compressionRatio}<br>
+                               <small>Fast compression via AWS Lambda</small>")
+                        ->duration(5000)
+                        ->send();
+                } elseif ($result['data']['compression_method'] === 'api_bg_removal') {
+                    // Successful Cloud Run API compression with bg removal
+                    Notification::make()
+                        ->success()
+                        ->title('Image Processed with Background Removal')
+                        ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                               Saved: {$compressionRatio}<br>
+                               <small>Background removed via Cloud Run</small>")
                         ->duration(5000)
                         ->send();
                 }
