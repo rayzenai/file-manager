@@ -53,7 +53,7 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     ```bash
     # Publish migration files to your app
     php artisan vendor:publish --provider="Kirantimsina\FileManager\FileManagerServiceProvider" --tag="file-manager-migrations"
-    
+
     # Run the migrations
     php artisan migrate
     ```
@@ -75,11 +75,19 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     FILE_MANAGER_COMPRESSION_ENABLED=true
     FILE_MANAGER_COMPRESSION_QUALITY=85
     FILE_MANAGER_COMPRESSION_FORMAT=webp
-    
-    # External API Settings (Required for background removal)
-    FILE_MANAGER_COMPRESSION_METHOD=api  # Use 'api' instead of 'gd'
-    FILE_MANAGER_COMPRESSION_API_URL=https://your-api-url.com/process-image
+
+    # Compression Method Settings
+    FILE_MANAGER_COMPRESSION_METHOD=gd  # 'gd' for built-in PHP processing or 'api' for external service
+
+    # Primary API Settings (Fast compression, no background removal)
+    FILE_MANAGER_COMPRESSION_API_URL=https://your-aws-lambda-url.com/process-image
     FILE_MANAGER_COMPRESSION_API_TOKEN=your-api-token
+    FILE_MANAGER_COMPRESSION_API_TIMEOUT=30
+
+    # Background Removal API Settings (Slower, supports background removal)
+    FILE_MANAGER_BG_REMOVAL_API_URL=https://your-gcp-run-url.com/process-image
+    FILE_MANAGER_BG_REMOVAL_API_TOKEN=your-bg-removal-token
+    FILE_MANAGER_BG_REMOVAL_API_TIMEOUT=60
     ```
 
 5. **Register the plugin in your Filament panel provider:**
@@ -103,38 +111,59 @@ The configuration file `config/file-manager.php` allows you to customize:
 ```php
 return [
     // CDN URL for serving files
-    'cdn' => env('CDN_URL', env('AWS_URL')),
+    'cdn' => env('CDN_URL', env('AWS_URL', env('APP_URL'))),
 
     // Maximum upload dimensions
     'max-upload-height' => '5120', // pixels
     'max-upload-width' => '5120',  // pixels
     'max-upload-size' => '8192',   // KB
 
-    // Model to directory mappings
+    // Model to directory mappings (supports full class names)
     'model' => [
-        'User' => 'users',
-        'Product' => 'products',
-        'Blog' => 'blogs',
+        'App\Models\User' => 'users',       // Or use User::class
+        'App\Models\Product' => 'products', // Or use Product::class
+        'App\Models\Blog' => 'blogs',       // Or use Blog::class
         // Add your models here
     ],
 
     // Image sizes to generate
     'image_sizes' => [
-        'extra-small' => 60,
-        'small' => 240,
-        'medium' => 480,
-        '640px' => 640,
-        'large' => 1080,
+        'icon' => 64,       // 64px height for small icons
+        'small' => 120,     // 120px height for small thumbnails
+        'thumb' => 240,     // 240px height for thumbnails
+        'card' => 360,      // 360px height for card images
+        'medium' => 480,    // 480px height for medium images
+        'large' => 720,     // 720px height for large images
+        'full' => 1080,     // 1080px height for full size
+        'ultra' => 2160,    // 2160px height for ultra HD
     ],
 
     // Compression settings
     'compression' => [
         'enabled' => true,
-        'method' => 'gd', // or 'api'
+        'method' => 'gd', // 'gd' or 'api'
         'auto_compress' => true,
         'quality' => 85,
-        'format' => 'webp',
-        'threshold' => 500 * 1024, // 500KB
+        'format' => 'webp', // webp, jpeg, png, avif
+        'mode' => 'contain', // contain, crop, cover
+        'height' => 1080,
+        'width' => null, // Auto-calculate
+        'threshold' => 100 * 1024, // 100KB
+
+        // API settings for external compression
+        'api' => [
+            // Primary API (AWS Lambda - fast, no background removal)
+            'url' => env('FILE_MANAGER_COMPRESSION_API_URL', ''),
+            'token' => env('FILE_MANAGER_COMPRESSION_API_TOKEN', ''),
+            'timeout' => 30,
+
+            // Background removal API (Google Cloud Run - slower, supports bg removal)
+            'bg_removal' => [
+                'url' => env('FILE_MANAGER_BG_REMOVAL_API_URL', ''),
+                'token' => env('FILE_MANAGER_BG_REMOVAL_API_TOKEN', ''),
+                'timeout' => 60,
+            ],
+        ],
     ],
 
     // Media metadata tracking
@@ -143,6 +172,7 @@ return [
         'track_file_size' => true,
         'track_dimensions' => true,
         'track_mime_type' => true,
+        'model' => \Kirantimsina\FileManager\Models\MediaMetadata::class,
     ],
 ];
 ```
@@ -204,6 +234,7 @@ MediaUpload::make('image')
     ->useCompression()          // Enable smart compression (default: true)
     ->trackMetadata()           // Track file metadata (default: true)
     ->removeBg()                // Remove background (requires API, default: false)
+    ->driver('api')             // Compression driver: 'gd' or 'api' (default: from config)
     ->multiple()                // Allow multiple files
     ->directory('custom-dir')   // Custom directory (optional)
 ```
@@ -219,13 +250,32 @@ MediaUpload::make('image')
 
 #### Background Removal
 
-The `removeBg()` method enables AI-powered background removal for images. This feature **requires external API configuration** and is not available with the GD library method.
+The `removeBg()` method enables AI-powered background removal for images. This feature **requires external API configuration** (specifically the background removal API endpoint) and is not available with the GD library method.
+
+#### Compression Drivers
+
+You can specify which compression driver to use:
+
+```php
+// Use GD library (built-in PHP processing)
+MediaUpload::make('image')
+    ->driver('gd')
+
+// Use external API service
+MediaUpload::make('image')
+    ->driver('api')
+```
+
+The package supports two external APIs:
+
+-   **Primary API** (AWS Lambda): Fast compression without background removal
+-   **Background Removal API** (Google Cloud Run): Slower but supports AI background removal
 
 ```php
 // Enable background removal with boolean
 MediaUpload::make('image')
     ->removeBg(true)
-    
+
 // Or use the convenience method
 MediaUpload::make('image')
     ->withoutBackground()
@@ -283,6 +333,20 @@ The package includes a built-in Filament resource for managing media metadata:
     - Delete resized versions
 3. **Navigate to parent resources** directly from media entries
 4. **Search and filter** by model type, field, or file name
+5. **Navigation badge** showing count of large files (>500KB)
+6. **Bulk operations** for processing multiple files at once
+
+### Image Processor Page
+
+The MediaMetadata resource includes a dedicated **Image Processor** page that allows you to:
+
+-   Upload and process images directly from the admin panel
+-   Test different compression settings and formats
+-   Preview results before saving
+-   Compare original vs compressed file sizes
+-   Test background removal functionality
+-   Choose between compression methods (GD or API)
+-   Download processed images
 
 ## Service Methods
 
@@ -392,8 +456,11 @@ $result = $service->compressExisting(
 
 **Compression Methods:**
 
-- **GD Library (`method: 'gd'`)**: Built-in PHP image processing. Supports resizing, format conversion, and basic compression. Does not support background removal.
-- **External API (`method: 'api'`)**: Uses external image processing service. Supports all GD features plus AI-powered background removal. Requires API configuration.
+-   **GD Library (`method: 'gd'`)**: Built-in PHP image processing. Supports resizing, format conversion, and basic compression. Does not support background removal.
+-   **External API (`method: 'api'`)**: Uses external image processing service. Supports all GD features plus AI-powered background removal. The package intelligently routes requests:
+    -   Standard compression requests go to the primary API (faster)
+    -   Background removal requests go to the specialized background removal API (slower but more features)
+    -   Falls back to GD if API is unavailable
 
 ## Queue Jobs
 
@@ -423,8 +490,9 @@ If you have existing images in your database before installing this package, you
 # Populate metadata for all configured models
 php artisan file-manager:populate-metadata
 
-# Populate metadata for a specific model
+# Populate metadata for a specific model (supports both short and full class names)
 php artisan file-manager:populate-metadata --model=Product
+php artisan file-manager:populate-metadata --model="App\Models\Product"
 
 # Populate metadata for a specific field
 php artisan file-manager:populate-metadata --model=Product --field=image_file_name
@@ -438,6 +506,15 @@ php artisan file-manager:populate-metadata --model=Product --sync --chunk=100
 # Dry run to see what would be processed
 php artisan file-manager:populate-metadata --dry-run
 ```
+
+**Improvements in the latest version:**
+
+-   Better model class resolution (supports both short names and full namespaces)
+-   Progress bar for tracking processing status
+-   Improved error handling and reporting
+-   Memory-efficient chunked processing
+-   Dry-run mode for testing
+-   Synchronous mode for immediate processing
 
 This command will:
 
@@ -527,7 +604,7 @@ Contributions are welcome! Please see [CONTRIBUTING](CONTRIBUTING.md) for detail
 
 ## Security
 
-If you discover any security issues, please email kirantimsina3@gmail.com instead of using the issue tracker.
+If you discover any security issues, please email timsinakiran@gmail.com instead of using the issue tracker.
 
 ## Credits
 
