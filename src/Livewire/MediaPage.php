@@ -34,8 +34,13 @@ class MediaPage extends Component
         $modelClass = null;
         foreach ($modelMapping as $className => $alias) {
             if ($alias === $directory) {
-                // Assuming your models reside in the App\Models namespace.
-                $modelClass = "App\\Models\\{$className}";
+                // Check if $className is already a fully qualified class name
+                if (class_exists($className)) {
+                    $modelClass = $className;
+                } else {
+                    // Fallback: Assuming your models reside in the App\Models namespace.
+                    $modelClass = "App\\Models\\{$className}";
+                }
                 break;
             }
         }
