@@ -144,19 +144,44 @@ class ImageProcessor extends Page implements HasForms
 
                             Toggle::make('remove_background')
                                 ->label('Remove Background')
-                                ->helperText('Uses AI to remove the background (requires API)')
-                                ->visible(fn () => config('file-manager.compression.method') === 'api' &&
-                                                 config('file-manager.compression.api.url')),
+                                ->helperText('Uses AI to remove the background (requires Cloud Run API)')
+                                ->visible(function () {
+                                    // Show if bg_removal API is configured OR if primary API is the Cloud Run endpoint
+                                    $bgRemovalUrl = config('file-manager.compression.api.bg_removal.url');
+                                    $primaryUrl = config('file-manager.compression.api.url');
+                                    
+                                    // Check if either bg_removal is configured or primary API is Cloud Run
+                                    return !empty($bgRemovalUrl) || 
+                                           (str_contains($primaryUrl ?? '', 'image-processor-ao25z3a2tq-el.a.run.app'));
+                                }),
 
                             Select::make('compression_method')
                                 ->label('Processing Method')
-                                ->options([
-                                    'auto' => 'Auto (Use API if available, fallback to GD)',
-                                    'api' => 'API Only (Background removal available)',
-                                    'gd' => 'GD Library Only (Faster, no background removal)',
-                                ])
+                                ->options(function () {
+                                    $options = [];
+                                    
+                                    $hasLambda = !empty(config('file-manager.compression.api.url'));
+                                    $hasCloudRun = !empty(config('file-manager.compression.api.bg_removal.url'));
+                                    
+                                    if ($hasLambda || $hasCloudRun) {
+                                        $options['auto'] = 'Auto (Use best available API, fallback to GD)';
+                                    }
+                                    
+                                    if ($hasLambda) {
+                                        $options['api'] = 'Lambda API (Fast compression)';
+                                    }
+                                    
+                                    if ($hasCloudRun) {
+                                        $options['api_bg_removal'] = 'Cloud Run API (Background removal support)';
+                                    }
+                                    
+                                    $options['gd'] = 'GD Library Only (Local processing)';
+                                    
+                                    return $options;
+                                })
                                 ->default('auto')
-                                ->visible(fn () => config('file-manager.compression.api.url'))
+                                ->visible(fn () => !empty(config('file-manager.compression.api.url')) || 
+                                                  !empty(config('file-manager.compression.api.bg_removal.url')))
                                 ->helperText('Choose which compression method to use'),
                         ])
                         ->columnSpan(1),
@@ -258,14 +283,22 @@ class ImageProcessor extends Page implements HasForms
                 };
             }
 
-            // Create compression service
-            $compressionService = new ImageCompressionService;
-
             // Override compression method if specified
             $originalMethod = config('file-manager.compression.method');
             if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
-                config(['file-manager.compression.method' => $data['compression_method']]);
+                // Map the UI options to actual compression methods
+                $methodMap = [
+                    'api' => 'api',  // Lambda API
+                    'api_bg_removal' => 'api',  // Cloud Run API (will be handled by removeBg flag)
+                    'gd' => 'gd',
+                ];
+                
+                $method = $methodMap[$data['compression_method']] ?? 'api';
+                config(['file-manager.compression.method' => $method]);
             }
+            
+            // Create compression service AFTER config override
+            $compressionService = new ImageCompressionService;
 
             // Perform compression
             $quality = (int) ($data['quality'] ?? 85);

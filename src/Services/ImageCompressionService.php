@@ -16,6 +16,10 @@ class ImageCompressionService
     private string $apiUrl;
 
     private string $apiToken;
+    
+    private string $bgRemovalApiUrl;
+    
+    private string $bgRemovalApiToken;
 
     private int $defaultQuality;
 
@@ -24,16 +28,21 @@ class ImageCompressionService
     private string $defaultMode;
 
     private int $timeout;
+    
+    private int $bgRemovalTimeout;
 
     public function __construct()
     {
         $this->compressionMethod = config('file-manager.compression.method', 'gd');
         $this->apiUrl = config('file-manager.compression.api.url', '');
         $this->apiToken = config('file-manager.compression.api.token', '');
+        $this->bgRemovalApiUrl = config('file-manager.compression.api.bg_removal.url', '');
+        $this->bgRemovalApiToken = config('file-manager.compression.api.bg_removal.token', '');
         $this->defaultQuality = config('file-manager.compression.quality', 85);
         $this->defaultFormat = config('file-manager.compression.format', 'webp');
         $this->defaultMode = config('file-manager.compression.mode', 'contain');
-        $this->timeout = config('file-manager.compression.api.timeout', 60); // Increased default to 60 seconds
+        $this->timeout = config('file-manager.compression.api.timeout', 30);
+        $this->bgRemovalTimeout = config('file-manager.compression.api.bg_removal.timeout', 60);
     }
 
     /**
@@ -182,7 +191,24 @@ class ImageCompressionService
                 return $fileContent;
             }
             
-            // Check file size - skip API for files over 5MB to avoid timeouts
+            // Determine which API to use
+            $useBackgroundRemovalApi = $removeBg && !empty($this->bgRemovalApiUrl);
+            $apiUrl = $useBackgroundRemovalApi ? $this->bgRemovalApiUrl : $this->apiUrl;
+            $apiToken = $useBackgroundRemovalApi ? $this->bgRemovalApiToken : $this->apiToken;
+            $apiTimeout = $useBackgroundRemovalApi ? $this->bgRemovalTimeout : $this->timeout;
+            
+            // If no appropriate API is configured, fall back to GD
+            if (empty($apiUrl)) {
+                if ($removeBg) {
+                    return [
+                        'success' => false,
+                        'message' => 'Background removal requested but no API configured',
+                    ];
+                }
+                return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+            }
+            
+            // Check file size - skip API for files over 5MB to avoid timeouts (except for bg removal)
             $fileSizeInMb = strlen($fileContent['data']['content']) / (1024 * 1024);
             if ($fileSizeInMb > 5 && !$removeBg) {
                 // For large files, fall back to GD unless background removal is required
@@ -212,13 +238,13 @@ class ImageCompressionService
             }
 
             $queryParams = http_build_query($params);
-            $url = $this->apiUrl . '?' . $queryParams;
+            $url = $apiUrl . '?' . $queryParams;
 
             // Make API request
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->apiToken,
+                'Authorization' => 'Bearer ' . $apiToken,
             ])
-                ->timeout($this->timeout)
+                ->timeout($apiTimeout)
                 ->attach(
                     'file',
                     $fileContent['data']['content'],
@@ -229,9 +255,21 @@ class ImageCompressionService
             if (! $response->successful()) {
                 // Fallback to GD if API fails (but can't do background removal with GD)
                 if ($removeBg) {
+                    $statusCode = $response->status();
+                    $errorMessage = match($statusCode) {
+                        401 => 'Authentication failed - check API token',
+                        403 => 'Access forbidden',
+                        404 => 'API endpoint not found',
+                        413 => 'Image too large',
+                        429 => 'Too many requests - please try again later',
+                        500 => 'Server error - please try again',
+                        503 => 'Service temporarily unavailable - Cloud Run is scaling up, please try again',
+                        default => "API returned status {$statusCode}"
+                    };
+                    
                     return [
                         'success' => false,
-                        'message' => 'Background removal failed: API returned error',
+                        'message' => "Background removal failed: {$errorMessage}",
                     ];
                 }
 
@@ -261,6 +299,9 @@ class ImageCompressionService
                 $finalHeight = $height ?? null;
             }
 
+            $apiType = $useBackgroundRemovalApi ? 'api_bg_removal' : 'api';
+            $apiName = $useBackgroundRemovalApi ? 'Cloud Run (BG Removal)' : 'Lambda';
+            
             return [
                 'success' => true,
                 'data' => [
@@ -272,17 +313,27 @@ class ImageCompressionService
                     'format' => $format,
                     'width' => $finalWidth,
                     'height' => $finalHeight,
-                    'compression_method' => 'api',
+                    'compression_method' => $apiType,
+                    'api_used' => $apiName,
                 ],
-                'message' => 'Image compressed successfully using API',
+                'message' => 'Image compressed successfully using ' . $apiName . ' API',
             ];
 
         } catch (Throwable $t) {
             // Fallback to GD if API fails (but can't do background removal with GD)
             if ($removeBg) {
+                $errorMessage = $t->getMessage();
+                
+                // Provide more user-friendly error messages
+                if (str_contains($errorMessage, 'cURL error 28') || str_contains($errorMessage, 'Operation timed out')) {
+                    $errorMessage = 'Request timed out - Cloud Run may be starting up. Please try again in a few seconds.';
+                } elseif (str_contains($errorMessage, 'Could not resolve host')) {
+                    $errorMessage = 'Cannot connect to API server - check your internet connection';
+                }
+                
                 return [
                     'success' => false,
-                    'message' => 'Background removal failed: ' . $t->getMessage(),
+                    'message' => 'Background removal failed: ' . $errorMessage,
                 ];
             }
 
