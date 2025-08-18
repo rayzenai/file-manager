@@ -7,17 +7,85 @@ A comprehensive Laravel package for **Filament v4** that provides advanced file 
 
 This package is developed and maintained by **Kiran Timsina** and **RayzenTech**.
 
+## 🚀 What's New in v4.3
+
+### 🎯 Dual API Architecture
+
+**Two specialized APIs for optimal performance:**
+
+-   **AWS Lambda API**: Lightning-fast compression for standard image processing
+-   **Google Cloud Run API**: AI-powered background removal and advanced processing
+
+![Dual API Architecture](docs/images/dual-api-architecture.webp)
+
+### 🔧 Enhanced Compression Driver System
+
+Choose your processing method with the new `->driver()` method:
+
+```php
+MediaUpload::make('image')
+    ->driver('api')  // Use external API
+    ->driver('gd')   // Use local GD library
+```
+
+![Driver Selection](docs/images/driver-selection.webp)
+
+### 🖼️ Interactive Image Processor
+
+New dedicated page for testing and processing images directly in the admin panel:
+
+-   Test different compression settings
+-   Preview before/after results
+-   Compare file sizes and quality
+-   Test background removal
+
+![Image Processor](docs/images/image-processor.webp)
+
+### 📊 Enhanced Media Metadata Resource
+
+-   **Navigation badges** showing large file counts
+-   **Bulk operations** for compression and resizing
+-   **Smart routing** to parent resources
+-   **Detailed compression statistics**
+
+![Media Metadata Resource](docs/images/metadata-dashboard.webp)
+
+### 🛠️ Improved CLI Commands
+
+Better `populate-metadata` command with:
+
+-   Progress bars for visual feedback
+-   Support for both short and full class names
+-   Dry-run mode for testing
+-   Synchronous processing option
+
+![CLI Progress](docs/images/cli-progress.webp)
+
 ## Key Features
 
+### Core Features
+
 -   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
--   🗜️ **Smart Compression** - WebP conversion with configurable quality settings
--   🎭 **AI Background Removal** - Remove backgrounds from images using external API
+-   🗜️ **Smart Compression** - WebP/AVIF conversion with configurable quality settings
+-   🎭 **AI Background Removal** - Remove backgrounds from images using Cloud Run API
 -   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
 -   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
+
+### Advanced Processing
+
+-   ⚡ **Dual API System** - Fast Lambda API for compression, Cloud Run for AI features
+-   🎨 **Flexible Driver System** - Choose between GD library or external APIs
+-   🖼️ **Interactive Processor** - Test and process images directly in admin panel
+-   📈 **Bulk Operations** - Process multiple files with detailed progress tracking
+-   🔄 **Smart Fallbacks** - Automatic fallback to GD when API unavailable
+
+### Developer Experience
+
 -   🎨 **Custom Filament Components** - MediaUpload and S3Image components
--   🔍 **Filament Resource** - Built-in media metadata management interface
--   🚀 **Performance Optimized** - Queue-based processing for large files
--   🔧 **Highly Configurable** - Extensive configuration options
+-   🔍 **Advanced Resource Management** - Built-in media metadata interface with bulk actions
+-   🚀 **Performance Optimized** - Queue-based processing with chunked operations
+-   🔧 **Highly Configurable** - Extensive configuration with environment variables
+-   📝 **Comprehensive CLI** - Powerful artisan commands with progress tracking
 
 ## About the Developers
 
@@ -324,68 +392,173 @@ S3Image::make('image')
 
 ## Media Metadata Management
 
-The package includes a built-in Filament resource for managing media metadata:
+The package includes a powerful Filament resource for comprehensive media management.
 
-1. **View all uploaded media** with file sizes, dimensions, and compression stats
-2. **Manually trigger operations:**
-    - Resize images to generate missing sizes
-    - Compress images with custom quality
-    - Delete resized versions
-3. **Navigate to parent resources** directly from media entries
-4. **Search and filter** by model type, field, or file name
-5. **Navigation badge** showing count of large files (>500KB)
-6. **Bulk operations** for processing multiple files at once
+![Media Metadata Dashboard](docs/images/metadata-dashboard.webp)
+
+### Dashboard Features
+
+#### Navigation & Monitoring
+
+-   **Smart Navigation Badge**: Real-time count of large files (>500KB)
+    -   🔵 Info: 1-50 large files
+    -   🟡 Warning: 51-100 large files
+    -   🔴 Danger: 100+ large files
+-   **Automatic cache refresh** every 5 minutes
+
+#### File Management
+
+-   **Comprehensive file listing** with:
+    -   Model type and ID
+    -   Field name
+    -   File size with human-readable format
+    -   Image dimensions (width × height)
+    -   MIME type with color-coded badges
+    -   Creation and update timestamps
+
+#### Advanced Filtering
+
+-   **Quick Filters**:
+    -   Large Files (>500KB)
+    -   Very Large Files (>2MB)
+-   **Model Type Filter**: Filter by specific models
+-   **File Type Filter**: Filter by MIME type
+-   **Search**: Find files by name or path
+
+![Filtering Options](docs/images/metadata-filters.webp)
+
+### Individual File Actions
+
+![File Actions Menu](docs/images/file-actions.webp)
+
+1. **Open in Panel**: Navigate directly to the parent resource
+2. **Resize**: Generate all configured size variations
+3. **Compress**: Apply custom compression settings
+4. **Rename**: Update file names in database
+5. **Delete Resized**: Remove all size variations
+
+### Bulk Operations
+
+![Bulk Operations](docs/images/bulk-operations.webp)
+
+#### Bulk Compress
+
+-   Select multiple images for compression
+-   Choose output format (WebP, AVIF, JPEG, PNG)
+-   Set compression quality (50-100%)
+-   Option to replace originals
+-   Detailed progress reporting
+
+#### Bulk Resize
+
+-   Generate all size variations for selected images
+-   Queue-based processing for performance
+-   Progress notifications
+
+#### Bulk Delete Resized
+
+-   Remove all resized versions for selected images
+-   Confirmation dialog with warnings
+-   Batch processing with result summary
 
 ### Image Processor Page
 
-The MediaMetadata resource includes a dedicated **Image Processor** page that allows you to:
+The MediaMetadata resource includes a dedicated **Image Processor** page - a powerful tool for testing and optimizing your image processing pipeline.
 
--   Upload and process images directly from the admin panel
--   Test different compression settings and formats
--   Preview results before saving
--   Compare original vs compressed file sizes
--   Test background removal functionality
--   Choose between compression methods (GD or API)
--   Download processed images
+![Image Processor Interface](docs/images/processor-interface.webp)
+
+#### Features:
+
+**Upload & Process**
+
+-   Drag-and-drop or click to upload images up to 10MB
+-   Support for JPEG, PNG, WebP, and AVIF formats
+-   Real-time preview of uploaded images
+
+**Processing Options**
+
+-   **Format Selection**: Convert between WebP, JPEG, PNG, and AVIF
+-   **Quality Control**: Adjust compression from 50% to 100%
+-   **Resizing**: Set custom dimensions with multiple resize modes
+-   **Background Removal**: AI-powered background removal (when API configured)
+
+**Compression Methods**
+
+-   **Auto**: Intelligently selects the best available method
+-   **Lambda API**: Fast compression via AWS Lambda
+-   **Cloud Run API**: Advanced features including background removal
+-   **GD Library**: Local processing fallback
+
+**Results & Analytics**
+
+-   Side-by-side comparison of original vs processed
+-   Detailed statistics:
+    -   Original and compressed file sizes
+    -   Space saved (KB and percentage)
+    -   Final dimensions
+    -   Processing method used
+-   Download processed images directly
+
+![Processing Results](docs/images/processor-results.webp)
+
+#### Use Cases:
+
+1. **Test compression settings** before applying to production
+2. **Optimize images** for specific use cases
+3. **Validate API configuration** and performance
+4. **Compare processing methods** (GD vs API)
+5. **Generate samples** for documentation
 
 ## Service Methods
 
 ### Using the FileManager Facade
 
 ```php
+use App\Models\Product;
 use Kirantimsina\FileManager\Facades\FileManager;
 
 // Upload a file
-$path = FileManager::upload(
-    model: 'Product',
-    file: $uploadedFile,
-    tag: 'summer-sale'
+$result = FileManager::upload(
+    Product::class,      // model class
+    $uploadedFile,       // file
+    'summer-sale',       // tag (optional)
+    false,               // fit (optional, default: false)
+    true,                // resize (optional, default: true)
+    false,               // webp (optional, default: false)
+    false                // reencode (optional, default: false)
 );
+$path = $result['file']; // Get the file path from result
 
 // Upload multiple files
-$paths = FileManager::uploadImages(
-    model: 'Product',
-    files: $uploadedFiles,
-    tag: 'gallery'
+$result = FileManager::uploadImages(
+    Product::class,      // model class
+    $uploadedFiles,      // files array
+    'gallery',           // tag (optional)
+    false,               // fit (optional)
+    true                 // resize (optional)
 );
+$paths = $result['files']; // Get array of file paths
 
 // Upload base64 encoded image
-$path = FileManager::uploadBase64(
-    model: 'Product',
-    base64Image: $base64String,
-    tag: 'user-upload'
+$result = FileManager::uploadBase64(
+    Product::class,      // model class
+    $base64String,       // base64 image
+    'user-upload',       // tag (optional)
+    false,               // fit (optional)
+    true                 // resize (optional)
 );
+$path = $result['file']; // Get the file path from result
 
 // Move temp file without resizing
 $path = FileManager::moveTempImageWithoutResize(
-    model: 'Product',
-    tempFile: 'temp/abc123.jpg'
+    Product::class,      // model class
+    'temp/abc123.jpg'    // temp file path
 );
 
 // Move temp file with automatic resizing
 $path = FileManager::moveTempImage(
-    model: 'Product',
-    tempFile: 'temp/abc123.jpg'
+    Product::class,      // model class
+    'temp/abc123.jpg'    // temp file path
 );
 
 // Delete image and all its sizes
@@ -408,7 +581,7 @@ $url = FileManager::getMediaPath('products/image.jpg', 'medium');
 $cdnUrl = FileManager::mainMediaUrl();
 
 // Get upload directory for a model
-$directory = FileManager::getUploadDirectory('Product');
+$directory = FileManager::getUploadDirectory(Product::class);
 
 // Get configured image sizes
 $sizes = FileManager::getImageSizes();
