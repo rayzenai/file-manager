@@ -376,6 +376,92 @@ protected function mutateFormDataBeforeSave(array $data): array
 }
 ```
 
+### MediaColumn
+
+Display images in tables with modal preview and optional editing capabilities:
+
+```php
+use Kirantimsina\FileManager\Tables\Columns\MediaColumn;
+
+// Basic usage for direct model fields
+MediaColumn::make(
+    field: 'image_file_name',
+    size: 'small',
+    label: 'Product Image'
+)
+
+// With modal for viewing and editing
+MediaColumn::make(
+    field: 'image_file_name',
+    size: 'small',
+    showInModal: true,
+    label: 'Product Image'
+)
+
+// For relationship fields (NEW in v4.3+)
+MediaColumn::make(
+    field: 'attachment_file_name',
+    size: 'extra-small',
+    showInModal: true,
+    relationship: 'attachments'  // Relationship name
+)->label('Attachments')
+
+// Legacy dot notation (still supported)
+MediaColumn::make(
+    field: 'product.image_file_name',
+    size: 'small',
+    label: 'Product Image'
+)
+```
+
+**Parameters:**
+- `field`: The field name on the model (or related model when using relationship)
+- `size`: Image size preset ('icon', 'small', 'medium', 'large', etc.)
+- `showInModal`: Enable modal for viewing/editing (default: false)
+- `modalSize`: Size for modal preview images
+- `label`: Column label
+- `heading`: Modal heading (closure or string)
+- `viewCountField`: Field to track view counts
+- `showMetadata`: Show file metadata in tooltip
+- `relationship`: Name of the Eloquent relationship (for HasMany, HasOne, BelongsTo)
+
+**Features:**
+- **Direct field access**: Works with model attributes directly
+- **Relationship support**: Access images through Eloquent relationships
+- **Dot notation**: Legacy support for nested relationships
+- **Modal editing**: View and replace images through modal interface
+- **Multiple images**: Handles both single and multiple image fields
+- **Smart loading**: Automatically loads relationships to prevent N+1 queries
+- **Metadata display**: Optional file size and type information
+
+**Relationship Support (v4.3+):**
+
+The `relationship` parameter allows you to display and manage images from related models:
+
+```php
+// In your model
+class CartItem extends Model
+{
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(AttachmentFile::class);
+    }
+}
+
+// In your Filament resource
+MediaColumn::make(
+    field: 'attachment_file_name',  // Field on the AttachmentFile model
+    relationship: 'attachments',     // Relationship method name
+    showInModal: true
+)
+```
+
+This will:
+- Display all attachment images in the table column
+- Allow viewing all images in a modal
+- Enable uploading new images that will replace existing attachments
+- Handle HasMany, HasOne, and BelongsTo relationships automatically
+
 ### S3Image Column
 
 Display images in tables with modal preview:
