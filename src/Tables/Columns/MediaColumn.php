@@ -149,11 +149,39 @@ abstract class MediaColumn
             ->action(
                 Action::make($field)
                     ->schema(function ($record) use ($field, $relationship) {
-                        // Don't show upload form for relationship fields
+                        // Handle relationship fields
                         if ($relationship) {
-                            return [];
+                            // Load the relationship to get current values
+                            if (!$record->relationLoaded($relationship)) {
+                                $record->load($relationship);
+                            }
+                            
+                            $related = $record->{$relationship};
+                            
+                            // Get current images for default value
+                            $currentImages = null;
+                            if ($related instanceof Collection) {
+                                $currentImages = $related->pluck($field)->filter()->values()->toArray();
+                            } elseif ($related && isset($related->{$field})) {
+                                $currentImages = $related->{$field};
+                            }
+                            
+                            return [
+                                MediaUpload::make('relationship_images')
+                                    ->label('Images')
+                                    ->default($currentImages)
+                                    ->uploadOriginal()
+                                    ->convertToWebp(false)
+                                    ->columnSpanFull()
+                                    ->downloadable()
+                                    ->multiple()
+                                    ->hint('Upload new images to replace existing ones')
+                                    ->previewable()
+                                    ->required(false),
+                            ];
                         }
                         
+                        // Original logic for non-relationship fields
                         return [
                             MediaUpload::make($field)
                                 ->uploadOriginal()
@@ -168,8 +196,48 @@ abstract class MediaColumn
                                 ->required(),
                         ];
                     })->action(function ($record, $data) use ($field, $relationship) {
-                        // Don't update if it's a relationship field
-                        if (!$relationship) {
+                        if ($relationship) {
+                            // Handle relationship update
+                            if (isset($data['relationship_images'])) {
+                                // Load the relationship
+                                if (!$record->relationLoaded($relationship)) {
+                                    $record->load($relationship);
+                                }
+                                
+                                $related = $record->{$relationship};
+                                
+                                // Handle HasMany relationships
+                                if ($related instanceof Collection) {
+                                    // Delete existing attachments
+                                    $record->{$relationship}()->delete();
+                                    
+                                    // Create new attachments for each uploaded image
+                                    if (is_array($data['relationship_images'])) {
+                                        foreach ($data['relationship_images'] as $image) {
+                                            $record->{$relationship}()->create([
+                                                $field => $image,
+                                            ]);
+                                        }
+                                    } else {
+                                        $record->{$relationship}()->create([
+                                            $field => $data['relationship_images'],
+                                        ]);
+                                    }
+                                } 
+                                // Handle HasOne/BelongsTo relationships
+                                elseif ($related) {
+                                    $related->update([
+                                        $field => $data['relationship_images'],
+                                    ]);
+                                } else {
+                                    // Create new related record if it doesn't exist
+                                    $record->{$relationship}()->create([
+                                        $field => $data['relationship_images'],
+                                    ]);
+                                }
+                            }
+                        } else {
+                            // Original logic for non-relationship fields
                             $record->update([
                                 $field => $data[$field],
                             ]);
