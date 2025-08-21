@@ -14,7 +14,7 @@ class MediaModalColumn extends MediaColumn
 {
     protected ?string $modalSize = null;
 
-    protected string|Closure $heading = '';
+    protected string|Closure|null $heading = null;
 
     protected bool|Closure $allowEdit = false;
 
@@ -35,7 +35,7 @@ class MediaModalColumn extends MediaColumn
         return $this;
     }
 
-    public function heading(string|Closure $heading): static
+    public function heading(string|Closure|null $heading): static
     {
         $this->heading = $heading;
 
@@ -124,8 +124,15 @@ class MediaModalColumn extends MediaColumn
                 return view('file-manager::livewire.media-modal', ['images' => $images ?? []]);
             })
             ->slideOver()
-            ->modalHeading($this->heading ?:
-                fn ($record) => isset($record->name) ? $record->name : (isset($record->title) ? $record->title : 'Image!'))
+            ->modalHeading(function ($record) {
+                // If heading is set, use it (resolve if it's a closure)
+                if ($this->heading !== null) {
+                    return $this->heading instanceof Closure ? ($this->heading)($record) : $this->heading;
+                }
+                
+                // Fallback to record name or title
+                return isset($record->name) ? $record->name : (isset($record->title) ? $record->title : 'Image!');
+            })
             ->modalWidth('2xl')
             ->schema(function ($record) {
                 // Only show schema if editing is allowed
