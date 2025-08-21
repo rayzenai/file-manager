@@ -23,13 +23,14 @@ abstract class MediaColumn
         string $label = 'Image',
         string|Closure $heading = '',
         string $viewCountField = '',
-        bool $showMetadata = false
+        bool $showMetadata = false,
+        ?string $relationship = null
     ): ImageColumn {
         return ImageColumn::make($field)->label($label)
-            ->when(! $showInModal, function (ImageColumn $column) use ($field, $viewCountField) {
+            ->when(! $showInModal, function (ImageColumn $column) use ($field, $viewCountField, $relationship) {
 
-                $column->url(function ($record) use ($field, $viewCountField) {
-                    $images = static::getImagesWithoutUrl($field, $record, null);
+                $column->url(function ($record) use ($field, $viewCountField, $relationship) {
+                    $images = static::getImagesWithoutUrl($field, $record, null, $relationship);
                     $imageFilename = $images[0] ?? null;
 
                     if ($imageFilename) {
@@ -57,10 +58,10 @@ abstract class MediaColumn
 
                     return '#';
                 });
-            })->when(! $showInModal, function (ImageColumn $column) use ($field) {
+            })->when(! $showInModal, function (ImageColumn $column) use ($field, $relationship) {
 
-                $column->openUrlInNewTab(function ($record) use ($field) {
-                    $images = static::getImagesWithoutUrl($field, $record, null);
+                $column->openUrlInNewTab(function ($record) use ($field, $relationship) {
+                    $images = static::getImagesWithoutUrl($field, $record, null, $relationship);
                     $slug = $images[0] ?? null;
 
                     if ($slug) {
@@ -70,8 +71,35 @@ abstract class MediaColumn
                     return false;
                 });
             })
-            ->getStateUsing(function ($record) use ($field, $size) {
+            ->getStateUsing(function ($record) use ($field, $size, $relationship) {
+                // If relationship is provided, use it to access the field
+                if ($relationship) {
+                    // Load the relationship if not already loaded
+                    if (!$record->relationLoaded($relationship)) {
+                        $record->load($relationship);
+                    }
+                    
+                    $related = $record->{$relationship};
+                    
+                    if (!$related) {
+                        return null;
+                    }
+                    
+                    // Handle HasMany/BelongsToMany relationships (collections)
+                    if ($related instanceof Collection) {
+                        $images = $related->pluck($field)->filter()->values();
+                        return $images->map(fn ($file) => FileManager::getMediaPath($file, $size))->toArray();
+                    }
+                    
+                    // Handle HasOne/BelongsTo relationships (single model)
+                    if (isset($related->{$field})) {
+                        return FileManager::getMediaPath($related->{$field}, $size);
+                    }
+                    
+                    return null;
+                }
 
+                // Original logic for non-relationship fields
                 $keys = explode('.', $field);
                 $temp = $record;
 
@@ -120,7 +148,12 @@ abstract class MediaColumn
             })
             ->action(
                 Action::make($field)
-                    ->schema(function ($record) use ($field) {
+                    ->schema(function ($record) use ($field, $relationship) {
+                        // Don't show upload form for relationship fields
+                        if ($relationship) {
+                            return [];
+                        }
+                        
                         return [
                             MediaUpload::make($field)
                                 ->uploadOriginal()
@@ -134,18 +167,40 @@ abstract class MediaColumn
                                 ->previewable()
                                 ->required(),
                         ];
-                    })->action(function ($record, $data) use ($field) {
-                        $record->update([
-                            $field => $data[$field],
-                        ]);
+                    })->action(function ($record, $data) use ($field, $relationship) {
+                        // Don't update if it's a relationship field
+                        if (!$relationship) {
+                            $record->update([
+                                $field => $data[$field],
+                            ]);
+                        }
                     })
-                    ->modalContent(function ($record, Action $action) use ($field, $modalSize) {
-                        // Use modalSize to determine the image size to display
-                        // null or 'full' means original size, otherwise use the specified size
-                        $displaySize = ($modalSize === null || $modalSize === 'full') ? null : $modalSize;
-                        $temp = static::getImages($field, $record, $displaySize);
+                    ->modalContent(function ($record, Action $action) use ($field, $modalSize, $relationship) {
+                        $images = null;
+                        
+                        if ($relationship) {
+                            // Load the relationship if not already loaded
+                            if (!$record->relationLoaded($relationship)) {
+                                $record->load($relationship);
+                            }
+                            
+                            $related = $record->{$relationship};
+                            
+                            if ($related instanceof Collection) {
+                                $images = $related->pluck($field)->filter()
+                                    ->map(fn ($file) => FileManager::getMediaPath($file, $modalSize))
+                                    ->toArray();
+                            } elseif ($related && isset($related->{$field})) {
+                                $images = [FileManager::getMediaPath($related->{$field}, $modalSize)];
+                            }
+                        } else {
+                            // Use modalSize to determine the image size to display
+                            // null or 'full' means original size, otherwise use the specified size
+                            $displaySize = ($modalSize === null || $modalSize === 'full') ? null : $modalSize;
+                            $images = static::getImages($field, $record, $displaySize);
+                        }
 
-                        return view('file-manager::livewire.media-modal', ['images' => $temp ?? []]);
+                        return view('file-manager::livewire.media-modal', ['images' => $images ?? []]);
                     })->slideOver()
                     ->modalSubmitActionLabel('Save')
                     ->modalHeading($heading ?:
@@ -154,8 +209,35 @@ abstract class MediaColumn
             );
     }
 
-    private static function getImagesWithoutUrl($field, $record, ?string $modalSize = null): ?array
+    private static function getImagesWithoutUrl($field, $record, ?string $modalSize = null, ?string $relationship = null): ?array
     {
+        if ($relationship) {
+            // Load the relationship if not already loaded
+            if (!$record->relationLoaded($relationship)) {
+                $record->load($relationship);
+            }
+            
+            $related = $record->{$relationship};
+            
+            if (!$related) {
+                return null;
+            }
+            
+            // Handle HasMany/BelongsToMany relationships (collections)
+            if ($related instanceof Collection) {
+                $images = $related->pluck($field)->filter()->values();
+                return $images->toArray();
+            }
+            
+            // Handle HasOne/BelongsTo relationships (single model)
+            if (isset($related->{$field})) {
+                return [$related->{$field}];
+            }
+            
+            return null;
+        }
+
+        // Original logic for non-relationship fields
         $keys = explode('.', $field);
         $temp = $record;
 
