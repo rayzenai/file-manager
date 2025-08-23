@@ -25,25 +25,16 @@ class MediaUrlColumn extends MediaColumn
             $imageFilename = $images[0] ?? null;
 
             if ($imageFilename) {
-                // Check if viewPageUrl method exists and if the model has a slug attribute with a value
+                // Check if viewPageUrl method exists - use it regardless of slug presence
                 if (method_exists($record, 'viewPageUrl')) {
-                    // Try to access slug - it might be a property, attribute, or accessor
-                    try {
-                        $hasSlug = isset($record->slug) && !empty($record->slug);
-                    } catch (\Exception $e) {
-                        $hasSlug = false;
+                    if ($this->viewCountField) {
+                        return $record->viewPageUrl(field: $this->getName(), counter: $this->viewCountField);
                     }
 
-                    if ($hasSlug) {
-                        if ($this->viewCountField) {
-                            return $record->viewPageUrl(field: $this->getName(), counter: $this->viewCountField);
-                        }
-
-                        return $record->viewPageUrl($this->getName());
-                    }
+                    return $record->viewPageUrl($this->getName());
                 }
 
-                // Return the full image URL as fallback
+                // Return the full image URL as fallback for models without viewPageUrl
                 return FileManager::getMediaPath($imageFilename);
             }
 

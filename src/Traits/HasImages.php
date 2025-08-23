@@ -238,23 +238,35 @@ trait HasImages
 
     public function viewPageUrl(string $field = 'file', string $counter = ''): ?string
     {
-        $modelKey = class_basename($this);
-
-        $modelAlias = config("file-manager.model.{$modelKey}", Str::plural(Str::lower($modelKey)));
+        $modelClass = get_class($this);
+        
+        // Use the full class name to look up in config
+        $modelAlias = config("file-manager.model.{$modelClass}");
+        
+        // If not found in config, use a fallback
+        if (!$modelAlias) {
+            $modelKey = class_basename($this);
+            $modelAlias = Str::plural(Str::lower($modelKey));
+        }
 
         if ($this->{$field}) {
+            // Use slug if available, otherwise use ID
+            $identifier = isset($this->slug) && !empty($this->slug) ? $this->slug : $this->id;
+            
             // Generate a URL matching your route: /media-page/{model}/{slug}
             if ($counter) {
                 return route('media.page', [
                     'directory' => $modelAlias,
-                    'slug' => $this->slug,
+                    'slug' => $identifier,
                     'counter' => $counter,
+                    'field' => $field,
                 ]);
             }
 
             return route('media.page', [
                 'directory' => $modelAlias,
-                'slug' => $this->slug,
+                'slug' => $identifier,
+                'field' => $field,
             ]);
 
         }
