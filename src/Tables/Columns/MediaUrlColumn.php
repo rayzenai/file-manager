@@ -73,9 +73,8 @@ class MediaUrlColumn extends MediaColumn
         $this->limitedRemainingText();
         
         // Apply the thumbnail size to the parent ImageColumn
-        if ($this->thumbnailSize !== null) {
-            $this->imageSize($this->thumbnailSize);
-        }
+        $thumbnailSize = $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
+        $this->imageSize($thumbnailSize);
 
         if ($this->showMetadata && config('file-manager.media_metadata.enabled')) {
             $this->tooltip(function ($record) {

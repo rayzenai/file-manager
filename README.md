@@ -206,6 +206,9 @@ return [
         'ultra' => 2160,    // 2160px height for ultra HD
     ],
 
+    // Default thumbnail size for MediaColumn components
+    'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
+
     // Compression settings
     'compression' => [
         'enabled' => true,
@@ -461,6 +464,28 @@ This will:
 - Allow viewing all images in a modal
 - Enable uploading new images that will replace existing attachments
 - Handle HasMany, HasOne, and BelongsTo relationships automatically
+
+#### Default Thumbnail Size
+
+You can configure the default thumbnail size for all `MediaColumn` components by setting the `default_thumbnail_size` in your configuration:
+
+```php
+// config/file-manager.php
+'default_thumbnail_size' => 'thumb', // Use 'thumb' instead of 'icon' as default
+```
+
+Or via environment variable:
+
+```env
+FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE=thumb
+```
+
+Individual columns can still override this default by calling the `thumbnailSize()` method:
+
+```php
+MediaColumn::make('image')
+    ->thumbnailSize('large') // This overrides the default
+```
 
 ### S3Image Column
 

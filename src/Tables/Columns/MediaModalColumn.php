@@ -97,7 +97,7 @@ class MediaModalColumn extends MediaColumn
 
         // Apply the thumbnail size to the parent ImageColumn
         $this->imageSize(function () {
-            return $this->thumbnailSize;
+            return $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
         });
 
         $this->tooltip(function ($record) {
