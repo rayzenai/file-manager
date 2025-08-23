@@ -95,4 +95,10 @@ return [
         'full' => 1080,     // 1080px height for full size
         'ultra' => 2160,    // 2160px height for ultra HD
     ],
+
+    /**
+     * Default thumbnail size for MediaColumn components
+     * This will be used as the default value for thumbnailSize() method
+     */
+    'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
 ];

@@ -49,8 +49,31 @@ class MediaPage extends Component
             abort(404, 'Invalid model type.');
         }
 
-        // Fetch the record based on the slug.
-        $record = $modelClass::where('slug', $slug)->firstOrFail();
+        // Fetch the record based on the slug or ID.
+        // First try to find by slug (if it's not numeric)
+        $record = null;
+        
+        // If the slug is numeric, it's likely an ID
+        if (is_numeric($slug)) {
+            $record = $modelClass::find($slug);
+        } else {
+            // Try to find by slug first
+            try {
+                $record = $modelClass::where('slug', $slug)->first();
+            } catch (\Exception $e) {
+                // If slug column doesn't exist, this will throw an exception
+                // We'll ignore it and try by ID
+            }
+            
+            // If not found by slug, try by ID anyway
+            if (!$record) {
+                $record = $modelClass::find($slug);
+            }
+        }
+        
+        if (!$record) {
+            abort(404, 'Record not found.');
+        }
 
         if (request('field')) {
             $this->field = [request('field')];
