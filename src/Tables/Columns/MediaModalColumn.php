@@ -92,22 +92,19 @@ class MediaModalColumn extends MediaColumn
             return $this->getStateForRecord($record);
         });
 
-        $this->stacked();
-        $this->limitedRemainingText();
-
         // Apply the thumbnail size to the parent ImageColumn
         $this->imageSize(function () {
             return $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
         });
 
         $this->tooltip(function ($record) {
-            if (!$this->showMetadata || !config('file-manager.media_metadata.enabled')) {
+            if (! $this->showMetadata || ! config('file-manager.media_metadata.enabled')) {
                 return null;
             }
 
             $metadata = $this->getMetadataForField($record);
 
-            if (!$metadata) {
+            if (! $metadata) {
                 return null;
             }
 
@@ -129,7 +126,7 @@ class MediaModalColumn extends MediaColumn
                 if ($this->heading !== null) {
                     return $this->heading instanceof Closure ? ($this->heading)($record) : $this->heading;
                 }
-                
+
                 // Fallback to record name or title
                 return isset($record->name) ? $record->name : (isset($record->title) ? $record->title : 'Image!');
             })
@@ -137,11 +134,11 @@ class MediaModalColumn extends MediaColumn
             ->schema(function ($record) {
                 // Only show schema if editing is allowed
                 $allowEdit = $this->allowEdit instanceof Closure ? ($this->allowEdit)($record) : $this->allowEdit;
-                
-                if (!$allowEdit) {
+
+                if (! $allowEdit) {
                     return [];
                 }
-                
+
                 // Handle relationship fields
                 if ($this->relationship) {
                     // Load the relationship to get current values
@@ -194,11 +191,11 @@ class MediaModalColumn extends MediaColumn
             ->action(function ($record, $data) {
                 // Only process action if editing is allowed
                 $allowEdit = $this->allowEdit instanceof Closure ? ($this->allowEdit)($record) : $this->allowEdit;
-                
-                if (!$allowEdit) {
+
+                if (! $allowEdit) {
                     return;
                 }
-                
+
                 if ($this->relationship) {
                     // Handle relationship update
                     if (isset($data['relationship_images'])) {
@@ -248,6 +245,7 @@ class MediaModalColumn extends MediaColumn
             })
             ->modalSubmitActionLabel(function ($record) {
                 $allowEdit = $this->allowEdit instanceof Closure ? ($this->allowEdit)($record) : $this->allowEdit;
+
                 return $allowEdit ? 'Save' : '';
             });
 

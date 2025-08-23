@@ -48,6 +48,16 @@ abstract class MediaColumn extends ImageColumn
         return $this;
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->circular();
+        $this->imageHeight(40);
+        $this->stacked();
+        $this->limitedRemainingText();
+    }
+
     protected function getImagesWithoutUrl($record): ?array
     {
         if ($this->relationship) {

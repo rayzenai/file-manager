@@ -68,9 +68,6 @@ class MediaUrlColumn extends MediaColumn
         $this->getStateUsing(function ($record) {
             return $this->getStateForRecord($record);
         });
-
-        $this->stacked();
-        $this->limitedRemainingText();
         
         // Apply the thumbnail size to the parent ImageColumn
         $thumbnailSize = $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
