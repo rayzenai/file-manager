@@ -77,8 +77,8 @@ class MediaUpload extends FileUpload
      */
     public function format(string $format): static
     {
-        if (! in_array($format, ['webp', 'jpeg', 'jpg', 'png', 'avif'])) {
-            throw new \InvalidArgumentException("Invalid format: {$format}. Must be webp, jpeg, jpg, png, or avif.");
+        if (! in_array($format, ['webp', 'jpeg', 'jpg', 'png', 'avif', 'original'])) {
+            throw new \InvalidArgumentException("Invalid format: {$format}. Must be webp, jpeg, jpg, png, avif, or original.");
         }
 
         $this->format = $format;
@@ -100,6 +100,16 @@ class MediaUpload extends FileUpload
     public function toAvif(): static
     {
         return $this->format('avif');
+    }
+
+    /**
+     * Keep original format but still compress.
+     */
+    public function keepOriginalFormat(): static
+    {
+        $this->format = 'original';
+        
+        return $this;
     }
 
     /**
@@ -362,7 +372,23 @@ class MediaUpload extends FileUpload
 
             // Use specified format or fall back to config
             $outputFormat = $this->format ?? config('file-manager.compression.format', 'webp');
-            $extension = $outputFormat === 'jpg' ? 'jpeg' : $outputFormat;
+            
+            // If keeping original format, use the file's extension
+            if ($outputFormat === 'original') {
+                $extension = $file->extension();
+                // Map common extensions to format names for compression
+                $formatMap = [
+                    'jpg' => 'jpeg',
+                    'jpeg' => 'jpeg',
+                    'png' => 'png',
+                    'webp' => 'webp',
+                    'avif' => 'avif',
+                ];
+                $outputFormat = $formatMap[strtolower($extension)] ?? 'jpeg'; // Default to jpeg if unknown
+            } else {
+                $extension = $outputFormat === 'jpg' ? 'jpeg' : $outputFormat;
+            }
+            
             $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
             $fullPath = "{$directory}/{$filename}";
 
@@ -407,7 +433,23 @@ class MediaUpload extends FileUpload
             $compressionService = new ImageCompressionService;
 
             $outputFormat = $this->format ?? config('file-manager.compression.format', 'webp');
-            $extension = $outputFormat === 'jpg' ? 'jpeg' : $outputFormat;
+            
+            // If keeping original format, use the file's extension
+            if ($outputFormat === 'original') {
+                $extension = $file->extension();
+                // Map common extensions to format names for compression
+                $formatMap = [
+                    'jpg' => 'jpeg',
+                    'jpeg' => 'jpeg',
+                    'png' => 'png',
+                    'webp' => 'webp',
+                    'avif' => 'avif',
+                ];
+                $outputFormat = $formatMap[strtolower($extension)] ?? 'jpeg'; // Default to jpeg if unknown
+            } else {
+                $extension = $outputFormat === 'jpg' ? 'jpeg' : $outputFormat;
+            }
+            
             $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
             $fullPath = "{$directory}/{$filename}";
             $shouldRemoveBackground = $this->evaluate($this->removeBackground);

@@ -298,24 +298,38 @@ The `MediaUpload` component extends Filament's `FileUpload` with automatic compr
 ```php
 use Kirantimsina\FileManager\Forms\Components\MediaUpload;
 
+// Example 1: Convert to WebP with custom quality
 MediaUpload::make('image')
     ->label('Product Image')
-    ->quality(90)               // Compression quality, capped at 95 (default: from config, typically 85)
-    ->toWebp()                  // Convert to WebP format (or use toAvif() for AVIF)
-    ->uploadOriginal()          // Upload file as-is without ANY processing (default: false)
-    ->trackMetadata()           // Track file metadata (default: true)
-    ->removeBg()                // Remove background (requires API, default: false)
-    ->driver('api')             // Compression driver: 'gd' or 'api' (default: from config)
+    ->quality(90)               // Compression quality, capped at 95
+    ->toWebp()                  // Convert to WebP format
+
+// Example 2: Compress but keep original format (JPEG stays JPEG, PNG stays PNG)
+MediaUpload::make('photo')
+    ->keepOriginalFormat()      // Compress but maintain original format
+    ->quality(85)               // Still applies compression
+
+// Example 3: Upload without ANY processing
+MediaUpload::make('document')
+    ->uploadOriginal()          // Skip all processing - no compression, no conversion
+
+// Example 4: Full featured upload with background removal
+MediaUpload::make('product_image')
+    ->toAvif()                  // Convert to AVIF format
+    ->quality(90)               // High quality
+    ->removeBg()                // Remove background (API required)
+    ->driver('api')             // Use API compression
+    ->trackMetadata()           // Track file metadata
     ->multiple()                // Allow multiple files
-    ->directory('custom-dir')   // Custom directory (optional)
 ```
 
 **Available Methods:**
 
 -   `quality(int $quality)`: Set compression quality (1-95, default: from config)
--   `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif')
+-   `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif', 'original')
 -   `toWebp()`: Convert to WebP format
--   `toAvif()`: Convert to AVIF format
+-   `toAvif()`: Convert to AVIF format, might not be avaialble with GD
+-   `keepOriginalFormat()`: Compress but keep the original file format
 -   `uploadOriginal()`: Skip ALL processing - no compression, no resizing, no format conversion
 -   `trackMetadata()`: Enable/disable metadata tracking
 -   `removeBg()`: Enable background removal (API only)
