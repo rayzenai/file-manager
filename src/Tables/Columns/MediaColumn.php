@@ -53,7 +53,7 @@ abstract class MediaColumn extends ImageColumn
         parent::setUp();
 
         $this->circular();
-        $this->imageHeight(40);
+        $this->imageHeight('40px');
         $this->stacked();
         $this->limitedRemainingText();
     }

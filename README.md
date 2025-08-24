@@ -141,7 +141,7 @@ Better `populate-metadata` command with:
 
     # Compression Settings (Optional)
     FILE_MANAGER_COMPRESSION_ENABLED=true
-    FILE_MANAGER_COMPRESSION_QUALITY=85
+    FILE_MANAGER_COMPRESSION_QUALITY=85 # Capped at 95
     FILE_MANAGER_COMPRESSION_FORMAT=webp
 
     # Compression Method Settings
@@ -195,6 +195,7 @@ return [
     ],
 
     // Image sizes to generate
+    // Set to empty array [] to disable automatic resizing completely
     'image_sizes' => [
         'icon' => 64,       // 64px height for small icons
         'small' => 120,     // 120px height for small thumbnails
@@ -213,13 +214,13 @@ return [
     'compression' => [
         'enabled' => true,
         'method' => 'gd', // 'gd' or 'api'
-        'auto_compress' => true,
+        'auto_compress' => true, // Automatically compress uploads
         'quality' => 85,
-        'format' => 'webp', // webp, jpeg, png, avif
+        'format' => 'webp', // Default output format: webp, jpeg, png, avif
         'mode' => 'contain', // contain, crop, cover
         'height' => 1080,
         'width' => null, // Auto-calculate
-        'threshold' => 100 * 1024, // 100KB
+        'threshold' => 100 * 1024, // Files larger than this will be compressed (100KB)
 
         // API settings for external compression
         'api' => [
@@ -297,23 +298,53 @@ The `MediaUpload` component extends Filament's `FileUpload` with automatic compr
 ```php
 use Kirantimsina\FileManager\Forms\Components\MediaUpload;
 
+// Example 1: Convert to WebP with custom quality
 MediaUpload::make('image')
     ->label('Product Image')
-    ->convertToWebp()           // Convert to WebP (default: true)
-    ->quality(90)               // Compression quality (default: 100)
-    ->uploadOriginal()          // Upload without resizing (default: true)
-    ->useCompression()          // Enable smart compression (default: true)
-    ->trackMetadata()           // Track file metadata (default: true)
-    ->removeBg()                // Remove background (requires API, default: false)
-    ->driver('api')             // Compression driver: 'gd' or 'api' (default: from config)
+    ->quality(90)               // Compression quality, capped at 95
+    ->toWebp()                  // Convert to WebP format
+
+// Example 2: Compress but keep original format (JPEG stays JPEG, PNG stays PNG)
+MediaUpload::make('photo')
+    ->keepOriginalFormat()      // Compress but maintain original format
+    ->quality(85)               // Still applies compression
+
+// Example 3: Upload without ANY processing
+MediaUpload::make('document')
+    ->uploadOriginal()          // Skip all processing - no compression, no conversion
+
+// Example 4: Full featured upload with background removal
+MediaUpload::make('product_image')
+    ->toAvif()                  // Convert to AVIF format
+    ->quality(90)               // High quality
+    ->removeBg()                // Remove background (API required)
+    ->driver('api')             // Use API compression
+    ->trackMetadata()           // Track file metadata
     ->multiple()                // Allow multiple files
-    ->directory('custom-dir')   // Custom directory (optional)
 ```
+
+**Available Methods:**
+
+-   `quality(int $quality)`: Set compression quality (1-95, default: from config)
+-   `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif', 'original')
+-   `toWebp()`: Convert to WebP format
+-   `toAvif()`: Convert to AVIF format, might not be avaialble with GD
+-   `keepOriginalFormat()`: Compress but keep the original file format
+-   `uploadOriginal()`: Skip ALL processing - no compression, no resizing, no format conversion
+-   `trackMetadata()`: Enable/disable metadata tracking
+-   `removeBg()`: Enable background removal (API only)
+-   `driver('gd'|'api')`: Choose compression driver
+-   `resize()`: Enable Filament's built-in resizing (opposite of uploadOriginal)
+
+**Important Notes:**
+
+-   **Compression:** Images are automatically compressed when enabled in config (unless `uploadOriginal()` is called)
+-   **Format Control:** Use `toWebp()`, `toAvif()`, or `format()` to override config format
+-   **Upload Original:** Call `uploadOriginal()` to skip ALL processing and upload file exactly as-is
 
 **Features:**
 
--   Automatic WebP conversion for better performance
--   Smart compression for files over threshold
+-   Smart compression with configurable output format (WebP/JPEG/PNG/AVIF)
 -   AI-powered background removal (API only)
 -   Metadata tracking with compression stats
 -   Supports both images and videos
@@ -379,63 +410,90 @@ protected function mutateFormDataBeforeSave(array $data): array
 }
 ```
 
-### MediaColumn
+### MediaModalColumn and MediaUrlColumn
 
-Display images in tables with modal preview and optional editing capabilities:
+Display images in tables with different interaction styles:
+
+#### MediaModalColumn
+
+Display images with modal preview and optional editing capabilities:
 
 ```php
-use Kirantimsina\FileManager\Tables\Columns\MediaColumn;
+use Kirantimsina\FileManager\Tables\Columns\MediaModalColumn;
 
-// Basic usage for direct model fields
-MediaColumn::make(
-    field: 'image_file_name',
-    size: 'small',
-    label: 'Product Image'
-)
+// Basic usage with modal preview
+MediaModalColumn::make('image_file_name')
+    ->label('Product Image')
+    ->thumbnailSize('small')
+    ->modalSize('large')
+    ->allowEdit() // Enable editing in modal
 
-// With modal for viewing and editing
-MediaColumn::make(
-    field: 'image_file_name',
-    size: 'small',
-    showInModal: true,
-    label: 'Product Image'
-)
-
-// For relationship fields (NEW in v4.3+)
-MediaColumn::make(
-    field: 'attachment_file_name',
-    size: 'extra-small',
-    showInModal: true,
-    relationship: 'attachments'  // Relationship name
-)->label('Attachments')
+// With custom heading and relationship
+MediaModalColumn::make('attachment_file_name')
+    ->label('Attachments')
+    ->relationship('attachments')
+    ->heading('View Attachments')
+    ->multiple() // Handle multiple images
+    ->downloadable() // Allow downloads
+    ->previewable() // Enable preview
 
 // Legacy dot notation (still supported)
-MediaColumn::make(
-    field: 'product.image_file_name',
-    size: 'small',
-    label: 'Product Image'
-)
+MediaModalColumn::make('product.image_file_name')
+    ->label('Product Image')
+    ->thumbnailSize('medium')
 ```
 
-**Parameters:**
-- `field`: The field name on the model (or related model when using relationship)
-- `size`: Image size preset ('icon', 'small', 'medium', 'large', etc.)
-- `showInModal`: Enable modal for viewing/editing (default: false)
-- `modalSize`: Size for modal preview images
-- `label`: Column label
-- `heading`: Modal heading (closure or string)
-- `viewCountField`: Field to track view counts
-- `showMetadata`: Show file metadata in tooltip
-- `relationship`: Name of the Eloquent relationship (for HasMany, HasOne, BelongsTo)
+#### MediaUrlColumn
+
+Display images that link to a dedicated media page:
+
+```php
+use Kirantimsina\FileManager\Tables\Columns\MediaUrlColumn;
+
+// Basic usage - links to media page
+MediaUrlColumn::make('image_file_name')
+    ->label('Product Image')
+    ->thumbnailSize('small')
+    ->openInNewTab() // Open link in new tab
+
+// With relationship
+MediaUrlColumn::make('featured_image')
+    ->label('Featured Image')
+    ->relationship('media')
+    ->thumbnailSize('card')
+```
+
+**Common Methods (both components):**
+
+-   `thumbnailSize()`: Set thumbnail size ('icon', 'small', 'medium', 'large', etc.)
+-   `label()`: Column label
+-   `relationship()`: Name of the Eloquent relationship (for HasMany, HasOne, BelongsTo)
+-   `showMetadata()`: Show file metadata in tooltip
+-   `viewCountField()`: Field to track view counts
+
+**MediaModalColumn specific methods:**
+
+-   `modalSize()`: Size for modal preview images
+-   `heading()`: Modal heading (closure or string)
+-   `allowEdit()`: Enable editing images in modal
+-   `multiple()`: Handle multiple images
+-   `downloadable()`: Allow image downloads
+-   `previewable()`: Enable image preview
+-   `uploadOriginal()`: Upload file as-is without any processing (default: false)
+
+**MediaUrlColumn specific methods:**
+
+-   `openInNewTab()`: Open media page in new tab (default: true)
 
 **Features:**
-- **Direct field access**: Works with model attributes directly
-- **Relationship support**: Access images through Eloquent relationships
-- **Dot notation**: Legacy support for nested relationships
-- **Modal editing**: View and replace images through modal interface
-- **Multiple images**: Handles both single and multiple image fields
-- **Smart loading**: Automatically loads relationships to prevent N+1 queries
-- **Metadata display**: Optional file size and type information
+
+-   **Direct field access**: Works with model attributes directly
+-   **Relationship support**: Access images through Eloquent relationships
+-   **Dot notation**: Legacy support for nested relationships
+-   **Modal editing**: View and replace images through modal interface
+-   **Multiple images**: Handles both single and multiple image fields
+-   **Smart loading**: Automatically loads relationships to prevent N+1 queries
+-   **Metadata display**: Optional file size and type information
 
 **Relationship Support (v4.3+):**
 
@@ -460,10 +518,11 @@ MediaColumn::make(
 ```
 
 This will:
-- Display all attachment images in the table column
-- Allow viewing all images in a modal
-- Enable uploading new images that will replace existing attachments
-- Handle HasMany, HasOne, and BelongsTo relationships automatically
+
+-   Display all attachment images in the table column
+-   Allow viewing all images in a modal
+-   Enable uploading new images that will replace existing attachments
+-   Handle HasMany, HasOne, and BelongsTo relationships automatically
 
 #### Default Thumbnail Size
 
@@ -483,7 +542,11 @@ FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE=thumb
 Individual columns can still override this default by calling the `thumbnailSize()` method:
 
 ```php
-MediaColumn::make('image')
+MediaModalColumn::make('image')
+    ->thumbnailSize('large') // This overrides the default
+
+// Or for URL column
+MediaUrlColumn::make('image')
     ->thumbnailSize('large') // This overrides the default
 ```
 
@@ -835,6 +898,21 @@ Define custom sizes in your config:
     // Add your custom sizes
 ],
 ```
+
+### Disabling Automatic Resizing
+
+To completely disable automatic image resizing, set the `image_sizes` config to an empty array:
+
+```php
+'image_sizes' => [],
+```
+
+This is useful when:
+
+-   You want to handle image resizing manually
+-   You're working with vector graphics or images that shouldn't be resized
+-   You want to optimize storage by keeping only original images
+-   You're using an external service for image processing
 
 ### Exclude Certain Fields from Resizing
 

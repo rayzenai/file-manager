@@ -84,6 +84,9 @@ return [
      * Define the sizes that should be created when an image is uploaded
      * Format: 'size_name' => height in pixels
      * The width will be calculated automatically to maintain aspect ratio
+     * 
+     * Set to empty array [] to disable automatic resizing completely:
+     * 'image_sizes' => [],
      */
     'image_sizes' => [
         'icon' => 64,       // 64px height for small icons
@@ -97,7 +100,7 @@ return [
     ],
 
     /**
-     * Default thumbnail size for MediaColumn components
+     * Default thumbnail size image to load for MediaColumn components
      * This will be used as the default value for thumbnailSize() method
      */
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),

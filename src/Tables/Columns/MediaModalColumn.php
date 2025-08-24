@@ -24,9 +24,7 @@ class MediaModalColumn extends MediaColumn
 
     protected bool $previewable = true;
 
-    protected bool $convertToWebp = false;
-
-    protected bool $uploadOriginal = true;
+    protected bool $uploadOriginal = false;
 
     public function modalSize(?string $size): static
     {
@@ -70,13 +68,6 @@ class MediaModalColumn extends MediaColumn
         return $this;
     }
 
-    public function convertToWebp(bool $convert = true): static
-    {
-        $this->convertToWebp = $convert;
-
-        return $this;
-    }
-
     public function uploadOriginal(bool $upload = true): static
     {
         $this->uploadOriginal = $upload;
@@ -90,11 +81,6 @@ class MediaModalColumn extends MediaColumn
 
         $this->getStateUsing(function ($record) {
             return $this->getStateForRecord($record);
-        });
-
-        // Apply the thumbnail size to the parent ImageColumn
-        $this->imageSize(function () {
-            return $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
         });
 
         $this->tooltip(function ($record) {
@@ -161,7 +147,6 @@ class MediaModalColumn extends MediaColumn
                             ->label('Images')
                             ->default($currentImages)
                             ->uploadOriginal($this->uploadOriginal)
-                            ->convertToWebp($this->convertToWebp)
                             ->columnSpanFull()
                             ->downloadable($this->downloadable)
                             ->multiple($this->multiple)
@@ -174,7 +159,6 @@ class MediaModalColumn extends MediaColumn
                 // Original logic for non-relationship fields
                 $mediaUpload = MediaUpload::make($this->getName())
                     ->uploadOriginal($this->uploadOriginal)
-                    ->convertToWebp($this->convertToWebp)
                     ->columnSpanFull()
                     ->downloadable($this->downloadable)
                     ->hint('Warning: This will replace the image/images.')
