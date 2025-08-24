@@ -8,10 +8,7 @@ use Exception;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\ImageManager;
-use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
@@ -20,24 +17,19 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 class MediaUpload extends FileUpload
 {
     /**
-     * Whether to upload the original version or resize.
+     * Whether to upload the original version without any processing.
      */
-    protected bool $uploadOriginal = true;
+    protected bool $uploadOriginal = false;
 
     /**
-     * Whether or not to convert (non-exempt images) to WebP.
+     * Quality to use for compression.
      */
-    protected bool $convertToWebp = true;
+    protected ?int $quality = null;
 
     /**
-     * Quality to use if converting to WebP.
+     * Output format for compression.
      */
-    protected int $quality = 100;
-
-    /**
-     * Whether to use compression service
-     */
-    protected bool $useCompression = true;
+    protected ?string $format = null;
 
     /**
      * Whether to track media metadata
@@ -53,7 +45,7 @@ class MediaUpload extends FileUpload
      * Whether to remove background from images
      */
     protected bool|\Closure $removeBackground = false;
-    
+
     /**
      * Compression driver to use (overrides config)
      */
@@ -70,23 +62,44 @@ class MediaUpload extends FileUpload
     }
 
     /**
-     * Set whether to convert images to WebP.
+     * Set the compression quality (capped at 95).
      */
-    public function convertToWebp(bool $convertToWebp = true): static
+    public function quality(int $quality): static
     {
-        $this->convertToWebp = $convertToWebp;
+        // Cap quality at 95 to prevent unnecessarily large files
+        $this->quality = min($quality, 95);
 
         return $this;
     }
 
     /**
-     * Set the WebP quality.
+     * Set the output format for compression.
      */
-    public function quality(int $quality): static
+    public function format(string $format): static
     {
-        $this->quality = $quality;
+        if (! in_array($format, ['webp', 'jpeg', 'jpg', 'png', 'avif'])) {
+            throw new \InvalidArgumentException("Invalid format: {$format}. Must be webp, jpeg, jpg, png, or avif.");
+        }
+
+        $this->format = $format;
 
         return $this;
+    }
+
+    /**
+     * Convert images to WebP format.
+     */
+    public function toWebp(): static
+    {
+        return $this->format('webp');
+    }
+
+    /**
+     * Convert images to AVIF format.
+     */
+    public function toAvif(): static
+    {
+        return $this->format('avif');
     }
 
     /**
@@ -95,24 +108,6 @@ class MediaUpload extends FileUpload
     public function resize(): static
     {
         return $this->uploadOriginal(false);
-    }
-
-    /**
-     * Convenience method to disable WebP conversion.
-     */
-    public function keepOriginalFormat(): static
-    {
-        return $this->convertToWebp(false);
-    }
-
-    /**
-     * Set whether to use compression service
-     */
-    public function useCompression(bool $useCompression = true): static
-    {
-        $this->useCompression = $useCompression;
-
-        return $this;
     }
 
     /**
@@ -142,18 +137,18 @@ class MediaUpload extends FileUpload
     {
         return $this->removeBg(true);
     }
-    
+
     /**
      * Set the compression driver (gd or api)
      */
     public function driver(string $driver): static
     {
-        if (!in_array($driver, ['gd', 'api'])) {
+        if (! in_array($driver, ['gd', 'api'])) {
             throw new \InvalidArgumentException("Invalid compression driver: {$driver}. Must be 'gd' or 'api'.");
         }
-        
+
         $this->compressionDriver = $driver;
-        
+
         return $this;
     }
 
@@ -238,22 +233,10 @@ class MediaUpload extends FileUpload
                 return $this->handleCompressedUpload($file, $get, $model, $directory);
             }
 
-            // Regular image upload with potential WebP conversion
-            $extension = ($this->convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif', 'webp']))
-                ? 'webp'
-                : $file->extension();
-
-            $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
+            // Regular image upload without compression
+            $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
             $fullPath = "{$directory}/{$filename}";
-
-            // If converting to webp, use Intervention
-            if ($this->convertToWebp && ! in_array($file->extension(), ['ico', 'svg', 'avif', 'webp'])) {
-                $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file->path())));
-                $media = $img->toWebp($this->quality)->toFilePointer();
-                Storage::disk('s3')->put($fullPath, $media);
-            } else {
-                $file->storeAs($directory, $filename, 's3');
-            }
+            $file->storeAs($directory, $filename, 's3');
 
             $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -262,13 +245,7 @@ class MediaUpload extends FileUpload
 
         // Determine the stored name for the file
         $this->getUploadedFileNameForStorageUsing(function (TemporaryUploadedFile $file, $get) {
-            $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
-
-            $extension = ($this->convertToWebp && ! $isVideo)
-                ? 'webp'
-                : $file->extension();
-
-            return (string) FileManagerService::filename($file, static::tag($get), $extension);
+            return (string) FileManagerService::filename($file, static::tag($get), $file->extension());
         });
     }
 
@@ -305,6 +282,11 @@ class MediaUpload extends FileUpload
      */
     protected function shouldUseCompression(TemporaryUploadedFile $file): bool
     {
+        // If uploadOriginal is true, skip all processing
+        if ($this->uploadOriginal) {
+            return false;
+        }
+
         // Skip compression for videos
         $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
         if ($isVideo) {
@@ -313,11 +295,6 @@ class MediaUpload extends FileUpload
 
         // Skip compression for certain formats that shouldn't be compressed
         if (in_array($file->extension(), ['ico', 'svg', 'gif'])) {
-            return false;
-        }
-
-        // If compression is disabled at component level
-        if (! $this->useCompression) {
             return false;
         }
 
@@ -348,7 +325,7 @@ class MediaUpload extends FileUpload
         try {
             // First, ensure we can access the file
             $tempPath = null;
-            
+
             // Try different methods to get the file path
             if (method_exists($file, 'getRealPath') && $file->getRealPath() && file_exists($file->getRealPath())) {
                 $tempPath = $file->getRealPath();
@@ -357,34 +334,36 @@ class MediaUpload extends FileUpload
             } else {
                 // Create a temporary copy if we can't access the original
                 $fileContent = null;
-                
+
                 // Try to get content from the file object
                 if (method_exists($file, 'get')) {
                     $fileContent = $file->get();
                 } elseif (method_exists($file, 'getContent')) {
                     $fileContent = $file->getContent();
                 }
-                
+
                 if ($fileContent) {
                     $tempPath = sys_get_temp_dir() . '/' . uniqid('media_') . '_' . $file->getClientOriginalName();
                     file_put_contents($tempPath, $fileContent);
                 } else {
-                    throw new \Exception('Cannot access temporary file content');
+                    throw new Exception('Cannot access temporary file content');
                 }
             }
-            
+
             // Override compression method if driver is specified
             $originalMethod = null;
             if ($this->compressionDriver !== null) {
                 $originalMethod = config('file-manager.compression.method');
                 config(['file-manager.compression.method' => $this->compressionDriver]);
             }
-            
+
             // Create compression service AFTER config override
             $compressionService = new ImageCompressionService;
 
-            // Always use webp for compressed images
-            $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+            // Use specified format or fall back to config
+            $outputFormat = $this->format ?? config('file-manager.compression.format', 'webp');
+            $extension = $outputFormat === 'jpg' ? 'jpeg' : $outputFormat;
+            $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
             $fullPath = "{$directory}/{$filename}";
 
             // Evaluate the removeBackground value if it's a closure
@@ -395,54 +374,56 @@ class MediaUpload extends FileUpload
             $result = $compressionService->compressAndSave(
                 $tempPath,
                 $fullPath,
-                (int) config('file-manager.compression.quality'),
+                min($this->quality ?? (int) config('file-manager.compression.quality', 85), 95),
                 config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
                 config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
-                config('file-manager.compression.format'),
+                $outputFormat,
                 config('file-manager.compression.mode'),
                 's3',
                 $shouldRemoveBackground  // Pass the evaluated removeBg flag
             );
-            
+
             // Restore original compression method if we changed it
             if ($originalMethod !== null) {
                 config(['file-manager.compression.method' => $originalMethod]);
             }
-            
+
             // Clean up temporary file if we created one
             if ($tempPath && strpos($tempPath, sys_get_temp_dir()) === 0 && file_exists($tempPath)) {
                 @unlink($tempPath);
             }
-            
-        } catch (\Exception $e) {
+
+        } catch (Exception $e) {
             // If compression fails, try with the original file object
-            
+
             // Apply driver override in fallback too
             $originalMethod = null;
             if ($this->compressionDriver !== null) {
                 $originalMethod = config('file-manager.compression.method');
                 config(['file-manager.compression.method' => $this->compressionDriver]);
             }
-            
+
             // Create compression service AFTER config override
             $compressionService = new ImageCompressionService;
-            
-            $filename = (string) FileManagerService::filename($file, static::tag($get), 'webp');
+
+            $outputFormat = $this->format ?? config('file-manager.compression.format', 'webp');
+            $extension = $outputFormat === 'jpg' ? 'jpeg' : $outputFormat;
+            $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
             $fullPath = "{$directory}/{$filename}";
             $shouldRemoveBackground = $this->evaluate($this->removeBackground);
-            
+
             $result = $compressionService->compressAndSave(
                 $file,
                 $fullPath,
-                (int) config('file-manager.compression.quality'),
+                min($this->quality ?? (int) config('file-manager.compression.quality', 85), 95),
                 config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
                 config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
-                config('file-manager.compression.format'),
+                $outputFormat,
                 config('file-manager.compression.mode'),
                 's3',
                 $shouldRemoveBackground
             );
-            
+
             // Restore original method after fallback
             if ($originalMethod !== null) {
                 config(['file-manager.compression.method' => $originalMethod]);
@@ -569,7 +550,7 @@ class MediaUpload extends FileUpload
         if ($this->compressionUsed) {
             $metadata['compression'] = [
                 'method' => config('file-manager.compression.method', 'gd'),
-                'quality' => $this->quality ?? config('file-manager.compression.quality', 85),
+                'quality' => min($this->quality ?? (int) config('file-manager.compression.quality', 85), 95),
             ];
         }
 

@@ -24,9 +24,7 @@ class MediaModalColumn extends MediaColumn
 
     protected bool $previewable = true;
 
-    protected bool $convertToWebp = false;
-
-    protected bool $uploadOriginal = true;
+    protected bool $uploadOriginal = false;
 
     public function modalSize(?string $size): static
     {
@@ -66,13 +64,6 @@ class MediaModalColumn extends MediaColumn
     public function previewable(bool $previewable = true): static
     {
         $this->previewable = $previewable;
-
-        return $this;
-    }
-
-    public function convertToWebp(bool $convert = true): static
-    {
-        $this->convertToWebp = $convert;
 
         return $this;
     }
@@ -156,7 +147,6 @@ class MediaModalColumn extends MediaColumn
                             ->label('Images')
                             ->default($currentImages)
                             ->uploadOriginal($this->uploadOriginal)
-                            ->convertToWebp($this->convertToWebp)
                             ->columnSpanFull()
                             ->downloadable($this->downloadable)
                             ->multiple($this->multiple)
@@ -169,7 +159,6 @@ class MediaModalColumn extends MediaColumn
                 // Original logic for non-relationship fields
                 $mediaUpload = MediaUpload::make($this->getName())
                     ->uploadOriginal($this->uploadOriginal)
-                    ->convertToWebp($this->convertToWebp)
                     ->columnSpanFull()
                     ->downloadable($this->downloadable)
                     ->hint('Warning: This will replace the image/images.')
