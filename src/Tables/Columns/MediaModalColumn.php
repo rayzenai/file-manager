@@ -92,11 +92,6 @@ class MediaModalColumn extends MediaColumn
             return $this->getStateForRecord($record);
         });
 
-        // Apply the thumbnail size to the parent ImageColumn
-        $this->imageSize(function () {
-            return $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
-        });
-
         $this->tooltip(function ($record) {
             if (! $this->showMetadata || ! config('file-manager.media_metadata.enabled')) {
                 return null;

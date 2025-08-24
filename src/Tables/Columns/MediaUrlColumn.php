@@ -13,6 +13,7 @@ class MediaUrlColumn extends MediaColumn
     public function openInNewTab(bool $open = true): static
     {
         $this->openInNewTab = $open;
+
         return $this;
     }
 
@@ -42,10 +43,10 @@ class MediaUrlColumn extends MediaColumn
         });
 
         $this->openUrlInNewTab(function ($record) {
-            if (!$this->openInNewTab) {
+            if (! $this->openInNewTab) {
                 return false;
             }
-            
+
             $images = $this->getImagesWithoutUrl($record);
             $imageFilename = $images[0] ?? null;
 
@@ -59,16 +60,12 @@ class MediaUrlColumn extends MediaColumn
         $this->getStateUsing(function ($record) {
             return $this->getStateForRecord($record);
         });
-        
-        // Apply the thumbnail size to the parent ImageColumn
-        $thumbnailSize = $this->thumbnailSize ?? config('file-manager.default_thumbnail_size', 'icon');
-        $this->imageSize($thumbnailSize);
 
         if ($this->showMetadata && config('file-manager.media_metadata.enabled')) {
             $this->tooltip(function ($record) {
                 $metadata = $this->getMetadataForField($record);
 
-                if (!$metadata) {
+                if (! $metadata) {
                     return null;
                 }
 
