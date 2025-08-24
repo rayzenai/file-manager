@@ -127,7 +127,9 @@ class FileManagerService
 
         $uploadedFilename = $file->storeAs($path, $filename);
 
-        if ($resize && in_array($mime, ['image/jpg', 'image/jpeg', 'image/png', 'image/webp', 'image/avif'])) {
+        // Only resize if enabled and image_sizes config is not empty
+        $sizes = static::getImageSizes();
+        if ($resize && ! empty($sizes) && in_array($mime, ['image/jpg', 'image/jpeg', 'image/png', 'image/webp', 'image/avif'])) {
             ResizeImages::dispatch([$uploadedFilename]);
         }
 
@@ -154,6 +156,13 @@ class FileManagerService
         $filename = Arr::last($exploded);
         $path = Arr::first($exploded);
 
+        // Get sizes from config and skip if empty
+        $sizes = static::getImageSizes();
+        if (empty($sizes)) {
+            $output->writeln("No image sizes configured. Skipping resize for {$filename}");
+            return;
+        }
+
         try {
 
             $disk = config('filesystems.default');
@@ -164,9 +173,6 @@ class FileManagerService
                 $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file)));
 
             }
-
-            // Get sizes from config
-            $sizes = static::getImageSizes();
 
             foreach ($sizes as $key => $val) {
                 $val = intval($val);
@@ -213,7 +219,9 @@ class FileManagerService
     {
         $newFile = static::moveTempImageWithoutResize($model, $tempFile);
 
-        if ($newFile) {
+        // Only dispatch resize job if image_sizes config is not empty
+        $sizes = static::getImageSizes();
+        if ($newFile && ! empty($sizes)) {
             ResizeImages::dispatch([$newFile]);
         }
 
@@ -243,11 +251,14 @@ class FileManagerService
         $s3 = Storage::disk();
         $s3->delete($filename);
 
+        // Get sizes from config and skip deletion of resized versions if empty
+        $sizes = static::getImageSizes();
+        if (empty($sizes)) {
+            return;
+        }
+
         $name = Arr::last(explode('/', $filename));
         $model = Arr::first(explode('/', $filename));
-
-        // Get sizes from config
-        $sizes = static::getImageSizes();
 
         foreach ($sizes as $key => $val) {
             $s3->delete("{$model}/{$key}/{$name}");

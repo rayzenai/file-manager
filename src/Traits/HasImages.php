@@ -37,11 +37,15 @@ trait HasImages
                 }
 
                 if ($model->{$field}) {
-                    $newFilename = $model->{$field};
-                    if (is_array($newFilename)) {
-                        ResizeImages::dispatch($newFilename);
-                    } else {
-                        ResizeImages::dispatch([$newFilename]);
+                    // Only dispatch resize if image_sizes config is not empty
+                    $sizes = FileManagerService::getImageSizes();
+                    if (! empty($sizes)) {
+                        $newFilename = $model->{$field};
+                        if (is_array($newFilename)) {
+                            ResizeImages::dispatch($newFilename);
+                        } else {
+                            ResizeImages::dispatch([$newFilename]);
+                        }
                     }
                 }
             }
@@ -121,18 +125,22 @@ trait HasImages
                     $newFilename = $model->{$field};
 
                     // Handle resizing ONLY truly new images
-                    if (is_array($newFilename) && is_array($oldFilename)) {
-                        // Find images that are in new but not in old (newly added images)
-                        $newlyAdded = array_diff($newFilename, $oldFilename);
-                        if (! empty($newlyAdded)) {
-                            ResizeImages::dispatch(array_values($newlyAdded));
+                    // Only dispatch resize if image_sizes config is not empty
+                    $sizes = FileManagerService::getImageSizes();
+                    if (! empty($sizes)) {
+                        if (is_array($newFilename) && is_array($oldFilename)) {
+                            // Find images that are in new but not in old (newly added images)
+                            $newlyAdded = array_diff($newFilename, $oldFilename);
+                            if (! empty($newlyAdded)) {
+                                ResizeImages::dispatch(array_values($newlyAdded));
+                            }
+                        } elseif (is_array($newFilename) && ! $oldFilename) {
+                            // All images are new if there was no old value
+                            ResizeImages::dispatch($newFilename);
+                        } elseif ($newFilename && $newFilename !== $oldFilename) {
+                            // Single new image that's different from the old one
+                            ResizeImages::dispatch([$newFilename]);
                         }
-                    } elseif (is_array($newFilename) && ! $oldFilename) {
-                        // All images are new if there was no old value
-                        ResizeImages::dispatch($newFilename);
-                    } elseif ($newFilename && $newFilename !== $oldFilename) {
-                        // Single new image that's different from the old one
-                        ResizeImages::dispatch([$newFilename]);
                     }
 
                     // Handle deleting old images

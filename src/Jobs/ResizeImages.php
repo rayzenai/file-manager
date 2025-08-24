@@ -34,6 +34,12 @@ class ResizeImages implements ShouldQueue
      */
     public function handle()
     {
+        // Skip if no image sizes are configured
+        $sizes = FileManagerService::getImageSizes();
+        if (empty($sizes)) {
+            return;
+        }
+
         foreach ($this->filesArr as $file) {
             FileManagerService::resizeImage($file, false);
         }
