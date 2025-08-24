@@ -195,6 +195,7 @@ return [
     ],
 
     // Image sizes to generate
+    // Set to empty array [] to disable automatic resizing completely
     'image_sizes' => [
         'icon' => 64,       // 64px height for small icons
         'small' => 120,     // 120px height for small thumbnails
@@ -835,6 +836,20 @@ Define custom sizes in your config:
     // Add your custom sizes
 ],
 ```
+
+### Disabling Automatic Resizing
+
+To completely disable automatic image resizing, set the `image_sizes` config to an empty array:
+
+```php
+'image_sizes' => [],
+```
+
+This is useful when:
+- You want to handle image resizing manually
+- You're working with vector graphics or images that shouldn't be resized
+- You want to optimize storage by keeping only original images
+- You're using an external service for image processing
 
 ### Exclude Certain Fields from Resizing
 
