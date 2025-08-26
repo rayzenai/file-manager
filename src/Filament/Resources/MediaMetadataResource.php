@@ -259,7 +259,7 @@ class MediaMetadataResource extends Resource
                         FormToggle::make('replace_original')
                             ->label('Replace original files')
                             ->helperText('This will permanently replace the original files with compressed versions')
-                            ->default(false),
+                            ->default(true),
                         FormToggle::make('resize_after')
                             ->label('Resize all versions after compression')
                             ->default(true),
@@ -614,7 +614,7 @@ class MediaMetadataResource extends Resource
                         FormToggle::make('replace_original')
                             ->label('Replace original file')
                             ->helperText('This will permanently replace the original file with the compressed version')
-                            ->default(false),
+                            ->default(true),
                         FormToggle::make('resize_after')
                             ->label('Resize all versions after compression')
                             ->default(true),

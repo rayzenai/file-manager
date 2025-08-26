@@ -80,6 +80,7 @@ class ImageProcessor extends Page implements HasForms
                                 ])
                                 ->required()
                                 ->live()
+                                ->directory('image-processor/uploads')
                                 ->afterStateUpdated(fn () => $this->resetProcessedImage())
                                 ->helperText('Maximum file size: 10MB. Supported formats: JPEG, PNG, WebP, AVIF'),
                         ])
@@ -324,11 +325,11 @@ class ImageProcessor extends Page implements HasForms
                 throw new \Exception($result['message'] ?? 'Compression failed');
             }
 
-            // Generate output filename
+            // Generate output filename for processed images
             $outputFilename = 'processed_' . uniqid() . '.' . $format;
-            $outputPath = 'temp/processed/' . $outputFilename;
+            $outputPath = 'image-processor/processed/' . date('Y-m-d') . '/' . $outputFilename;
 
-            // Save processed image to temp storage
+            // Save processed image to local storage for download
             Storage::disk('local')->put($outputPath, $result['data']['compressed_image']);
 
             // Store the path for download
