@@ -6,6 +6,7 @@ namespace Kirantimsina\FileManager;
 
 use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
 use Kirantimsina\FileManager\Commands\TestCompressionApiCommand;
+use Kirantimsina\FileManager\Commands\UpdateImageCacheHeadersCommand;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages\ImageProcessor;
 use Livewire\Livewire;
 use Spatie\LaravelPackageTools\Package;
@@ -29,6 +30,7 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasCommands([
                 PopulateMediaMetadataCommand::class,
                 TestCompressionApiCommand::class,
+                UpdateImageCacheHeadersCommand::class,
             ]);
     }
     

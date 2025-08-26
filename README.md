@@ -850,6 +850,61 @@ This command will:
 4. Dispatch jobs to handle large datasets efficiently
 5. Extract file information including size, mime type, and dimensions
 
+### Update Cache Headers for Existing Images
+
+Retroactively add cache control headers to existing images in S3:
+
+```bash
+# Update all images in all directories
+php artisan file-manager:update-cache-headers
+
+# Update images in a specific directory
+php artisan file-manager:update-cache-headers products
+php artisan file-manager:update-cache-headers users
+
+# Preview changes without applying them (dry run)
+php artisan file-manager:update-cache-headers --dry-run
+
+# Limit the number of files to process (useful for testing)
+php artisan file-manager:update-cache-headers --limit=100
+
+# Show detailed output for each file processed
+php artisan file-manager:update-cache-headers --detailed
+
+# Combine options
+php artisan file-manager:update-cache-headers products --dry-run --limit=10 --detailed
+```
+
+**Features:**
+- ✅ Progress bar showing real-time progress
+- 🔍 Dry run mode to preview changes
+- 📁 Directory-specific updates  
+- 🎯 Limit option for batch processing
+- 📝 Detailed output mode showing each file processed
+- 📊 Summary report with success/error counts
+- 🚀 Automatically detects all image directories from config
+
+**How it works:**
+- Uses S3's `copyObject` API to update metadata without re-uploading files
+- Applies cache control settings from your config
+- Sets proper Content-Type based on file extension
+- Processes original images and all resized versions
+
+This command is essential if you have images uploaded before cache headers were implemented, ensuring all your images benefit from optimal browser and CDN caching.
+
+**💡 Tip: Verifying Cache Headers**
+
+To check if cache headers are properly set on your images, use `curl`:
+
+```bash
+# Check headers for a specific image
+curl -I https://your-cdn.amazonaws.com/products/image.jpg | grep -E "Cache-Control|Content-Type"
+
+# Expected output:
+# Cache-Control: public, max-age=31536000, immutable
+# Content-Type: image/jpeg
+```
+
 ## Helper Functions
 
 ```php
