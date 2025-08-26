@@ -7,60 +7,6 @@ A comprehensive Laravel package for **Filament v4** that provides advanced file 
 
 This package is developed and maintained by **Kiran Timsina** and **RayzenTech**.
 
-## 🚀 What's New in v4.3
-
-### 🎯 Dual API Architecture
-
-**Two specialized APIs for optimal performance:**
-
--   **AWS Lambda API**: Lightning-fast compression for standard image processing
--   **Google Cloud Run API**: AI-powered background removal and advanced processing
-
-![Dual API Architecture](docs/images/dual-api-architecture.webp)
-
-### 🔧 Enhanced Compression Driver System
-
-Choose your processing method with the new `->driver()` method:
-
-```php
-MediaUpload::make('image')
-    ->driver('api')  // Use external API
-    ->driver('gd')   // Use local GD library
-```
-
-![Driver Selection](docs/images/driver-selection.webp)
-
-### 🖼️ Interactive Image Processor
-
-New dedicated page for testing and processing images directly in the admin panel:
-
--   Test different compression settings
--   Preview before/after results
--   Compare file sizes and quality
--   Test background removal
-
-![Image Processor](docs/images/image-processor.webp)
-
-### 📊 Enhanced Media Metadata Resource
-
--   **Navigation badges** showing large file counts
--   **Bulk operations** for compression and resizing
--   **Smart routing** to parent resources
--   **Detailed compression statistics**
-
-![Media Metadata Resource](docs/images/metadata-dashboard.webp)
-
-### 🛠️ Improved CLI Commands
-
-Better `populate-metadata` command with:
-
--   Progress bars for visual feedback
--   Support for both short and full class names
--   Dry-run mode for testing
--   Synchronous processing option
-
-![CLI Progress](docs/images/cli-progress.webp)
-
 ## Key Features
 
 ### Core Features
@@ -70,6 +16,10 @@ Better `populate-metadata` command with:
 -   🎭 **AI Background Removal** - Remove backgrounds from images using Cloud Run API
 -   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
 -   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
+-   ⚡ **Cache Control Headers** - Configurable browser/CDN caching for optimal performance
+-   🛠️ **Artisan Commands** - CLI tools for populating metadata with progress tracking
+-   📁 **Media Metadata Resource** - Dedicated admin page for managing media with bulk operations
+-   🖼️ **Image Processor Page** - Interactive tool for testing compression and processing settings
 
 ### Advanced Processing
 
@@ -139,10 +89,16 @@ Better `populate-metadata` command with:
     # Optional CDN URL (defaults to AWS_URL)
     CDN_URL=https://your-cdn-url.com
 
+    # Cache Control Settings (Optional)
+    FILE_MANAGER_CACHE_ENABLED=true
+    FILE_MANAGER_CACHE_MAX_AGE=31536000  # 1 year in seconds
+    FILE_MANAGER_CACHE_VISIBILITY=public  # 'public' or 'private'
+    FILE_MANAGER_CACHE_IMMUTABLE=true     # Add immutable directive
+
     # Compression Settings (Optional)
     FILE_MANAGER_COMPRESSION_ENABLED=true
-    FILE_MANAGER_COMPRESSION_QUALITY=85 # Capped at 95
-    FILE_MANAGER_COMPRESSION_FORMAT=webp
+    FILE_MANAGER_COMPRESSION_QUALITY=85 # 1-100, quality level
+    FILE_MANAGER_COMPRESSION_FORMAT=webp # webp, jpg, png, avif
 
     # Compression Method Settings
     FILE_MANAGER_COMPRESSION_METHOD=gd  # 'gd' for built-in PHP processing or 'api' for external service
@@ -210,40 +166,63 @@ return [
     // Default thumbnail size for MediaColumn components
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
 
+    // Cache Control Headers for Images
+    'cache' => [
+        'enabled' => env('FILE_MANAGER_CACHE_ENABLED', true),
+        
+        // Cache duration in seconds
+        // Common values:
+        // 3600 = 1 hour
+        // 86400 = 1 day  
+        // 604800 = 1 week
+        // 2592000 = 30 days
+        // 31536000 = 1 year (default)
+        'max_age' => env('FILE_MANAGER_CACHE_MAX_AGE', 31536000),
+        
+        // Cache visibility:
+        // 'public' - Can be cached by browsers and CDNs
+        // 'private' - Only cached by browsers, not CDNs
+        'visibility' => env('FILE_MANAGER_CACHE_VISIBILITY', 'public'),
+        
+        // Immutable directive - tells browsers the file will never change
+        // Recommended for versioned/hashed filenames
+        'immutable' => env('FILE_MANAGER_CACHE_IMMUTABLE', true),
+    ],
+
     // Compression settings
     'compression' => [
-        'enabled' => true,
-        'method' => 'gd', // 'gd' or 'api'
-        'auto_compress' => true, // Automatically compress uploads
-        'quality' => 85,
-        'format' => 'webp', // Default output format: webp, jpeg, png, avif
-        'mode' => 'contain', // contain, crop, cover
-        'height' => 1080,
-        'width' => null, // Auto-calculate
-        'threshold' => 100 * 1024, // Files larger than this will be compressed (100KB)
+        'enabled' => env('FILE_MANAGER_COMPRESSION_ENABLED', true),
+        'method' => env('FILE_MANAGER_COMPRESSION_METHOD', 'gd'), // 'gd' or 'api'
+        'auto_compress' => env('FILE_MANAGER_AUTO_COMPRESS', true),
+        'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85), // 1-100
+        'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'), // webp, jpeg, jpg, png, avif
+        'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'), // contain, crop, cover
+        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 1080),
+        'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
+        'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB
 
         // API settings for external compression
         'api' => [
             // Primary API (AWS Lambda - fast, no background removal)
             'url' => env('FILE_MANAGER_COMPRESSION_API_URL', ''),
             'token' => env('FILE_MANAGER_COMPRESSION_API_TOKEN', ''),
-            'timeout' => 30,
+            'timeout' => env('FILE_MANAGER_COMPRESSION_API_TIMEOUT', 30),
 
             // Background removal API (Google Cloud Run - slower, supports bg removal)
             'bg_removal' => [
                 'url' => env('FILE_MANAGER_BG_REMOVAL_API_URL', ''),
                 'token' => env('FILE_MANAGER_BG_REMOVAL_API_TOKEN', ''),
-                'timeout' => 60,
+                'timeout' => env('FILE_MANAGER_BG_REMOVAL_API_TIMEOUT', 60),
             ],
         ],
     ],
 
     // Media metadata tracking
     'media_metadata' => [
-        'enabled' => true,
-        'track_file_size' => true,
-        'track_dimensions' => true,
-        'track_mime_type' => true,
+        'enabled' => env('FILE_MANAGER_METADATA_ENABLED', true),
+        'track_file_size' => env('FILE_MANAGER_TRACK_FILE_SIZE', true),
+        'track_dimensions' => env('FILE_MANAGER_TRACK_DIMENSIONS', true),
+        'track_mime_type' => env('FILE_MANAGER_TRACK_MIME_TYPE', true),
         'model' => \Kirantimsina\FileManager\Models\MediaMetadata::class,
     ],
 ];
@@ -955,6 +934,35 @@ $checkout->items = [
 3. **Configure CDN** for faster content delivery
 4. **Set appropriate thresholds** to avoid compressing small files
 5. **Use WebP format** for 25-35% smaller file sizes
+6. **Configure cache headers** for optimal browser and CDN caching:
+   - Set `max_age` to 31536000 (1 year) for versioned/hashed filenames
+   - Use `public` visibility for CDN caching
+   - Enable `immutable` for static assets that never change
+
+### Cache Control Configuration
+
+The package automatically adds cache headers to all uploaded images for optimal performance:
+
+```env
+# Disable cache headers (not recommended)
+FILE_MANAGER_CACHE_ENABLED=false
+
+# Custom cache duration (in seconds)
+FILE_MANAGER_CACHE_MAX_AGE=86400   # 1 day
+FILE_MANAGER_CACHE_MAX_AGE=604800  # 1 week
+FILE_MANAGER_CACHE_MAX_AGE=2592000 # 30 days
+
+# Private caching (browser only, no CDN)
+FILE_MANAGER_CACHE_VISIBILITY=private
+
+# Allow revalidation (for frequently updated images)
+FILE_MANAGER_CACHE_IMMUTABLE=false
+```
+
+All images uploaded to S3 will automatically include these cache headers:
+- `Cache-Control: public, max-age=31536000, immutable` (default)
+- Proper `Content-Type` based on actual file format
+- Optimized for CDN edge caching
 
 ## Changelog
 
