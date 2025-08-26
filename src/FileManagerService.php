@@ -186,6 +186,10 @@ class FileManagerService
             return;
         }
 
+        // Get compression settings from config
+        $format = config('file-manager.compression.format', 'webp');
+        $quality = (int) config('file-manager.compression.quality', 85);
+
         try {
 
             $disk = config('filesystems.default');
@@ -209,20 +213,33 @@ class FileManagerService
                     // Scale down by width, not height
                     $resizedImg->scaleDown(width: $val);
                 }
-                // The below code recreates the image in desired size by placing the image at the center
-                // else {
-                //     $newImage = ImageManager::gd()->create($val, $val);
-                //     $img->scale(height: $val);
-
-                //     $newImage->place($img, 'center');
-                //     $img = $newImage;
-                // }
-
-                $image = $resizedImg->toWebp(85)->toFilePointer();
+                
+                // Convert to configured format with quality
+                // Keep the original filename to maintain consistency
+                switch ($format) {
+                    case 'jpeg':
+                    case 'jpg':
+                        $image = $resizedImg->toJpeg($quality)->toFilePointer();
+                        $contentType = 'image/jpeg';
+                        break;
+                    case 'png':
+                        $image = $resizedImg->toPng()->toFilePointer();
+                        $contentType = 'image/png';
+                        break;
+                    case 'avif':
+                        $image = $resizedImg->toAvif($quality)->toFilePointer();
+                        $contentType = 'image/avif';
+                        break;
+                    case 'webp':
+                    default:
+                        $image = $resizedImg->toWebp($quality)->toFilePointer();
+                        $contentType = 'image/webp';
+                        break;
+                }
 
                 $storageOptions = [
                     'visibility' => 'public',
-                    'ContentType' => 'image/webp',
+                    'ContentType' => $contentType,
                 ];
 
                 // Add cache headers if enabled
@@ -233,6 +250,7 @@ class FileManagerService
                     }
                 }
 
+                // Keep original filename for consistency across all sizes
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
@@ -242,12 +260,12 @@ class FileManagerService
                 if ($status) {
                     $output->writeln("Resized to {$path}/{$key}/{$filename}");
                 } else {
-                    $output->writeln("Cound NOT Resize to {$path}/{$key}/{$filename}");
+                    $output->writeln("Could NOT Resize to {$path}/{$key}/{$filename}");
                 }
             }
-        } catch (NotSupportedException $e) {
-            $output->writeln("{$filename} econding format is not supported!");
-        } catch (NotReadableException  $e) {
+        } catch (NotSupportedException) {
+            $output->writeln("{$filename} encoding format is not supported!");
+        } catch (NotReadableException) {
             $output->writeln("{$filename} is not readable!");
         }
     }
@@ -297,7 +315,7 @@ class FileManagerService
         $name = Arr::last(explode('/', $filename));
         $model = Arr::first(explode('/', $filename));
 
-        foreach ($sizes as $key => $val) {
+        foreach (array_keys($sizes) as $key) {
             $s3->delete("{$model}/{$key}/{$name}");
         }
     }
