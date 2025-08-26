@@ -115,7 +115,7 @@ class FileManagerService
             $img = ImageManager::gd()->read($file);
 
             if ($webp) {
-                $img = $img->toWebp(100)->toFilePointer();
+                $img = $img->toWebp(95)->toFilePointer();
                 $ext = 'webp';
 
             } else {
@@ -132,7 +132,7 @@ class FileManagerService
                 'visibility' => 'public',
                 'ContentType' => $mime,
             ];
-            
+
             // Add cache headers if enabled
             if (config('file-manager.cache.enabled', true)) {
                 $cacheControl = static::buildCacheControlHeader();
@@ -141,7 +141,7 @@ class FileManagerService
                 }
             }
         }
-        
+
         $uploadedFilename = Storage::disk()->putFileAs(
             $path,
             $file,
@@ -182,6 +182,7 @@ class FileManagerService
         $sizes = static::getImageSizes();
         if (empty($sizes)) {
             $output->writeln("No image sizes configured. Skipping resize for {$filename}");
+
             return;
         }
 
@@ -223,7 +224,7 @@ class FileManagerService
                     'visibility' => 'public',
                     'ContentType' => 'image/webp',
                 ];
-                
+
                 // Add cache headers if enabled
                 if (config('file-manager.cache.enabled', true)) {
                     $cacheControl = static::buildCacheControlHeader();
@@ -231,7 +232,7 @@ class FileManagerService
                         $storageOptions['CacheControl'] = $cacheControl;
                     }
                 }
-                
+
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
@@ -382,26 +383,26 @@ class FileManagerService
     {
         return Arr::last(explode('.', $filename));
     }
-    
+
     /**
      * Build the Cache-Control header value from config
      */
     public static function buildCacheControlHeader(): ?string
     {
-        if (!config('file-manager.cache.enabled', true)) {
+        if (! config('file-manager.cache.enabled', true)) {
             return null;
         }
-        
+
         $visibility = config('file-manager.cache.visibility', 'public');
         $maxAge = config('file-manager.cache.max_age', 31536000);
         $immutable = config('file-manager.cache.immutable', true);
-        
+
         $header = "{$visibility}, max-age={$maxAge}";
-        
+
         if ($immutable) {
             $header .= ', immutable';
         }
-        
+
         return $header;
     }
 }
