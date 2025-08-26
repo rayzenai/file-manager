@@ -414,8 +414,14 @@ class ImageProcessor extends Page implements HasForms
 
         $filePath = Storage::disk('local')->path($this->processedImagePath);
         $fileName = 'processed_image_' . date('Y-m-d_H-i-s') . '.' . pathinfo($this->processedImagePath, PATHINFO_EXTENSION);
+        
+        // Add cache control headers for 1 year
+        $headers = [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'Expires' => gmdate('D, d M Y H:i:s', time() + 31536000) . ' GMT',
+        ];
 
-        return response()->download($filePath, $fileName);
+        return response()->download($filePath, $fileName, $headers);
     }
 
     public function resetProcessedImage(): void

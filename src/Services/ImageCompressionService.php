@@ -370,14 +370,31 @@ class ImageCompressionService
 
             // Use putFileAs for more reliable S3 uploads
             try {
-                $saved = Storage::disk($disk)->put(
-                    $outputPath,
-                    $result['data']['compressed_image']
-                );
-                
-                // Set visibility separately if needed
-                if ($disk === 's3' && $saved) {
-                    Storage::disk($disk)->setVisibility($outputPath, 'public');
+                // Prepare storage options with cache headers for S3
+                if ($disk === 's3') {
+                    // Determine content type based on format
+                    $contentType = match($format) {
+                        'jpeg', 'jpg' => 'image/jpeg',
+                        'png' => 'image/png',
+                        'webp' => 'image/webp',
+                        'avif' => 'image/avif',
+                        default => 'image/webp',
+                    };
+                    
+                    $saved = Storage::disk($disk)->put(
+                        $outputPath,
+                        $result['data']['compressed_image'],
+                        [
+                            'visibility' => 'public',
+                            'CacheControl' => 'public, max-age=31536000, immutable',
+                            'ContentType' => $contentType,
+                        ]
+                    );
+                } else {
+                    $saved = Storage::disk($disk)->put(
+                        $outputPath,
+                        $result['data']['compressed_image']
+                    );
                 }
             } catch (\Exception $e) {
                 return [

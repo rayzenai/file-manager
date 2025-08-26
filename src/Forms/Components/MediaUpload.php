@@ -229,7 +229,10 @@ class MediaUpload extends FileUpload
             if ($isVideo) {
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
                 $fullPath = "{$directory}/{$filename}";
-                $file->storeAs($directory, $filename, 's3');
+                $file->storeAs($directory, $filename, [
+                    'disk' => 's3',
+                    'visibility' => 'public',
+                ]);
 
                 $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -246,7 +249,14 @@ class MediaUpload extends FileUpload
             // Regular image upload without compression
             $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
             $fullPath = "{$directory}/{$filename}";
-            $file->storeAs($directory, $filename, 's3');
+            
+            // Store with cache headers for images
+            $file->storeAs($directory, $filename, [
+                'disk' => 's3',
+                'visibility' => 'public',
+                'CacheControl' => 'public, max-age=31536000, immutable',
+                'ContentType' => $file->getMimeType(),
+            ]);
 
             $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -560,7 +570,12 @@ class MediaUpload extends FileUpload
         }
 
         // Fallback to regular upload if compression fails
-        $file->storeAs($directory, $filename, 's3');
+        $file->storeAs($directory, $filename, [
+            'disk' => 's3',
+            'visibility' => 'public',
+            'CacheControl' => 'public, max-age=31536000, immutable',
+            'ContentType' => $file->getMimeType(),
+        ]);
         $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
         return $fullPath;

@@ -125,7 +125,22 @@ class FileManagerService
             $filename = \explode('.', $filename)[0] . '.' . $ext;
         }
 
-        $uploadedFilename = $file->storeAs($path, $filename);
+        // Prepare storage options with cache headers for images
+        $storageOptions = [];
+        if (in_array($mime, ['image/jpg', 'image/jpeg', 'image/png', 'image/webp', 'image/avif'])) {
+            $storageOptions = [
+                'visibility' => 'public',
+                'CacheControl' => 'public, max-age=31536000, immutable',
+                'ContentType' => $mime,
+            ];
+        }
+        
+        $uploadedFilename = Storage::disk()->putFileAs(
+            $path,
+            $file,
+            $filename,
+            $storageOptions
+        );
 
         // Only resize if enabled and image_sizes config is not empty
         $sizes = static::getImageSizes();
@@ -200,6 +215,11 @@ class FileManagerService
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
+                    [
+                        'visibility' => 'public',
+                        'CacheControl' => 'public, max-age=31536000, immutable',
+                        'ContentType' => 'image/webp',
+                    ]
                 );
 
                 if ($status) {
