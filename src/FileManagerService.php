@@ -115,7 +115,7 @@ class FileManagerService
             $img = ImageManager::gd()->read($file);
 
             if ($webp) {
-                $img = $img->toWebp(100)->toFilePointer();
+                $img = $img->toWebp(95)->toFilePointer();
                 $ext = 'webp';
 
             } else {
@@ -125,7 +125,29 @@ class FileManagerService
             $filename = \explode('.', $filename)[0] . '.' . $ext;
         }
 
-        $uploadedFilename = $file->storeAs($path, $filename);
+        // Prepare storage options with cache headers for images
+        $storageOptions = [];
+        if (in_array($mime, ['image/jpg', 'image/jpeg', 'image/png', 'image/webp', 'image/avif'])) {
+            $storageOptions = [
+                'visibility' => 'public',
+                'ContentType' => $mime,
+            ];
+
+            // Add cache headers if enabled
+            if (config('file-manager.cache.enabled', true)) {
+                $cacheControl = static::buildCacheControlHeader();
+                if ($cacheControl) {
+                    $storageOptions['CacheControl'] = $cacheControl;
+                }
+            }
+        }
+
+        $uploadedFilename = Storage::disk()->putFileAs(
+            $path,
+            $file,
+            $filename,
+            $storageOptions
+        );
 
         // Only resize if enabled and image_sizes config is not empty
         $sizes = static::getImageSizes();
@@ -160,8 +182,13 @@ class FileManagerService
         $sizes = static::getImageSizes();
         if (empty($sizes)) {
             $output->writeln("No image sizes configured. Skipping resize for {$filename}");
+
             return;
         }
+
+        // Get compression settings from config
+        $format = config('file-manager.compression.format', 'webp');
+        $quality = (int) config('file-manager.compression.quality', 85);
 
         try {
 
@@ -186,31 +213,59 @@ class FileManagerService
                     // Scale down by width, not height
                     $resizedImg->scaleDown(width: $val);
                 }
-                // The below code recreates the image in desired size by placing the image at the center
-                // else {
-                //     $newImage = ImageManager::gd()->create($val, $val);
-                //     $img->scale(height: $val);
+                
+                // Convert to configured format with quality
+                // Keep the original filename to maintain consistency
+                switch ($format) {
+                    case 'jpeg':
+                    case 'jpg':
+                        $image = $resizedImg->toJpeg($quality)->toFilePointer();
+                        $contentType = 'image/jpeg';
+                        break;
+                    case 'png':
+                        $image = $resizedImg->toPng()->toFilePointer();
+                        $contentType = 'image/png';
+                        break;
+                    case 'avif':
+                        $image = $resizedImg->toAvif($quality)->toFilePointer();
+                        $contentType = 'image/avif';
+                        break;
+                    case 'webp':
+                    default:
+                        $image = $resizedImg->toWebp($quality)->toFilePointer();
+                        $contentType = 'image/webp';
+                        break;
+                }
 
-                //     $newImage->place($img, 'center');
-                //     $img = $newImage;
-                // }
+                $storageOptions = [
+                    'visibility' => 'public',
+                    'ContentType' => $contentType,
+                ];
 
-                $image = $resizedImg->toWebp(85)->toFilePointer();
+                // Add cache headers if enabled
+                if (config('file-manager.cache.enabled', true)) {
+                    $cacheControl = static::buildCacheControlHeader();
+                    if ($cacheControl) {
+                        $storageOptions['CacheControl'] = $cacheControl;
+                    }
+                }
 
+                // Keep original filename for consistency across all sizes
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
+                    $storageOptions
                 );
 
                 if ($status) {
                     $output->writeln("Resized to {$path}/{$key}/{$filename}");
                 } else {
-                    $output->writeln("Cound NOT Resize to {$path}/{$key}/{$filename}");
+                    $output->writeln("Could NOT Resize to {$path}/{$key}/{$filename}");
                 }
             }
-        } catch (NotSupportedException $e) {
-            $output->writeln("{$filename} econding format is not supported!");
-        } catch (NotReadableException  $e) {
+        } catch (NotSupportedException) {
+            $output->writeln("{$filename} encoding format is not supported!");
+        } catch (NotReadableException) {
             $output->writeln("{$filename} is not readable!");
         }
     }
@@ -260,7 +315,7 @@ class FileManagerService
         $name = Arr::last(explode('/', $filename));
         $model = Arr::first(explode('/', $filename));
 
-        foreach ($sizes as $key => $val) {
+        foreach (array_keys($sizes) as $key) {
             $s3->delete("{$model}/{$key}/{$name}");
         }
     }
@@ -345,5 +400,27 @@ class FileManagerService
     public static function getExtensionFromName(string $filename): string
     {
         return Arr::last(explode('.', $filename));
+    }
+
+    /**
+     * Build the Cache-Control header value from config
+     */
+    public static function buildCacheControlHeader(): ?string
+    {
+        if (! config('file-manager.cache.enabled', true)) {
+            return null;
+        }
+
+        $visibility = config('file-manager.cache.visibility', 'public');
+        $maxAge = config('file-manager.cache.max_age', 31536000);
+        $immutable = config('file-manager.cache.immutable', true);
+
+        $header = "{$visibility}, max-age={$maxAge}";
+
+        if ($immutable) {
+            $header .= ', immutable';
+        }
+
+        return $header;
     }
 }

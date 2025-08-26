@@ -414,8 +414,25 @@ class ImageProcessor extends Page implements HasForms
 
         $filePath = Storage::disk('local')->path($this->processedImagePath);
         $fileName = 'processed_image_' . date('Y-m-d_H-i-s') . '.' . pathinfo($this->processedImagePath, PATHINFO_EXTENSION);
+        
+        // Build cache headers from config
+        $headers = [];
+        
+        if (config('file-manager.cache.enabled', true)) {
+            $maxAge = config('file-manager.cache.max_age', 31536000);
+            $visibility = config('file-manager.cache.visibility', 'public');
+            $immutable = config('file-manager.cache.immutable', true);
+            
+            $cacheControl = "{$visibility}, max-age={$maxAge}";
+            if ($immutable) {
+                $cacheControl .= ', immutable';
+            }
+            
+            $headers['Cache-Control'] = $cacheControl;
+            $headers['Expires'] = gmdate('D, d M Y H:i:s', time() + $maxAge) . ' GMT';
+        }
 
-        return response()->download($filePath, $fileName);
+        return response()->download($filePath, $fileName, $headers);
     }
 
     public function resetProcessedImage(): void

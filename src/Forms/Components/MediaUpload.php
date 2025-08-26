@@ -229,7 +229,10 @@ class MediaUpload extends FileUpload
             if ($isVideo) {
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
                 $fullPath = "{$directory}/{$filename}";
-                $file->storeAs($directory, $filename, 's3');
+                $file->storeAs($directory, $filename, [
+                    'disk' => 's3',
+                    'visibility' => 'public',
+                ]);
 
                 $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -246,7 +249,22 @@ class MediaUpload extends FileUpload
             // Regular image upload without compression
             $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
             $fullPath = "{$directory}/{$filename}";
-            $file->storeAs($directory, $filename, 's3');
+            
+            // Build storage options
+            $storageOptions = [
+                'disk' => 's3',
+                'visibility' => 'public',
+                'ContentType' => $file->getMimeType(),
+            ];
+            
+            // Add cache headers if enabled
+            $cacheControl = FileManagerService::buildCacheControlHeader();
+            if ($cacheControl) {
+                $storageOptions['CacheControl'] = $cacheControl;
+            }
+            
+            // Store with cache headers for images
+            $file->storeAs($directory, $filename, $storageOptions);
 
             $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -559,8 +577,21 @@ class MediaUpload extends FileUpload
                 ->send();
         }
 
+        // Build storage options for fallback
+        $storageOptions = [
+            'disk' => 's3',
+            'visibility' => 'public',
+            'ContentType' => $file->getMimeType(),
+        ];
+        
+        // Add cache headers if enabled
+        $cacheControl = FileManagerService::buildCacheControlHeader();
+        if ($cacheControl) {
+            $storageOptions['CacheControl'] = $cacheControl;
+        }
+        
         // Fallback to regular upload if compression fails
-        $file->storeAs($directory, $filename, 's3');
+        $file->storeAs($directory, $filename, $storageOptions);
         $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
         return $fullPath;
