@@ -104,4 +104,31 @@ return [
      * This will be used as the default value for thumbnailSize() method
      */
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
+
+    /**
+     * Cache Control Settings for Images
+     * Configure browser and CDN caching for uploaded images
+     */
+    'cache' => [
+        // Enable cache headers for images
+        'enabled' => env('FILE_MANAGER_CACHE_ENABLED', true),
+        
+        // Cache duration in seconds (default: 31536000 = 1 year)
+        // Common values:
+        // 3600 = 1 hour
+        // 86400 = 1 day
+        // 604800 = 1 week
+        // 2592000 = 30 days
+        // 31536000 = 1 year
+        'max_age' => env('FILE_MANAGER_CACHE_MAX_AGE', 31536000),
+        
+        // Cache control directive
+        // Options: 'public' (can be cached by browsers and CDNs)
+        //          'private' (only cached by browsers, not CDNs)
+        'visibility' => env('FILE_MANAGER_CACHE_VISIBILITY', 'public'),
+        
+        // Whether to use immutable directive (tells browsers the file will never change)
+        // This is recommended for versioned/hashed filenames
+        'immutable' => env('FILE_MANAGER_CACHE_IMMUTABLE', true),
+    ],
 ];

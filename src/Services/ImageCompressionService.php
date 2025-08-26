@@ -381,14 +381,23 @@ class ImageCompressionService
                         default => 'image/webp',
                     };
                     
+                    $storageOptions = [
+                        'visibility' => 'public',
+                        'ContentType' => $contentType,
+                    ];
+                    
+                    // Add cache headers if enabled
+                    if (config('file-manager.cache.enabled', true)) {
+                        $cacheControl = $this->buildCacheControlHeader();
+                        if ($cacheControl) {
+                            $storageOptions['CacheControl'] = $cacheControl;
+                        }
+                    }
+                    
                     $saved = Storage::disk($disk)->put(
                         $outputPath,
                         $result['data']['compressed_image'],
-                        [
-                            'visibility' => 'public',
-                            'CacheControl' => 'public, max-age=31536000, immutable',
-                            'ContentType' => $contentType,
-                        ]
+                        $storageOptions
                     );
                 } else {
                     $saved = Storage::disk($disk)->put(
@@ -506,5 +515,27 @@ class ImageCompressionService
                 'message' => 'Exception: ' . $t->getMessage(),
             ];
         }
+    }
+    
+    /**
+     * Build the Cache-Control header value from config
+     */
+    protected function buildCacheControlHeader(): ?string
+    {
+        if (!config('file-manager.cache.enabled', true)) {
+            return null;
+        }
+        
+        $visibility = config('file-manager.cache.visibility', 'public');
+        $maxAge = config('file-manager.cache.max_age', 31536000);
+        $immutable = config('file-manager.cache.immutable', true);
+        
+        $header = "{$visibility}, max-age={$maxAge}";
+        
+        if ($immutable) {
+            $header .= ', immutable';
+        }
+        
+        return $header;
     }
 }

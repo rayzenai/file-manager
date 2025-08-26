@@ -130,9 +130,16 @@ class FileManagerService
         if (in_array($mime, ['image/jpg', 'image/jpeg', 'image/png', 'image/webp', 'image/avif'])) {
             $storageOptions = [
                 'visibility' => 'public',
-                'CacheControl' => 'public, max-age=31536000, immutable',
                 'ContentType' => $mime,
             ];
+            
+            // Add cache headers if enabled
+            if (config('file-manager.cache.enabled', true)) {
+                $cacheControl = static::buildCacheControlHeader();
+                if ($cacheControl) {
+                    $storageOptions['CacheControl'] = $cacheControl;
+                }
+            }
         }
         
         $uploadedFilename = Storage::disk()->putFileAs(
@@ -212,14 +219,23 @@ class FileManagerService
 
                 $image = $resizedImg->toWebp(85)->toFilePointer();
 
+                $storageOptions = [
+                    'visibility' => 'public',
+                    'ContentType' => 'image/webp',
+                ];
+                
+                // Add cache headers if enabled
+                if (config('file-manager.cache.enabled', true)) {
+                    $cacheControl = static::buildCacheControlHeader();
+                    if ($cacheControl) {
+                        $storageOptions['CacheControl'] = $cacheControl;
+                    }
+                }
+                
                 $status = Storage::disk()->put(
                     "{$path}/{$key}/{$filename}",
                     $image,
-                    [
-                        'visibility' => 'public',
-                        'CacheControl' => 'public, max-age=31536000, immutable',
-                        'ContentType' => 'image/webp',
-                    ]
+                    $storageOptions
                 );
 
                 if ($status) {
@@ -365,5 +381,27 @@ class FileManagerService
     public static function getExtensionFromName(string $filename): string
     {
         return Arr::last(explode('.', $filename));
+    }
+    
+    /**
+     * Build the Cache-Control header value from config
+     */
+    public static function buildCacheControlHeader(): ?string
+    {
+        if (!config('file-manager.cache.enabled', true)) {
+            return null;
+        }
+        
+        $visibility = config('file-manager.cache.visibility', 'public');
+        $maxAge = config('file-manager.cache.max_age', 31536000);
+        $immutable = config('file-manager.cache.immutable', true);
+        
+        $header = "{$visibility}, max-age={$maxAge}";
+        
+        if ($immutable) {
+            $header .= ', immutable';
+        }
+        
+        return $header;
     }
 }

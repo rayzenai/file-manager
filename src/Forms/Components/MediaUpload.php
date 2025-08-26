@@ -250,13 +250,21 @@ class MediaUpload extends FileUpload
             $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
             $fullPath = "{$directory}/{$filename}";
             
-            // Store with cache headers for images
-            $file->storeAs($directory, $filename, [
+            // Build storage options
+            $storageOptions = [
                 'disk' => 's3',
                 'visibility' => 'public',
-                'CacheControl' => 'public, max-age=31536000, immutable',
                 'ContentType' => $file->getMimeType(),
-            ]);
+            ];
+            
+            // Add cache headers if enabled
+            $cacheControl = FileManagerService::buildCacheControlHeader();
+            if ($cacheControl) {
+                $storageOptions['CacheControl'] = $cacheControl;
+            }
+            
+            // Store with cache headers for images
+            $file->storeAs($directory, $filename, $storageOptions);
 
             $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -569,13 +577,21 @@ class MediaUpload extends FileUpload
                 ->send();
         }
 
-        // Fallback to regular upload if compression fails
-        $file->storeAs($directory, $filename, [
+        // Build storage options for fallback
+        $storageOptions = [
             'disk' => 's3',
             'visibility' => 'public',
-            'CacheControl' => 'public, max-age=31536000, immutable',
             'ContentType' => $file->getMimeType(),
-        ]);
+        ];
+        
+        // Add cache headers if enabled
+        $cacheControl = FileManagerService::buildCacheControlHeader();
+        if ($cacheControl) {
+            $storageOptions['CacheControl'] = $cacheControl;
+        }
+        
+        // Fallback to regular upload if compression fails
+        $file->storeAs($directory, $filename, $storageOptions);
         $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
         return $fullPath;
