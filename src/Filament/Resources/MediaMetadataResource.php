@@ -256,6 +256,33 @@ class MediaMetadataResource extends Resource
                             ])
                             ->default('85')
                             ->required(),
+                        FormSelect::make('compression_method')
+                            ->label('Processing Method')
+                            ->options(function () {
+                                $options = [];
+                                
+                                $hasApi = !empty(config('file-manager.compression.api.url'));
+                                
+                                if ($hasApi) {
+                                    $options['auto'] = 'Auto (Use API, fallback to GD)';
+                                    $options['api'] = 'API Only (Fast compression)';
+                                }
+                                
+                                $options['gd'] = 'GD Library Only (Local processing)';
+                                
+                                return $options;
+                            })
+                            ->default(function () {
+                                $configMethod = config('file-manager.compression.method', 'api');
+                                // Map config values to form values
+                                return match($configMethod) {
+                                    'gd' => 'gd',
+                                    'api' => 'auto',  // 'api' in config means auto (with fallback)
+                                    default => 'auto'
+                                };
+                            })
+                            ->visible(fn () => !empty(config('file-manager.compression.api.url')))
+                            ->helperText('Choose which compression method to use'),
                         FormToggle::make('replace_original')
                             ->label('Replace original files')
                             ->helperText('This will permanently replace the original files with compressed versions')
@@ -265,6 +292,14 @@ class MediaMetadataResource extends Resource
                             ->default(true),
                     ])
                     ->action(function (Collection $records, array $data): void {
+                        // Override compression method if specified
+                        $originalMethod = config('file-manager.compression.method');
+                        if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
+                            $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
+                            config(['file-manager.compression.method' => $method]);
+                        }
+                        
+                        // Create compression service after config override
                         $compressionService = new ImageCompressionService;
                         $successCount = 0;
                         $failedCount = 0;
@@ -331,6 +366,9 @@ class MediaMetadataResource extends Resource
                             }
                         }
 
+                        // Restore original compression method
+                        config(['file-manager.compression.method' => $originalMethod]);
+                        
                         Notification::make()
                             ->title('Bulk compression completed')
                             ->body($notificationBody)
@@ -611,6 +649,33 @@ class MediaMetadataResource extends Resource
                             ])
                             ->default('85')
                             ->required(),
+                        FormSelect::make('compression_method')
+                            ->label('Processing Method')
+                            ->options(function () {
+                                $options = [];
+                                
+                                $hasApi = !empty(config('file-manager.compression.api.url'));
+                                
+                                if ($hasApi) {
+                                    $options['auto'] = 'Auto (Use API, fallback to GD)';
+                                    $options['api'] = 'API Only (Fast compression)';
+                                }
+                                
+                                $options['gd'] = 'GD Library Only (Local processing)';
+                                
+                                return $options;
+                            })
+                            ->default(function () {
+                                $configMethod = config('file-manager.compression.method', 'api');
+                                // Map config values to form values
+                                return match($configMethod) {
+                                    'gd' => 'gd',
+                                    'api' => 'auto',  // 'api' in config means auto (with fallback)
+                                    default => 'auto'
+                                };
+                            })
+                            ->visible(fn () => !empty(config('file-manager.compression.api.url')))
+                            ->helperText('Choose which compression method to use'),
                         FormToggle::make('replace_original')
                             ->label('Replace original file')
                             ->helperText('This will permanently replace the original file with the compressed version')
@@ -621,8 +686,19 @@ class MediaMetadataResource extends Resource
                     ])
                     ->action(function (MediaMetadata $record, array $data): void {
                         try {
+                            // Override compression method if specified
+                            $originalMethod = config('file-manager.compression.method');
+                            if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
+                                $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
+                                config(['file-manager.compression.method' => $method]);
+                            }
+                            
+                            // Create compression service after config override
                             $compressionService = new ImageCompressionService;
                             $result = static::compressMediaRecord($record, $data, $compressionService);
+                            
+                            // Restore original compression method
+                            config(['file-manager.compression.method' => $originalMethod]);
 
                             if ($result['success']) {
                                 $savedKb = round($result['saved'] / 1024, 2);
