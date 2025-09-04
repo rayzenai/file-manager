@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Kirantimsina\FileManager\Forms\Components;
 
 use Exception;
+use Closure;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -50,6 +52,16 @@ class MediaUpload extends FileUpload
      * Compression driver to use (overrides config)
      */
     protected ?string $compressionDriver = null;
+
+    /**
+     * SEO title to use for the uploaded media
+     */
+    protected string|Closure|null $seoTitle = null;
+
+    /**
+     * Field name to use for SEO title from the model
+     */
+    protected ?string $seoTitleField = null;
 
     /**
      * Set whether to upload original or resize.
@@ -158,6 +170,30 @@ class MediaUpload extends FileUpload
         }
 
         $this->compressionDriver = $driver;
+
+        return $this;
+    }
+
+    /**
+     * Set the SEO title for the uploaded media
+     * Can be a string, null, or a closure that receives Get $get
+     */
+    public function seoTitle(string|Closure|null $seoTitle): static
+    {
+        $this->seoTitle = $seoTitle;
+        $this->seoTitleField = null; // Clear field-based title if using direct title
+
+        return $this;
+    }
+
+    /**
+     * Set the SEO title from a field on the model
+     * The SEO title will be taken from the specified field of the record
+     */
+    public function seoTitleFromField(string $fieldName): static
+    {
+        $this->seoTitleField = $fieldName;
+        $this->seoTitle = null; // Clear direct title if using field-based title
 
         return $this;
     }
@@ -627,11 +663,47 @@ class MediaUpload extends FileUpload
             ];
         }
 
-        return MediaMetadata::updateOrCreateFor($model, $field, [
+        // Determine SEO title
+        $seoTitleValue = null;
+        
+        // Check if this model type should have SEO titles
+        $modelClass = get_class($model);
+        $enabledModels = config('file-manager.seo.enabled_models', []);
+        $excludedModels = config('file-manager.seo.excluded_models', []);
+        
+        // Skip SEO title for excluded models
+        if (in_array($modelClass, $excludedModels)) {
+            $seoTitleValue = null;
+        }
+        // Only set SEO title if model is enabled (or if no restrictions are set)
+        elseif (empty($enabledModels) || in_array($modelClass, $enabledModels)) {
+            // First check if SEO title from field is set
+            if ($this->seoTitleField !== null && $model) {
+                $seoTitleValue = $model->{$this->seoTitleField} ?? null;
+            }
+            // Then check if direct SEO title is set (can be closure)
+            elseif ($this->seoTitle !== null) {
+                $seoTitleValue = $this->evaluate($this->seoTitle);
+            }
+            
+            // Limit SEO title to 160 characters (reasonable for meta titles)
+            if ($seoTitleValue !== null) {
+                $seoTitleValue = substr($seoTitleValue, 0, 160);
+            }
+        }
+
+        $data = [
             'file_name' => $fullPath,
             'file_size' => $fileSize,
             'mime_type' => $mimeType,
             'metadata' => $metadata,
-        ]);
+        ];
+
+        // Only add SEO title if it has a value
+        if ($seoTitleValue !== null && $seoTitleValue !== '') {
+            $data['seo_title'] = $seoTitleValue;
+        }
+
+        return MediaMetadata::updateOrCreateFor($model, $field, $data);
     }
 }

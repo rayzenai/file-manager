@@ -98,6 +98,10 @@ class MediaMetadataResource extends Resource
                     ->disabled(),
                 TextInput::make('mime_type')
                     ->disabled(),
+                TextInput::make('seo_title')
+                    ->label('SEO Title')
+                    ->maxLength(160)
+                    ->helperText('SEO-friendly title for search engines (recommended 50-160 chars)'),
             ]);
     }
 
@@ -140,6 +144,11 @@ class MediaMetadataResource extends Resource
                         str_starts_with($state, 'application/pdf') => 'danger',
                         default => 'gray',
                     }),
+                TextEntry::make('seo_title')
+                    ->label('SEO Title')
+                    ->badge()
+                    ->color('primary')
+                    ->copyable(),
                 TextEntry::make('metadata')
                     ->label('Additional Metadata')
                     ->formatStateUsing(fn ($state) => $state ? json_encode($state, JSON_PRETTY_PRINT) : '-')
@@ -173,6 +182,13 @@ class MediaMetadataResource extends Resource
                     ->searchable()
                     ->limit(50)
                     ->tooltip(fn ($state) => $state),
+                TextColumn::make('seo_title')
+                    ->label('SEO Title')
+                    ->searchable()
+                    ->sortable()
+                    ->limit(60)
+                    ->tooltip(fn ($state) => $state)
+                    ->toggleable(),
                 TextColumn::make('file_size')
                     ->label('File Size')
                     ->sortable()
@@ -751,6 +767,48 @@ class MediaMetadataResource extends Resource
                         }
                     }),
 
+                Action::make('edit_seo')
+                    ->label('Edit SEO')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->color('success')
+                    ->modalHeading('Edit SEO Title')
+                    ->modalDescription(fn (MediaMetadata $record): string => "Optimize SEO for: {$record->file_name}")
+                    ->schema([
+                        TextInput::make('seo_title')
+                            ->label('SEO Title')
+                            ->placeholder('Enter SEO-friendly title')
+                            ->required()
+                            ->default(fn (MediaMetadata $record): ?string => $record->seo_title)
+                            ->maxLength(160)
+                            ->helperText('SEO-friendly title for search engines (recommended 50-160 characters)')
+                            ->live()
+                            ->afterStateUpdatedJs(<<<'JS'
+                                const count = ($state ?? '').length;
+                                const counter = document.querySelector('[data-seo-counter]');
+                                if (counter) {
+                                    counter.textContent = count + '/160';
+                                    counter.style.color = count > 160 ? '#ef4444' : (count < 50 ? '#f59e0b' : '#6b7280');
+                                }
+                            JS),
+                    ])
+                    ->action(function (MediaMetadata $record, array $data): void {
+                        try {
+                            $record->update(['seo_title' => $data['seo_title']]);
+                            
+                            Notification::make()
+                                ->title('SEO title updated')
+                                ->body('The SEO title has been updated successfully.')
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Update failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                
                 Action::make('rename')
                     ->label('Rename')
                     ->icon('heroicon-o-pencil')

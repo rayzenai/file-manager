@@ -161,6 +161,19 @@ trait HasImages
             }
         });
 
+        // Update SEO titles when model's SEO field changes
+        self::updated(function (self $model) {
+            // Check if model has seoTitleField method (indicates it wants SEO titles)
+            if (method_exists($model, 'seoTitleField')) {
+                $seoField = $model->seoTitleField();
+                
+                // Check if the SEO field was changed
+                if ($model->wasChanged($seoField)) {
+                    static::updateMediaSeoTitles($model);
+                }
+            }
+        });
+        
         // Create media metadata after the model is updated
         self::updated(function (self $model) {
             if (! config('file-manager.media_metadata.enabled', true)) {
@@ -408,4 +421,103 @@ trait HasImages
             return null;
         }
     }
+
+
+    /**
+     * Update SEO titles for all media metadata associated with this model
+     */
+    protected static function updateMediaSeoTitles($model): void
+    {
+        // Get all media metadata for this model
+        $mediaRecords = MediaMetadata::where('mediable_type', get_class($model))
+            ->where('mediable_id', $model->id)
+            ->get();
+
+        if ($mediaRecords->isEmpty()) {
+            return;
+        }
+
+        foreach ($mediaRecords as $media) {
+            $newSeoTitle = static::generateSeoTitle($model, $media);
+            
+            // Only update if the SEO title has changed
+            if ($newSeoTitle && $newSeoTitle !== $media->seo_title) {
+                $media->update(['seo_title' => $newSeoTitle]);
+            }
+        }
+    }
+
+    /**
+     * Generate SEO title for media based on parent model
+     */
+    protected static function generateSeoTitle($model, MediaMetadata $media): ?string
+    {
+        // Get the SEO title field for this model
+        $seoField = method_exists($model, 'seoTitleField') ? $model->seoTitleField() : 'name';
+        
+        if (isset($model->$seoField) && !empty($model->$seoField)) {
+            $value = $model->$seoField;
+            
+            // Clean up the value
+            $value = strip_tags($value);
+            $value = trim($value);
+            
+            // Skip if it's just numbers or too short
+            if (strlen($value) < 3 || is_numeric($value)) {
+                return null;
+            }
+
+            // Add field context if needed
+            $field = $media->mediable_field;
+            $contextualFields = ['thumbnail', 'gallery_images', 'sec_images', 'cover_image', 'banner_image'];
+            
+            if (in_array($field, $contextualFields)) {
+                $fieldContext = static::getFieldContext($field);
+                if ($fieldContext && !str_contains(strtolower($value), strtolower($fieldContext))) {
+                    $value = mb_substr($value . ' - ' . $fieldContext, 0, 160);
+                }
+            }
+
+            // Clean SEO title
+            $value = mb_substr($value, 0, 160);
+            
+            // Remove all control characters (0x00-0x1F, 0x7F) except tab, newline, and carriage return
+            // These characters are invalid in XML
+            $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value);
+            
+            // Remove non-word characters from start and end
+            $value = preg_replace('/^[^\w\s]+|[^\w\s]+$/u', '', $value);
+            
+            // Collapse multiple spaces
+            $value = preg_replace('/\s+/', ' ', $value);
+            
+            return trim($value);
+        }
+        
+        return null;
+    }
+
+    /**
+     * Get field context for SEO title
+     */
+    protected static function getFieldContext(string $field): ?string
+    {
+        $fieldContextMap = [
+            'featured_image' => 'Featured',
+            'gallery_images' => 'Gallery',
+            'thumbnail' => 'Thumbnail',
+            'cover_image' => 'Cover',
+            'banner_image' => 'Banner',
+            'logo' => 'Logo',
+            'profile_image' => 'Profile Picture',
+            'avatar' => 'Avatar',
+            'background_image' => 'Background',
+            'hero_image' => 'Hero',
+            'icon' => 'Icon',
+            'sec_images' => 'Gallery',
+        ];
+
+        return $fieldContextMap[$field] ?? null;
+    }
+
 }

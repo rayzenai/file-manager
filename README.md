@@ -270,6 +270,46 @@ class Product extends Model
 
 ## Usage in Filament Resources
 
+### SEO Title Support
+
+The package includes built-in SEO title functionality for better search engine optimization of media files:
+
+```php
+use Kirantimsina\FileManager\Forms\Components\MediaUpload;
+
+// Set SEO title directly
+MediaUpload::make('image')
+    ->seoTitle('Premium Chocolate Cake')
+
+// Set SEO title from another field
+MediaUpload::make('image')
+    ->seoTitleFromField('name')  // Uses the 'name' field value as SEO title
+
+// Dynamic SEO title with closure
+MediaUpload::make('image')
+    ->seoTitle(fn (Get $get) => $get('meta_title') ?? $get('name'))
+```
+
+**Configuration:**
+
+Control which models receive SEO titles in `config/file-manager.php`:
+
+```php
+'seo' => [
+    'enabled_models' => [
+        'App\Models\Product',
+        'App\Models\Category',
+        'App\Models\Blog',
+        // Models that should have SEO titles
+    ],
+    'excluded_models' => [
+        'App\Models\User',
+        'App\Models\Order',
+        // Models that should NOT have SEO titles
+    ],
+],
+```
+
 ### MediaUpload Component
 
 The `MediaUpload` component extends Filament's `FileUpload` with automatic compression and metadata tracking:
@@ -807,6 +847,133 @@ php artisan queue:monitor
 -   `PopulateMediaMetadataJob` - Populate media metadata for existing images
 
 ## Artisan Commands
+
+### Populate SEO Titles
+
+Generate SEO-optimized titles for existing media files based on their parent model data:
+
+```bash
+# Populate SEO titles for all configured models
+php artisan file-manager:populate-seo-titles
+
+# Process with custom chunk size for large datasets
+php artisan file-manager:populate-seo-titles --chunk=100
+
+# Preview what would be processed (dry run)
+php artisan file-manager:populate-seo-titles --dry-run
+
+# Process specific model only
+php artisan file-manager:populate-seo-titles --model=Product
+
+# Overwrite existing SEO titles
+php artisan file-manager:populate-seo-titles --overwrite
+```
+
+**Features:**
+- Intelligently extracts titles from parent model fields (meta_title, seo_title, name, title, etc.)
+- Removes special characters from beginning/end of titles
+- Respects configuration for enabled/excluded models
+- Processes large datasets efficiently with chunked operations
+- Shows detailed breakdown by model type
+
+### Update SEO Titles
+
+Update SEO titles when parent model data changes:
+
+```bash
+# Update all SEO titles for models that have changed
+php artisan file-manager:update-seo-titles
+
+# Update for a specific model type
+php artisan file-manager:update-seo-titles --model=Product
+
+# Update for a specific model instance
+php artisan file-manager:update-seo-titles --model=Product --id=123
+
+# Process with custom chunk size
+php artisan file-manager:update-seo-titles --chunk=200
+```
+
+#### Automatic Updates with HasImages Trait
+
+The `HasImages` trait now includes automatic SEO title updates. Simply define which field to use for SEO titles in your model:
+
+```php
+use Kirantimsina\FileManager\Traits\HasImages;
+
+class Product extends Model
+{
+    use HasImages;
+    
+    /**
+     * Define which field should be used for SEO title generation
+     * This field is also monitored for changes to trigger updates
+     * Default: 'name'
+     */
+    public function seoTitleField(): string
+    {
+        return 'meta_title'; // If meta_title is null/empty, SEO title will be null
+    }
+}
+```
+
+The HasImages trait now provides:
+- Automatic image resizing for configured sizes
+- Media metadata tracking
+- **Automatic SEO title updates** when the field returned by `seoTitleField()` changes
+
+**How SEO Titles Work:**
+- **Opt-in system**: Only models with a `seoTitleField()` method will have SEO titles
+- **No configuration needed**: The presence of the method indicates the model wants SEO titles
+- **Null is fine**: If the specified field is null/empty, the SEO title will be null
+- **Clean and explicit**: Each model declares exactly which field to use
+
+**Important Notes:**
+- Models without `seoTitleField()` method won't have SEO titles (intentional)
+- Return a single field name, not conditional logic
+- This is perfect for models where SEO is important (Product, Blog, Category) while internal models (Order, User, CartItem) simply don't define the method
+
+**Example for different models:**
+
+```php
+// Product model - wants SEO titles from meta_title
+class Product extends Model
+{
+    use HasImages;
+    
+    public function seoTitleField(): string
+    {
+        return 'meta_title';
+    }
+}
+
+// Blog model - wants SEO titles from title field  
+class Blog extends Model
+{
+    use HasImages;
+    
+    public function seoTitleField(): string
+    {
+        return 'title';
+    }
+}
+
+// Order model - no SEO titles needed (internal use)
+class Order extends Model
+{
+    use HasImages;
+    
+    // No seoTitleField() method = no SEO titles for media
+}
+
+// CartItem model - no SEO titles needed
+class CartItem extends Model
+{
+    use HasImages;
+    
+    // No seoTitleField() method = media won't have SEO titles
+}
+```
 
 ### Populate Media Metadata
 

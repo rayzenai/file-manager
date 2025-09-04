@@ -20,6 +20,7 @@ class MediaMetadata extends Model
         'width',
         'height',
         'metadata',
+        'seo_title',
     ];
 
     protected $casts = [

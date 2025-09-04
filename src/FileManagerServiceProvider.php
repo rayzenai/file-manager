@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Kirantimsina\FileManager;
 
 use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
+use Kirantimsina\FileManager\Commands\PopulateSeoTitlesCommand;
 use Kirantimsina\FileManager\Commands\TestCompressionApiCommand;
 use Kirantimsina\FileManager\Commands\UpdateImageCacheHeadersCommand;
+use Kirantimsina\FileManager\Commands\UpdateSeoTitlesCommand;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages\ImageProcessor;
 use Livewire\Livewire;
 use Spatie\LaravelPackageTools\Package;
@@ -26,11 +28,16 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasRoute('web')
             ->hasViews()
-            ->hasMigration('2025_01_09_000001_create_media_metadata_table')
+            ->hasMigrations([
+                '2025_01_09_000001_create_media_metadata_table',
+                '2025_01_09_000002_add_seo_title_to_media_metadata'
+            ])
             ->hasCommands([
                 PopulateMediaMetadataCommand::class,
+                PopulateSeoTitlesCommand::class,
                 TestCompressionApiCommand::class,
                 UpdateImageCacheHeadersCommand::class,
+                UpdateSeoTitlesCommand::class,
             ]);
     }
     
