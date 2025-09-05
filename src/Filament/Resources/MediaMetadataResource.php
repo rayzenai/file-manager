@@ -1197,15 +1197,15 @@ class MediaMetadataResource extends Resource
         };
         $newFileName = $directory . '/' . $filenameWithoutExt . '.' . $newExtension;
 
-        // Compress the image
+        // Compress the image - use configured dimensions if available
         $result = $compressionService->compressAndSave(
             $tempPath,
             $newFileName,
             (int) $data['quality'],
-            null,
-            null,
+            config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
+            config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
             $outputFormat,
-            'contain',
+            config('file-manager.compression.mode', 'contain'),
             's3'
         );
 

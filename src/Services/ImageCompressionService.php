@@ -281,7 +281,10 @@ class ImageCompressionService
                 $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
                 if ($gdResult['success']) {
                     $gdResult['data']['compression_method'] = 'gd_fallback';
-                    $gdResult['data']['api_fallback_reason'] = 'API returned status ' . $response->status();
+                    $responseBody = $response->body();
+                    $statusCode = $response->status();
+                    $gdResult['data']['api_fallback_reason'] = "API returned status {$statusCode}" . 
+                        ($responseBody ? ". Response: " . substr($responseBody, 0, 100) : '');
                 }
 
                 return $gdResult;
