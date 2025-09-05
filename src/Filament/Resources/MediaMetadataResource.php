@@ -29,6 +29,7 @@ use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
+use Kirantimsina\FileManager\Services\MetadataRefreshService;
 
 class MediaMetadataResource extends Resource
 {
@@ -431,6 +432,58 @@ class MediaMetadataResource extends Resource
                         }
                     }),
 
+                BulkAction::make('bulk_refetch')
+                    ->label('Refetch Metadata')
+                    ->deselectRecordsAfterCompletion()
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Refetch Metadata')
+                    ->modalDescription(fn (Collection $records): string => "Refetch metadata for {$records->count()} selected items")
+                    ->action(function (Collection $records): void {
+                        $service = new MetadataRefreshService();
+                        $result = $service->refreshBulk($records);
+                        
+                        // Build notification body
+                        $notificationBody = "Processed {$result['success_count']} items successfully.";
+                        
+                        if ($result['updated_count'] > 0) {
+                            $notificationBody .= "\nUpdated {$result['updated_count']} items.";
+                            
+                            // Show first few details
+                            if (!empty($result['details'])) {
+                                $notificationBody .= "\n\n**Changes:**\n";
+                                $detailsToShow = array_slice($result['details'], 0, 3);
+                                foreach ($detailsToShow as $detail) {
+                                    $notificationBody .= "• {$detail}\n";
+                                }
+                                if (count($result['details']) > 3) {
+                                    $remaining = count($result['details']) - 3;
+                                    $notificationBody .= "• ...and {$remaining} more\n";
+                                }
+                            }
+                        }
+                        
+                        if ($result['failed_count'] > 0) {
+                            $notificationBody .= "\n\n**Failed ({$result['failed_count']}):**\n";
+                            $failedToShow = array_slice($result['failed_records'], 0, 3);
+                            foreach ($failedToShow as $failed) {
+                                $notificationBody .= "• {$failed}\n";
+                            }
+                            if (count($result['failed_records']) > 3) {
+                                $remaining = count($result['failed_records']) - 3;
+                                $notificationBody .= "• ...and {$remaining} more\n";
+                            }
+                        }
+                        
+                        Notification::make()
+                            ->title('Bulk refetch completed')
+                            ->body($notificationBody)
+                            ->success()
+                            ->duration(10000)
+                            ->send();
+                    }),
+
                 BulkAction::make('bulk_delete_resized')
                     ->label('Delete Resized Versions')
                     ->deselectRecordsAfterCompletion()
@@ -775,73 +828,27 @@ class MediaMetadataResource extends Resource
                     ->modalDescription(fn (MediaMetadata $record): string => "Refetch metadata from parent model for: {$record->file_name}")
                     ->requiresConfirmation()
                     ->action(function (MediaMetadata $record): void {
-                        try {
-                            // Get the parent model
-                            $model = $record->mediable_type::find($record->mediable_id);
-                            
-                            if (!$model) {
-                                throw new \Exception('Parent model not found');
-                            }
-                            
-                            $updates = [];
-                            
-                            // Refetch SEO title if the model has seoTitleField method
-                            if (method_exists($model, 'seoTitleField')) {
-                                $seoField = $model->seoTitleField();
-                                $seoTitle = $model->$seoField ?? null;
-                                
-                                if ($seoTitle) {
-                                    // Clean control characters
-                                    $seoTitle = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $seoTitle);
-                                    // Limit to 160 characters
-                                    $seoTitle = substr($seoTitle, 0, 160);
-                                    $updates['seo_title'] = $seoTitle;
-                                }
-                            }
-                            
-                            // Check if file exists and update file info
-                            if (Storage::disk('s3')->exists($record->file_name)) {
-                                $fileSize = Storage::disk('s3')->size($record->file_name);
-                                $updates['file_size'] = $fileSize;
-                                
-                                // Get MIME type if possible
-                                $mimeType = Storage::disk('s3')->mimeType($record->file_name);
-                                if ($mimeType) {
-                                    $updates['mime_type'] = $mimeType;
-                                }
-                            }
-                            
-                            // Update the record
-                            if (!empty($updates)) {
-                                $record->update($updates);
-                                
-                                $message = [];
-                                if (isset($updates['seo_title'])) {
-                                    $message[] = 'SEO title';
-                                }
-                                if (isset($updates['file_size'])) {
-                                    $message[] = 'file size';
-                                }
-                                if (isset($updates['mime_type'])) {
-                                    $message[] = 'MIME type';
-                                }
-                                
+                        $service = new MetadataRefreshService();
+                        $result = $service->refreshSingle($record);
+                        
+                        if ($result['success']) {
+                            if ($result['updated'] ?? false) {
                                 Notification::make()
                                     ->title('Metadata refetched successfully')
-                                    ->body('Updated: ' . implode(', ', $message))
+                                    ->body($result['message'])
                                     ->success()
                                     ->send();
                             } else {
                                 Notification::make()
                                     ->title('No updates needed')
-                                    ->body('Metadata is already up to date')
+                                    ->body($result['message'])
                                     ->info()
                                     ->send();
                             }
-                        } catch (\Exception $e) {
+                        } else {
                             Notification::make()
                                 ->title('Refetch failed')
-                                ->body($e->getMessage())
+                                ->body($result['message'])
                                 ->danger()
                                 ->send();
                         }
