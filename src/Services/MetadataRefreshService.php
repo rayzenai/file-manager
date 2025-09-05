@@ -52,12 +52,47 @@ class MetadataRefreshService
                 }
             }
             
-            // Check if file exists and update file info
-            $disk = $this->getDiskForFile($record->file_name);
+            // Get the actual file name from the parent model's field
+            $field = $record->mediable_field;
+            $actualFileName = null;
             
-            if (Storage::disk($disk)->exists($record->file_name)) {
+            if (is_array($model->{$field})) {
+                // If it's an array field, find the file in the array
+                $values = $model->{$field};
+                if (in_array($record->file_name, $values)) {
+                    $actualFileName = $record->file_name; // File still exists in array
+                } else {
+                    // File name might have changed, we can't determine which one
+                    return [
+                        'success' => false,
+                        'message' => 'File not found in model field array',
+                    ];
+                }
+            } else {
+                // Single value field - get the current value from model
+                $actualFileName = $model->{$field};
+            }
+            
+            // Check if the file name has changed
+            if ($actualFileName && $actualFileName !== $record->file_name) {
+                $updates['file_name'] = $actualFileName;
+                $changes[] = "File name: {$record->file_name} → {$actualFileName}";
+            }
+            
+            // If no file name found in model
+            if (!$actualFileName) {
+                return [
+                    'success' => false,
+                    'message' => 'File reference removed from model',
+                ];
+            }
+            
+            // Check if file exists and update file info using the actual file name
+            $disk = $this->getDiskForFile($actualFileName);
+            
+            if (Storage::disk($disk)->exists($actualFileName)) {
                 // Update file size
-                $fileSize = Storage::disk($disk)->size($record->file_name);
+                $fileSize = Storage::disk($disk)->size($actualFileName);
                 if ($fileSize !== $record->file_size) {
                     $oldSizeKb = round(($record->file_size ?? 0) / 1024, 1);
                     $newSizeKb = round($fileSize / 1024, 1);
@@ -66,7 +101,7 @@ class MetadataRefreshService
                 }
                 
                 // Get MIME type if possible
-                $mimeType = Storage::disk($disk)->mimeType($record->file_name);
+                $mimeType = Storage::disk($disk)->mimeType($actualFileName);
                 if ($mimeType && $mimeType !== $record->mime_type) {
                     $updates['mime_type'] = $mimeType;
                     $changes[] = "MIME type: {$record->mime_type} → {$mimeType}";
@@ -74,7 +109,7 @@ class MetadataRefreshService
                 
                 // For images, try to get dimensions
                 if (str_starts_with($mimeType ?? $record->mime_type ?? '', 'image/')) {
-                    $dimensions = $this->getImageDimensions($record->file_name, $disk);
+                    $dimensions = $this->getImageDimensions($actualFileName, $disk);
                     if ($dimensions) {
                         if ($dimensions['width'] !== $record->width) {
                             $updates['width'] = $dimensions['width'];
@@ -89,7 +124,7 @@ class MetadataRefreshService
             } else {
                 return [
                     'success' => false,
-                    'message' => 'File not found on storage',
+                    'message' => "File not found on storage: {$actualFileName}",
                 ];
             }
             
