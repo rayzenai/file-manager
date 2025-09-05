@@ -10,12 +10,72 @@ use Kirantimsina\FileManager\Models\MediaMetadata;
 class MetadataRefreshService
 {
     /**
-     * Refresh metadata for a single media record
+     * Check if there's a discrepancy between model field and metadata
      * 
      * @param MediaMetadata $record
      * @return array
      */
-    public function refreshSingle(MediaMetadata $record): array
+    public function checkDiscrepancy(MediaMetadata $record): array
+    {
+        try {
+            // Get the parent model
+            $model = $record->mediable_type::find($record->mediable_id);
+            
+            if (!$model) {
+                return [
+                    'has_discrepancy' => false,
+                    'reason' => 'Parent model not found',
+                ];
+            }
+            
+            $field = $record->mediable_field;
+            $modelFileName = null;
+            
+            if (is_array($model->{$field})) {
+                // Array field - check if our file is in the array
+                $values = $model->{$field};
+                if (in_array($record->file_name, $values)) {
+                    // File exists in array with same name
+                    return ['has_discrepancy' => false];
+                } else {
+                    // File not in array or has different name
+                    return [
+                        'has_discrepancy' => true,
+                        'model_value' => 'Multiple files in array',
+                        'metadata_value' => $record->file_name,
+                    ];
+                }
+            } else {
+                // Single value field
+                $modelFileName = $model->{$field};
+                
+                if ($modelFileName !== $record->file_name) {
+                    return [
+                        'has_discrepancy' => true,
+                        'model_value' => $modelFileName ?: '(empty)',
+                        'metadata_value' => $record->file_name,
+                    ];
+                }
+            }
+            
+            return ['has_discrepancy' => false];
+            
+        } catch (\Exception $e) {
+            return [
+                'has_discrepancy' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+    
+    /**
+     * Refresh metadata for a single media record
+     * 
+     * @param MediaMetadata $record
+     * @param string $source 'model' to use parent model's field value, 'metadata' to use current metadata value
+     * @return array
+     */
+    public function refreshSingle(MediaMetadata $record, string $source = 'model'): array
     {
         try {
             // Get the parent model
@@ -52,39 +112,46 @@ class MetadataRefreshService
                 }
             }
             
-            // Get the actual file name from the parent model's field
-            $field = $record->mediable_field;
+            // Determine the file name based on source
             $actualFileName = null;
             
-            if (is_array($model->{$field})) {
-                // If it's an array field, find the file in the array
-                $values = $model->{$field};
-                if (in_array($record->file_name, $values)) {
-                    $actualFileName = $record->file_name; // File still exists in array
+            if ($source === 'model') {
+                // Get the actual file name from the parent model's field
+                $field = $record->mediable_field;
+                
+                if (is_array($model->{$field})) {
+                    // If it's an array field, find the file in the array
+                    $values = $model->{$field};
+                    if (in_array($record->file_name, $values)) {
+                        $actualFileName = $record->file_name; // File still exists in array
+                    } else {
+                        // File name might have changed, we can't determine which one
+                        return [
+                            'success' => false,
+                            'message' => 'File not found in model field array',
+                        ];
+                    }
                 } else {
-                    // File name might have changed, we can't determine which one
+                    // Single value field - get the current value from model
+                    $actualFileName = $model->{$field};
+                }
+                
+                // Check if the file name has changed
+                if ($actualFileName && $actualFileName !== $record->file_name) {
+                    $updates['file_name'] = $actualFileName;
+                    $changes[] = "File name: {$record->file_name} → {$actualFileName}";
+                }
+                
+                // If no file name found in model
+                if (!$actualFileName) {
                     return [
                         'success' => false,
-                        'message' => 'File not found in model field array',
+                        'message' => 'File reference removed from model',
                     ];
                 }
             } else {
-                // Single value field - get the current value from model
-                $actualFileName = $model->{$field};
-            }
-            
-            // Check if the file name has changed
-            if ($actualFileName && $actualFileName !== $record->file_name) {
-                $updates['file_name'] = $actualFileName;
-                $changes[] = "File name: {$record->file_name} → {$actualFileName}";
-            }
-            
-            // If no file name found in model
-            if (!$actualFileName) {
-                return [
-                    'success' => false,
-                    'message' => 'File reference removed from model',
-                ];
+                // Use the file name from metadata record
+                $actualFileName = $record->file_name;
             }
             
             // Check if file exists and update file info using the actual file name
@@ -155,12 +222,47 @@ class MetadataRefreshService
     }
     
     /**
-     * Refresh metadata for multiple records
+     * Check if any records in a collection have discrepancies
      * 
      * @param \Illuminate\Support\Collection $records
      * @return array
      */
-    public function refreshBulk($records): array
+    public function checkBulkDiscrepancies($records): array
+    {
+        $hasAnyDiscrepancy = false;
+        $discrepancyCount = 0;
+        $examples = [];
+        
+        foreach ($records as $record) {
+            $check = $this->checkDiscrepancy($record);
+            if ($check['has_discrepancy']) {
+                $hasAnyDiscrepancy = true;
+                $discrepancyCount++;
+                
+                // Collect first few examples
+                if (count($examples) < 3) {
+                    $modelName = class_basename($record->mediable_type);
+                    $examples[] = "{$modelName} #{$record->mediable_id}: {$check['metadata_value']} → {$check['model_value']}";
+                }
+            }
+        }
+        
+        return [
+            'has_any_discrepancy' => $hasAnyDiscrepancy,
+            'discrepancy_count' => $discrepancyCount,
+            'total_count' => $records->count(),
+            'examples' => $examples,
+        ];
+    }
+    
+    /**
+     * Refresh metadata for multiple records
+     * 
+     * @param \Illuminate\Support\Collection $records
+     * @param string $source 'model' to use parent model's field value, 'metadata' to use current metadata value
+     * @return array
+     */
+    public function refreshBulk($records, string $source = 'model'): array
     {
         $successCount = 0;
         $failedCount = 0;
@@ -169,7 +271,7 @@ class MetadataRefreshService
         $failedRecords = [];
         
         foreach ($records as $record) {
-            $result = $this->refreshSingle($record);
+            $result = $this->refreshSingle($record, $source);
             
             if ($result['success']) {
                 $successCount++;

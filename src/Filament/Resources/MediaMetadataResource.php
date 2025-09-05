@@ -439,10 +439,51 @@ class MediaMetadataResource extends Resource
                     ->color('success')
                     ->requiresConfirmation()
                     ->modalHeading('Refetch Metadata')
-                    ->modalDescription(fn (Collection $records): string => "Refetch metadata for {$records->count()} selected items")
-                    ->action(function (Collection $records): void {
+                    ->modalDescription(function (Collection $records): string {
                         $service = new MetadataRefreshService();
-                        $result = $service->refreshBulk($records);
+                        $check = $service->checkBulkDiscrepancies($records);
+                        
+                        $description = "Refetch metadata for {$records->count()} selected items";
+                        
+                        if ($check['has_any_discrepancy']) {
+                            $description .= "\n\n⚠️ {$check['discrepancy_count']} items have filename discrepancies!";
+                            if (!empty($check['examples'])) {
+                                $description .= "\nExamples:\n• " . implode("\n• ", $check['examples']);
+                            }
+                        }
+                        
+                        return $description;
+                    })
+                    ->schema(function (Collection $records): array {
+                        $service = new MetadataRefreshService();
+                        $check = $service->checkBulkDiscrepancies($records);
+                        
+                        // Only show source selection if there are discrepancies
+                        if ($check['has_any_discrepancy']) {
+                            return [
+                                Radio::make('source')
+                                    ->label('Choose which file names to use')
+                                    ->options([
+                                        'model' => 'Use parent model field values (will update metadata filenames)',
+                                        'metadata' => 'Keep current metadata filenames',
+                                    ])
+                                    ->default('model')
+                                    ->helperText("{$check['discrepancy_count']} out of {$check['total_count']} items have filename discrepancies.")
+                                    ->required(),
+                            ];
+                        }
+                        
+                        // No discrepancies, no need to show selection
+                        return [];
+                    })
+                    ->action(function (Collection $records, array $data): void {
+                        $service = new MetadataRefreshService();
+                        
+                        // Check for discrepancies to determine source
+                        $check = $service->checkBulkDiscrepancies($records);
+                        $source = $check['has_any_discrepancy'] ? ($data['source'] ?? 'model') : 'model';
+                        
+                        $result = $service->refreshBulk($records, $source);
                         
                         // Build notification body
                         $notificationBody = "Processed {$result['success_count']} items successfully.";
@@ -825,11 +866,48 @@ class MediaMetadataResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->color('info')
                     ->modalHeading('Refetch Metadata')
-                    ->modalDescription(fn (MediaMetadata $record): string => "Refetch metadata from parent model for: {$record->file_name}")
-                    ->requiresConfirmation()
-                    ->action(function (MediaMetadata $record): void {
+                    ->modalDescription(function (MediaMetadata $record): string {
                         $service = new MetadataRefreshService();
-                        $result = $service->refreshSingle($record);
+                        $discrepancy = $service->checkDiscrepancy($record);
+                        
+                        if ($discrepancy['has_discrepancy']) {
+                            return "⚠️ Discrepancy detected!\n" .
+                                   "Model field: {$discrepancy['model_value']}\n" .
+                                   "Metadata: {$discrepancy['metadata_value']}";
+                        }
+                        
+                        return "Refetch metadata for: {$record->file_name}";
+                    })
+                    ->schema(function (MediaMetadata $record): array {
+                        $service = new MetadataRefreshService();
+                        $discrepancy = $service->checkDiscrepancy($record);
+                        
+                        // Only show source selection if there's a discrepancy
+                        if ($discrepancy['has_discrepancy']) {
+                            return [
+                                Radio::make('source')
+                                    ->label('Choose which file to use')
+                                    ->options([
+                                        'model' => "Use model's value: " . ($discrepancy['model_value'] ?? 'unknown'),
+                                        'metadata' => "Use metadata's value: " . ($discrepancy['metadata_value'] ?? 'unknown'),
+                                    ])
+                                    ->default('model')
+                                    ->helperText('A discrepancy was detected between the model and metadata. Choose which one to use.')
+                                    ->required(),
+                            ];
+                        }
+                        
+                        // No discrepancy, no need to show selection
+                        return [];
+                    })
+                    ->action(function (MediaMetadata $record, array $data): void {
+                        $service = new MetadataRefreshService();
+                        
+                        // Check for discrepancy to determine source
+                        $discrepancy = $service->checkDiscrepancy($record);
+                        $source = $discrepancy['has_discrepancy'] ? ($data['source'] ?? 'model') : 'model';
+                        
+                        $result = $service->refreshSingle($record, $source);
                         
                         if ($result['success']) {
                             if ($result['updated'] ?? false) {
