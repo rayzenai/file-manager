@@ -767,6 +767,86 @@ class MediaMetadataResource extends Resource
                         }
                     }),
 
+                Action::make('refetch')
+                    ->label('Refetch')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('info')
+                    ->modalHeading('Refetch Metadata')
+                    ->modalDescription(fn (MediaMetadata $record): string => "Refetch metadata from parent model for: {$record->file_name}")
+                    ->requiresConfirmation()
+                    ->action(function (MediaMetadata $record): void {
+                        try {
+                            // Get the parent model
+                            $model = $record->mediable_type::find($record->mediable_id);
+                            
+                            if (!$model) {
+                                throw new \Exception('Parent model not found');
+                            }
+                            
+                            $updates = [];
+                            
+                            // Refetch SEO title if the model has seoTitleField method
+                            if (method_exists($model, 'seoTitleField')) {
+                                $seoField = $model->seoTitleField();
+                                $seoTitle = $model->$seoField ?? null;
+                                
+                                if ($seoTitle) {
+                                    // Clean control characters
+                                    $seoTitle = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $seoTitle);
+                                    // Limit to 160 characters
+                                    $seoTitle = substr($seoTitle, 0, 160);
+                                    $updates['seo_title'] = $seoTitle;
+                                }
+                            }
+                            
+                            // Check if file exists and update file info
+                            if (Storage::disk('s3')->exists($record->file_name)) {
+                                $fileSize = Storage::disk('s3')->size($record->file_name);
+                                $updates['file_size'] = $fileSize;
+                                
+                                // Get MIME type if possible
+                                $mimeType = Storage::disk('s3')->mimeType($record->file_name);
+                                if ($mimeType) {
+                                    $updates['mime_type'] = $mimeType;
+                                }
+                            }
+                            
+                            // Update the record
+                            if (!empty($updates)) {
+                                $record->update($updates);
+                                
+                                $message = [];
+                                if (isset($updates['seo_title'])) {
+                                    $message[] = 'SEO title';
+                                }
+                                if (isset($updates['file_size'])) {
+                                    $message[] = 'file size';
+                                }
+                                if (isset($updates['mime_type'])) {
+                                    $message[] = 'MIME type';
+                                }
+                                
+                                Notification::make()
+                                    ->title('Metadata refetched successfully')
+                                    ->body('Updated: ' . implode(', ', $message))
+                                    ->success()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('No updates needed')
+                                    ->body('Metadata is already up to date')
+                                    ->info()
+                                    ->send();
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Refetch failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                
                 Action::make('edit_seo')
                     ->label('Edit SEO')
                     ->icon('heroicon-o-magnifying-glass')
