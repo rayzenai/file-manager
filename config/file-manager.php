@@ -38,7 +38,7 @@ return [
         'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'),
         
         // Default dimensions
-        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 1080),
+        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 2160),
         'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
         
         // Files larger than this will be compressed (in bytes)
