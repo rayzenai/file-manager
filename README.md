@@ -169,21 +169,21 @@ return [
     // Cache Control Headers for Images
     'cache' => [
         'enabled' => env('FILE_MANAGER_CACHE_ENABLED', true),
-        
+
         // Cache duration in seconds
         // Common values:
         // 3600 = 1 hour
-        // 86400 = 1 day  
+        // 86400 = 1 day
         // 604800 = 1 week
         // 2592000 = 30 days
         // 31536000 = 1 year (default)
         'max_age' => env('FILE_MANAGER_CACHE_MAX_AGE', 31536000),
-        
+
         // Cache visibility:
         // 'public' - Can be cached by browsers and CDNs
         // 'private' - Only cached by browsers, not CDNs
         'visibility' => env('FILE_MANAGER_CACHE_VISIBILITY', 'public'),
-        
+
         // Immutable directive - tells browsers the file will never change
         // Recommended for versioned/hashed filenames
         'immutable' => env('FILE_MANAGER_CACHE_IMMUTABLE', true),
@@ -194,10 +194,10 @@ return [
         'enabled' => env('FILE_MANAGER_COMPRESSION_ENABLED', true),
         'method' => env('FILE_MANAGER_COMPRESSION_METHOD', 'gd'), // 'gd' or 'api'
         'auto_compress' => env('FILE_MANAGER_AUTO_COMPRESS', true),
-        'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85), // 1-100
+        'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85), // 1-95
         'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'), // webp, jpeg, jpg, png, avif
         'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'), // contain, crop, cover
-        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 1080),
+        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 2160),
         'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
         'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB
 
@@ -870,11 +870,12 @@ php artisan file-manager:populate-seo-titles --overwrite
 ```
 
 **Features:**
-- Intelligently extracts titles from parent model fields (meta_title, seo_title, name, title, etc.)
-- Removes special characters from beginning/end of titles
-- Respects configuration for enabled/excluded models
-- Processes large datasets efficiently with chunked operations
-- Shows detailed breakdown by model type
+
+-   Intelligently extracts titles from parent model fields (meta_title, seo_title, name, title, etc.)
+-   Removes special characters from beginning/end of titles
+-   Respects configuration for enabled/excluded models
+-   Processes large datasets efficiently with chunked operations
+-   Shows detailed breakdown by model type
 
 ### Update SEO Titles
 
@@ -904,7 +905,7 @@ use Kirantimsina\FileManager\Traits\HasImages;
 class Product extends Model
 {
     use HasImages;
-    
+
     /**
      * Define which field should be used for SEO title generation
      * This field is also monitored for changes to trigger updates
@@ -918,20 +919,23 @@ class Product extends Model
 ```
 
 The HasImages trait now provides:
-- Automatic image resizing for configured sizes
-- Media metadata tracking
-- **Automatic SEO title updates** when the field returned by `seoTitleField()` changes
+
+-   Automatic image resizing for configured sizes
+-   Media metadata tracking
+-   **Automatic SEO title updates** when the field returned by `seoTitleField()` changes
 
 **How SEO Titles Work:**
-- **Opt-in system**: Only models with a `seoTitleField()` method will have SEO titles
-- **No configuration needed**: The presence of the method indicates the model wants SEO titles
-- **Null is fine**: If the specified field is null/empty, the SEO title will be null
-- **Clean and explicit**: Each model declares exactly which field to use
+
+-   **Opt-in system**: Only models with a `seoTitleField()` method will have SEO titles
+-   **No configuration needed**: The presence of the method indicates the model wants SEO titles
+-   **Null is fine**: If the specified field is null/empty, the SEO title will be null
+-   **Clean and explicit**: Each model declares exactly which field to use
 
 **Important Notes:**
-- Models without `seoTitleField()` method won't have SEO titles (intentional)
-- Return a single field name, not conditional logic
-- This is perfect for models where SEO is important (Product, Blog, Category) while internal models (Order, User, CartItem) simply don't define the method
+
+-   Models without `seoTitleField()` method won't have SEO titles (intentional)
+-   Return a single field name, not conditional logic
+-   This is perfect for models where SEO is important (Product, Blog, Category) while internal models (Order, User, CartItem) simply don't define the method
 
 **Example for different models:**
 
@@ -940,18 +944,18 @@ The HasImages trait now provides:
 class Product extends Model
 {
     use HasImages;
-    
+
     public function seoTitleField(): string
     {
         return 'meta_title';
     }
 }
 
-// Blog model - wants SEO titles from title field  
+// Blog model - wants SEO titles from title field
 class Blog extends Model
 {
     use HasImages;
-    
+
     public function seoTitleField(): string
     {
         return 'title';
@@ -962,7 +966,7 @@ class Blog extends Model
 class Order extends Model
 {
     use HasImages;
-    
+
     // No seoTitleField() method = no SEO titles for media
 }
 
@@ -970,7 +974,7 @@ class Order extends Model
 class CartItem extends Model
 {
     use HasImages;
-    
+
     // No seoTitleField() method = media won't have SEO titles
 }
 ```
@@ -1043,19 +1047,21 @@ php artisan file-manager:update-cache-headers products --dry-run --limit=10 --de
 ```
 
 **Features:**
-- ✅ Progress bar showing real-time progress
-- 🔍 Dry run mode to preview changes
-- 📁 Directory-specific updates  
-- 🎯 Limit option for batch processing
-- 📝 Detailed output mode showing each file processed
-- 📊 Summary report with success/error counts
-- 🚀 Automatically detects all image directories from config
+
+-   ✅ Progress bar showing real-time progress
+-   🔍 Dry run mode to preview changes
+-   📁 Directory-specific updates
+-   🎯 Limit option for batch processing
+-   📝 Detailed output mode showing each file processed
+-   📊 Summary report with success/error counts
+-   🚀 Automatically detects all image directories from config
 
 **How it works:**
-- Uses S3's `copyObject` API to update metadata without re-uploading files
-- Applies cache control settings from your config
-- Sets proper Content-Type based on file extension
-- Processes original images and all resized versions
+
+-   Uses S3's `copyObject` API to update metadata without re-uploading files
+-   Applies cache control settings from your config
+-   Sets proper Content-Type based on file extension
+-   Processes original images and all resized versions
 
 This command is essential if you have images uploaded before cache headers were implemented, ensuring all your images benefit from optimal browser and CDN caching.
 
@@ -1157,9 +1163,9 @@ $checkout->items = [
 4. **Set appropriate thresholds** to avoid compressing small files
 5. **Use WebP format** for 25-35% smaller file sizes
 6. **Configure cache headers** for optimal browser and CDN caching:
-   - Set `max_age` to 31536000 (1 year) for versioned/hashed filenames
-   - Use `public` visibility for CDN caching
-   - Enable `immutable` for static assets that never change
+    - Set `max_age` to 31536000 (1 year) for versioned/hashed filenames
+    - Use `public` visibility for CDN caching
+    - Enable `immutable` for static assets that never change
 
 ### Cache Control Configuration
 
@@ -1182,9 +1188,10 @@ FILE_MANAGER_CACHE_IMMUTABLE=false
 ```
 
 All images uploaded to S3 will automatically include these cache headers:
-- `Cache-Control: public, max-age=31536000, immutable` (default)
-- Proper `Content-Type` based on actual file format
-- Optimized for CDN edge caching
+
+-   `Cache-Control: public, max-age=31536000, immutable` (default)
+-   Proper `Content-Type` based on actual file format
+-   Optimized for CDN edge caching
 
 ## Changelog
 

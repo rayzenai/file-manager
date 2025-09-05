@@ -1,6 +1,7 @@
 # Image Compression & Media Metadata Features
 
 ## Overview
+
 This package now includes built-in image compression and media metadata tracking capabilities.
 
 ## Configuration
@@ -20,7 +21,7 @@ The package configuration has been extended with compression and metadata settin
     'height' => 1080,
     'width' => null,
     'threshold' => 500 * 1024, // 500KB
-    
+
     // If using API method
     'api' => [
         'url' => 'https://your-api.com/compress',
@@ -49,7 +50,7 @@ FILE_MANAGER_AUTO_COMPRESS=true
 FILE_MANAGER_COMPRESSION_QUALITY=85
 FILE_MANAGER_COMPRESSION_FORMAT=webp
 FILE_MANAGER_COMPRESSION_MODE=contain
-FILE_MANAGER_COMPRESSION_HEIGHT=1080
+FILE_MANAGER_COMPRESSION_HEIGHT=2160
 FILE_MANAGER_COMPRESSION_THRESHOLD=512000  # in bytes
 
 # API Compression (if using API method)
@@ -67,9 +68,11 @@ FILE_MANAGER_TRACK_MIME_TYPE=true
 ## Compression Methods
 
 ### 1. GD Method (Default)
+
 Uses PHP's built-in GD library with Intervention Image for compression. This is suitable for most use cases and doesn't require external services.
 
 ### 2. API Method
+
 Uses an external API service for compression. This is useful if you have a dedicated image processing service. The package will automatically fall back to GD if the API fails.
 
 ## Usage
@@ -131,11 +134,12 @@ MediaUpload::make('image_file_name')
 ## Media Metadata
 
 The package automatically tracks:
-- File size
-- MIME type
-- Image dimensions (width & height)
-- Compression information (if compressed)
-- Upload timestamp
+
+-   File size
+-   MIME type
+-   Image dimensions (width & height)
+-   Compression information (if compressed)
+-   Upload timestamp
 
 ### Accessing Metadata
 
@@ -173,7 +177,7 @@ class Product extends Model
     {
         return $this->morphMany(MediaMetadata::class, 'mediable');
     }
-    
+
     public function getImageMetadata()
     {
         return $this->mediaMetadata()
@@ -194,43 +198,48 @@ php artisan migrate
 ## How It Works
 
 1. **File Upload**: When a file is uploaded through `MediaUpload`:
-   - Files over the threshold (default 500KB) are automatically compressed
-   - Compression uses either GD or external API based on configuration
-   - Images are converted to WebP format by default
-   - Metadata is tracked in the `media_metadata` table
+
+    - Files over the threshold (default 500KB) are automatically compressed
+    - Compression uses either GD or external API based on configuration
+    - Images are converted to WebP format by default
+    - Metadata is tracked in the `media_metadata` table
 
 2. **Compression Process**:
-   - GD Method: Uses Intervention Image to resize and convert
-   - API Method: Sends to external API, falls back to GD on failure
-   - Maintains aspect ratio with 'contain' mode by default
+
+    - GD Method: Uses Intervention Image to resize and convert
+    - API Method: Sends to external API, falls back to GD on failure
+    - Maintains aspect ratio with 'contain' mode by default
 
 3. **Metadata Tracking**:
-   - Automatically creates/updates metadata records
-   - Tracks original and compressed sizes
-   - Stores compression ratio for analysis
+    - Automatically creates/updates metadata records
+    - Tracks original and compressed sizes
+    - Stores compression ratio for analysis
 
 ## Performance Considerations
 
-- **GD Method**: Fast, no external dependencies, limited by PHP memory
-- **API Method**: Can handle larger files, adds network latency
-- **Automatic Fallback**: API method falls back to GD on failure
-- **Caching**: Metadata queries are optimized with indexes
+-   **GD Method**: Fast, no external dependencies, limited by PHP memory
+-   **API Method**: Can handle larger files, adds network latency
+-   **Automatic Fallback**: API method falls back to GD on failure
+-   **Caching**: Metadata queries are optimized with indexes
 
 ## Troubleshooting
 
 ### Images not compressing
-- Check if compression is enabled in config
-- Verify file size is above threshold
-- Check PHP memory limit for GD method
-- Verify API credentials for API method
+
+-   Check if compression is enabled in config
+-   Verify file size is above threshold
+-   Check PHP memory limit for GD method
+-   Verify API credentials for API method
 
 ### Metadata not being tracked
-- Ensure migration has been run
-- Check if metadata tracking is enabled
-- Verify model is passed to MediaUpload
+
+-   Ensure migration has been run
+-   Check if metadata tracking is enabled
+-   Verify model is passed to MediaUpload
 
 ### API compression failing
-- Check API URL and token
-- Verify API timeout setting
-- Check network connectivity
-- Package will fall back to GD automatically
+
+-   Check API URL and token
+-   Verify API timeout setting
+-   Check network connectivity
+-   Package will fall back to GD automatically
