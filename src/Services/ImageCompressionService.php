@@ -225,9 +225,13 @@ class ImageCompressionService
                 'format' => $format,
                 'mode' => $mode,
                 'quality' => $quality,
-                'height' => $height ?? 1080,
             ];
 
+            // Only add dimensions if they are explicitly provided
+            if ($height !== null) {
+                $params['height'] = $height;
+            }
+            
             if ($width !== null) {
                 $params['width'] = $width;
             }
