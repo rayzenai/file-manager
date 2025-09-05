@@ -39,9 +39,17 @@ class MetadataRefreshService
                     return ['has_discrepancy' => false];
                 } else {
                     // File not in array or has different name
+                    // Return the array files for user to see
+                    $filesList = !empty($values) ? implode(', ', array_slice($values, 0, 3)) : '(empty array)';
+                    if (count($values) > 3) {
+                        $filesList .= ' and ' . (count($values) - 3) . ' more';
+                    }
+                    
                     return [
                         'has_discrepancy' => true,
-                        'model_value' => 'Multiple files in array',
+                        'is_array' => true,
+                        'array_files' => $values,
+                        'model_value' => $filesList,
                         'metadata_value' => $record->file_name,
                     ];
                 }
@@ -52,6 +60,7 @@ class MetadataRefreshService
                 if ($modelFileName !== $record->file_name) {
                     return [
                         'has_discrepancy' => true,
+                        'is_array' => false,
                         'model_value' => $modelFileName ?: '(empty)',
                         'metadata_value' => $record->file_name,
                     ];
