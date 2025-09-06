@@ -122,8 +122,15 @@ class MediaMetadataResource extends Resource
                                 // Use FileManager to get the thumbnail path with configured size
                                 $thumbnailSize = config('file-manager.default_card_size', 'thumbnail');
                                 $thumbnailPath = FileManager::getMediaPath($state, $thumbnailSize);
-                                $thumbnailUrl = Storage::disk('s3')->url($thumbnailPath);
-                                $fullImageUrl = Storage::disk('s3')->url($state);
+                                
+                                // Check if FileManager returned a full URL or just a path
+                                $thumbnailUrl = str_starts_with($thumbnailPath, 'http') 
+                                    ? $thumbnailPath 
+                                    : Storage::disk('s3')->url($thumbnailPath);
+                                
+                                $fullImageUrl = str_starts_with($state, 'http') 
+                                    ? $state 
+                                    : Storage::disk('s3')->url($state);
 
                                 return "<a href='{$fullImageUrl}' target='_blank' class='block'>
                                     <img src='{$thumbnailUrl}' 
