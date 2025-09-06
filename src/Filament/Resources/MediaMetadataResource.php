@@ -1505,13 +1505,13 @@ class MediaMetadataResource extends Resource
         };
         $newFileName = $directory . '/' . $filenameWithoutExt . '.' . $newExtension;
 
-        // Compress the image - use configured dimensions if available
+        // Compress the image - let the service handle max constraints automatically
         $result = $compressionService->compressAndSave(
             $tempPath,
             $newFileName,
             (int) $data['quality'],
-            config('file-manager.compression.height') ? (int) config('file-manager.compression.height') : null,
-            config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
+            null, // Let the service apply max height constraint automatically
+            null, // Let the service apply max width constraint automatically  
             $outputFormat,
             config('file-manager.compression.mode', 'contain'),
             's3'
