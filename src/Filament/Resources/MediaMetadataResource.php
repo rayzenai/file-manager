@@ -1358,8 +1358,55 @@ class MediaMetadataResource extends Resource
                                     }
                                 }
 
+                                // Delete old resized versions before updating metadata
+                                $deletedResizedCount = 0;
+                                if (str_starts_with($record->mime_type ?? '', 'image/')) {
+                                    try {
+                                        $pathParts = explode('/', $oldFileName);
+                                        $oldName = array_pop($pathParts);
+                                        $directory = implode('/', $pathParts);
+
+                                        // Get configured image sizes and delete old resized versions
+                                        $sizes = config('file-manager.image_sizes', []);
+                                        foreach (array_keys($sizes) as $size) {
+                                            $oldResizedPath = "{$directory}/{$size}/{$oldName}";
+                                            if (Storage::disk('s3')->exists($oldResizedPath)) {
+                                                Storage::disk('s3')->delete($oldResizedPath);
+                                                $deletedResizedCount++;
+                                            }
+                                        }
+                                    } catch (\Exception $e) {
+                                        // Log but don't fail the rename if resized deletion fails
+                                        \Log::warning("Failed to delete old resized images during rename: " . $e->getMessage());
+                                    }
+                                }
+
+                                // Actually move/rename the file in S3 only if new file doesn't exist but old file does
+                                if (!$fileExists && Storage::disk('s3')->exists($oldFileName)) {
+                                    try {
+                                        // Copy the file to new location
+                                        Storage::disk('s3')->copy($oldFileName, $newFileName);
+                                        // Delete the old file
+                                        Storage::disk('s3')->delete($oldFileName);
+                                    } catch (\Exception $e) {
+                                        \Log::error("Failed to move file in S3 during rename: " . $e->getMessage());
+                                        throw new \Exception("Failed to rename file in storage: " . $e->getMessage());
+                                    }
+                                }
+
                                 // Update the metadata record
                                 $record->update(['file_name' => $newFileName]);
+
+                                // Auto-resize for images to ensure all versions use new filename
+                                $resizeSuccess = true;
+                                if (str_starts_with($record->mime_type ?? '', 'image/')) {
+                                    try {
+                                        \Kirantimsina\FileManager\FileManagerService::resizeImage($newFileName, false);
+                                    } catch (\Exception $e) {
+                                        \Log::error("Failed to resize image during rename: " . $e->getMessage());
+                                        $resizeSuccess = false;
+                                    }
+                                }
 
                                 $notificationTitle = $fileExists
                                     ? 'Metadata updated to existing file'
@@ -1369,10 +1416,23 @@ class MediaMetadataResource extends Resource
                                     ? "Metadata updated to point to existing file '{$newFileName}'."
                                     : "Database updated from '{$oldFileName}' to '{$newFileName}'.";
 
+                                // Add info about resized file cleanup and regeneration
+                                if (str_starts_with($record->mime_type ?? '', 'image/')) {
+                                    if ($deletedResizedCount > 0) {
+                                        $notificationBody .= " Cleaned up {$deletedResizedCount} old resized versions.";
+                                    }
+                                    if ($resizeSuccess) {
+                                        $notificationBody .= " New resized versions generated successfully.";
+                                    } else {
+                                        $notificationBody .= " Warning: Failed to generate new resized versions - check logs.";
+                                    }
+                                }
+
                                 Notification::make()
                                     ->title($notificationTitle)
                                     ->body($notificationBody)
-                                    ->success()
+                                    ->{$resizeSuccess ? 'success' : 'warning'}()
+                                    ->duration(8000)
                                     ->send();
 
                             } catch (\Exception $e) {
