@@ -198,19 +198,6 @@ class MediaMetadataResource extends Resource
                     ])
                     ->columns(2),
 
-                Section::make('Model Information')
-                    ->schema([
-                        TextEntry::make('mediable_type')
-                            ->label('Model Type')
-                            ->formatStateUsing(fn (string $state): string => class_basename($state)),
-                        TextEntry::make('mediable_id')
-                            ->label('Model ID')
-                            ->numeric(),
-                        TextEntry::make('mediable_field')
-                            ->label('Field'),
-                    ])
-                    ->columns(3),
-
                 Section::make('File Details')
                     ->schema([
                         TextEntry::make('file_name')
@@ -278,13 +265,13 @@ class MediaMetadataResource extends Resource
                                 ]),
 
                             Action::make('refetch_metadata')
-                                ->label('Refresh Metadata')
+                                ->label('Quick Refresh from Model')
                                 ->icon('heroicon-o-arrow-path')
                                 ->color('info')
                                 ->link()
                                 ->action(function (MediaMetadata $record): void {
                                     $service = new MetadataRefreshService;
-                                    
+
                                     // Simple refresh using model as source (most common case)
                                     $result = $service->refreshSingle($record, 'model');
 
@@ -313,9 +300,22 @@ class MediaMetadataResource extends Resource
                                             ->send();
                                     }
                                 }),
-                        ]),
+                        ])->columnSpanFull(),
                     ])
                     ->columns(2),
+
+                Section::make('Model Information')
+                    ->schema([
+                        TextEntry::make('mediable_type')
+                            ->label('Model Type')
+                            ->formatStateUsing(fn (string $state): string => class_basename($state)),
+                        TextEntry::make('mediable_id')
+                            ->label('Model ID')
+                            ->numeric(),
+                        TextEntry::make('mediable_field')
+                            ->label('Field'),
+                    ])
+                    ->columns(3),
 
                 Section::make('Additional Information')
                     ->schema([
