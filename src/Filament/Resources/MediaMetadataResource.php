@@ -282,115 +282,34 @@ class MediaMetadataResource extends Resource
                                 ->icon('heroicon-o-arrow-path')
                                 ->color('info')
                                 ->link()
-                                ->modalHeading('Refetch Metadata')
-                                ->modalDescription(function (MediaMetadata $record): string {
+                                ->action(function (MediaMetadata $record): void {
                                     $service = new MetadataRefreshService;
-                                    $discrepancy = $service->checkDiscrepancy($record);
-
-                                    if ($discrepancy['has_discrepancy']) {
-                                        $description = "⚠️ Discrepancy detected!\n";
-
-                                        if ($discrepancy['is_array'] ?? false) {
-                                            $description .= 'Model field contains an array with ' . count($discrepancy['array_files']) . " files:\n";
-                                            foreach (array_slice($discrepancy['array_files'], 0, 5) as $i => $file) {
-                                                $description .= '  ' . ($i + 1) . '. ' . $file . "\n";
-                                            }
-                                            if (count($discrepancy['array_files']) > 5) {
-                                                $description .= '  ... and ' . (count($discrepancy['array_files']) - 5) . " more\n";
-                                            }
-                                            $description .= "\nMetadata record: {$discrepancy['metadata_value']}";
-                                        } else {
-                                            $description .= "Model field: {$discrepancy['model_value']}\n";
-                                            $description .= "Metadata: {$discrepancy['metadata_value']}";
-                                        }
-
-                                        return $description;
-                                    }
-
-                                    return "Refetch metadata for: {$record->file_name}";
-                                })
-                                ->schema(function (MediaMetadata $record): array {
-                                    $service = new MetadataRefreshService;
-                                    $discrepancy = $service->checkDiscrepancy($record);
-
-                                    // Only show source selection if there's a discrepancy
-                                    if ($discrepancy['has_discrepancy']) {
-                                        $options = [];
-
-                                        if ($discrepancy['is_array'] ?? false) {
-                                            // For arrays, show each file as an option
-                                            $arrayFiles = $discrepancy['array_files'] ?? [];
-                                            if (! empty($arrayFiles)) {
-                                                foreach ($arrayFiles as $file) {
-                                                    $shortName = strlen($file) > 60 ? '...' . substr($file, -57) : $file;
-                                                    $options['array:' . $file] = 'Model array: ' . $shortName;
-                                                }
-                                            }
-                                            $options['metadata'] = 'Keep metadata: ' . $discrepancy['metadata_value'];
-                                        } else {
-                                            // For single values, show both options
-                                            $options['model'] = "Use model's value: " . ($discrepancy['model_value'] ?? 'unknown');
-                                            $options['metadata'] = "Use metadata's value: " . ($discrepancy['metadata_value'] ?? 'unknown');
-                                        }
-
-                                        return [
-                                            Radio::make('source')
-                                                ->label('Choose which file to use')
-                                                ->options($options)
-                                                ->default(array_key_first($options))
-                                                ->helperText('Select the correct file to use for refreshing metadata.')
-                                                ->required(),
-                                        ];
-                                    }
-
-                                    // No discrepancy, no need to show selection
-                                    return [];
-                                })
-                                ->action(function (MediaMetadata $record, array $data): void {
-                                    $service = new MetadataRefreshService;
-
-                                    // Check for discrepancy to determine source
-                                    $discrepancy = $service->checkDiscrepancy($record);
-
-                                    if ($discrepancy['has_discrepancy']) {
-                                        $selectedSource = $data['source'] ?? 'model';
-
-                                        // Handle array selection
-                                        if (str_starts_with($selectedSource, 'array:')) {
-                                            // Extract the selected file from the array
-                                            $selectedFile = substr($selectedSource, 6);
-                                            // Update the metadata to use this specific file
-                                            $record->update(['file_name' => $selectedFile]);
-                                            // Now refresh using this file
-                                            $result = $service->refreshSingle($record, 'metadata');
-                                        } else {
-                                            // Regular model or metadata source
-                                            $result = $service->refreshSingle($record, $selectedSource);
-                                        }
-                                    } else {
-                                        // No discrepancy, use model
-                                        $result = $service->refreshSingle($record, 'model');
-                                    }
+                                    
+                                    // Simple refresh using model as source (most common case)
+                                    $result = $service->refreshSingle($record, 'model');
 
                                     if ($result['success']) {
                                         if ($result['updated'] ?? false) {
                                             Notification::make()
-                                                ->title('Metadata refetched successfully')
+                                                ->title('Metadata refreshed')
                                                 ->body($result['message'])
                                                 ->success()
+                                                ->duration(5000)
                                                 ->send();
                                         } else {
                                             Notification::make()
                                                 ->title('No updates needed')
                                                 ->body($result['message'])
                                                 ->info()
+                                                ->duration(3000)
                                                 ->send();
                                         }
                                     } else {
                                         Notification::make()
-                                            ->title('Refetch failed')
+                                            ->title('Refresh failed')
                                             ->body($result['message'])
                                             ->danger()
+                                            ->duration(5000)
                                             ->send();
                                     }
                                 }),
