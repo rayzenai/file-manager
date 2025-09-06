@@ -16,6 +16,7 @@ use Filament\Forms\Components\Toggle as FormToggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -122,14 +123,14 @@ class MediaMetadataResource extends Resource
                                 // Use FileManager to get the thumbnail path with configured size
                                 $thumbnailSize = config('file-manager.default_card_size', 'thumbnail');
                                 $thumbnailPath = FileManager::getMediaPath($state, $thumbnailSize);
-                                
+
                                 // Check if FileManager returned a full URL or just a path
-                                $thumbnailUrl = str_starts_with($thumbnailPath, 'http') 
-                                    ? $thumbnailPath 
+                                $thumbnailUrl = str_starts_with($thumbnailPath, 'http')
+                                    ? $thumbnailPath
                                     : Storage::disk('s3')->url($thumbnailPath);
-                                
-                                $fullImageUrl = str_starts_with($state, 'http') 
-                                    ? $state 
+
+                                $fullImageUrl = str_starts_with($state, 'http')
+                                    ? $state
                                     : Storage::disk('s3')->url($state);
 
                                 return "<a href='{$fullImageUrl}' target='_blank' class='block'>
@@ -225,10 +226,175 @@ class MediaMetadataResource extends Resource
                             ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/')),
                         TextEntry::make('seo_title')
                             ->label('SEO Title')
+                            ->formatStateUsing(fn ($state) => $state ?: 'No SEO title set')
                             ->badge()
                             ->color('primary')
-                            ->copyable()
-                            ->placeholder('No SEO title set'),
+                            ->copyable(),
+
+                        Actions::make([
+                            Action::make('edit_seo_title')
+                                ->label('Edit SEO')
+                                ->icon('heroicon-o-pencil')
+                                ->link()
+                                ->color('success')
+                                ->modalHeading('Edit SEO Title')
+                                ->modalDescription(fn (MediaMetadata $record): string => "Optimize SEO for: {$record->file_name}")
+                                ->schema([
+                                    TextInput::make('seo_title')
+                                        ->label('SEO Title')
+                                        ->placeholder('Enter SEO-friendly title')
+                                        ->default(fn (MediaMetadata $record): ?string => $record->seo_title)
+                                        ->maxLength(160)
+                                        ->helperText('SEO-friendly title for search engines (recommended 50-160 characters)')
+                                        ->live()
+                                        ->afterStateUpdatedJs(<<<'JS'
+                                            const count = ($state ?? '').length;
+                                            const counter = document.querySelector('[data-seo-counter]');
+                                            if (counter) {
+                                                counter.textContent = count + '/160';
+                                                counter.style.color = count > 160 ? '#ef4444' : (count < 50 ? '#f59e0b' : '#6b7280');
+                                            }
+                                        JS),
+                                ])
+                                ->action(function (MediaMetadata $record, array $data): void {
+                                    try {
+                                        $record->update(['seo_title' => $data['seo_title']]);
+
+                                        Notification::make()
+                                            ->title('SEO title updated')
+                                            ->body('The SEO title has been updated successfully.')
+                                            ->success()
+                                            ->send();
+                                    } catch (\Exception $e) {
+                                        Notification::make()
+                                            ->title('Update failed')
+                                            ->body($e->getMessage())
+                                            ->danger()
+                                            ->send();
+                                    }
+                                })
+                                ->fillForm(fn (MediaMetadata $record): array => [
+                                    'seo_title' => $record->seo_title,
+                                ]),
+
+                            Action::make('refetch_metadata')
+                                ->label('Refresh Metadata')
+                                ->icon('heroicon-o-arrow-path')
+                                ->color('info')
+                                ->link()
+                                ->modalHeading('Refetch Metadata')
+                                ->modalDescription(function (MediaMetadata $record): string {
+                                    $service = new MetadataRefreshService;
+                                    $discrepancy = $service->checkDiscrepancy($record);
+
+                                    if ($discrepancy['has_discrepancy']) {
+                                        $description = "⚠️ Discrepancy detected!\n";
+
+                                        if ($discrepancy['is_array'] ?? false) {
+                                            $description .= 'Model field contains an array with ' . count($discrepancy['array_files']) . " files:\n";
+                                            foreach (array_slice($discrepancy['array_files'], 0, 5) as $i => $file) {
+                                                $description .= '  ' . ($i + 1) . '. ' . $file . "\n";
+                                            }
+                                            if (count($discrepancy['array_files']) > 5) {
+                                                $description .= '  ... and ' . (count($discrepancy['array_files']) - 5) . " more\n";
+                                            }
+                                            $description .= "\nMetadata record: {$discrepancy['metadata_value']}";
+                                        } else {
+                                            $description .= "Model field: {$discrepancy['model_value']}\n";
+                                            $description .= "Metadata: {$discrepancy['metadata_value']}";
+                                        }
+
+                                        return $description;
+                                    }
+
+                                    return "Refetch metadata for: {$record->file_name}";
+                                })
+                                ->schema(function (MediaMetadata $record): array {
+                                    $service = new MetadataRefreshService;
+                                    $discrepancy = $service->checkDiscrepancy($record);
+
+                                    // Only show source selection if there's a discrepancy
+                                    if ($discrepancy['has_discrepancy']) {
+                                        $options = [];
+
+                                        if ($discrepancy['is_array'] ?? false) {
+                                            // For arrays, show each file as an option
+                                            $arrayFiles = $discrepancy['array_files'] ?? [];
+                                            if (! empty($arrayFiles)) {
+                                                foreach ($arrayFiles as $file) {
+                                                    $shortName = strlen($file) > 60 ? '...' . substr($file, -57) : $file;
+                                                    $options['array:' . $file] = 'Model array: ' . $shortName;
+                                                }
+                                            }
+                                            $options['metadata'] = 'Keep metadata: ' . $discrepancy['metadata_value'];
+                                        } else {
+                                            // For single values, show both options
+                                            $options['model'] = "Use model's value: " . ($discrepancy['model_value'] ?? 'unknown');
+                                            $options['metadata'] = "Use metadata's value: " . ($discrepancy['metadata_value'] ?? 'unknown');
+                                        }
+
+                                        return [
+                                            Radio::make('source')
+                                                ->label('Choose which file to use')
+                                                ->options($options)
+                                                ->default(array_key_first($options))
+                                                ->helperText('Select the correct file to use for refreshing metadata.')
+                                                ->required(),
+                                        ];
+                                    }
+
+                                    // No discrepancy, no need to show selection
+                                    return [];
+                                })
+                                ->action(function (MediaMetadata $record, array $data): void {
+                                    $service = new MetadataRefreshService;
+
+                                    // Check for discrepancy to determine source
+                                    $discrepancy = $service->checkDiscrepancy($record);
+
+                                    if ($discrepancy['has_discrepancy']) {
+                                        $selectedSource = $data['source'] ?? 'model';
+
+                                        // Handle array selection
+                                        if (str_starts_with($selectedSource, 'array:')) {
+                                            // Extract the selected file from the array
+                                            $selectedFile = substr($selectedSource, 6);
+                                            // Update the metadata to use this specific file
+                                            $record->update(['file_name' => $selectedFile]);
+                                            // Now refresh using this file
+                                            $result = $service->refreshSingle($record, 'metadata');
+                                        } else {
+                                            // Regular model or metadata source
+                                            $result = $service->refreshSingle($record, $selectedSource);
+                                        }
+                                    } else {
+                                        // No discrepancy, use model
+                                        $result = $service->refreshSingle($record, 'model');
+                                    }
+
+                                    if ($result['success']) {
+                                        if ($result['updated'] ?? false) {
+                                            Notification::make()
+                                                ->title('Metadata refetched successfully')
+                                                ->body($result['message'])
+                                                ->success()
+                                                ->send();
+                                        } else {
+                                            Notification::make()
+                                                ->title('No updates needed')
+                                                ->body($result['message'])
+                                                ->info()
+                                                ->send();
+                                        }
+                                    } else {
+                                        Notification::make()
+                                            ->title('Refetch failed')
+                                            ->body($result['message'])
+                                            ->danger()
+                                            ->send();
+                                    }
+                                }),
+                        ]),
                     ])
                     ->columns(2),
 
