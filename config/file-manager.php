@@ -37,9 +37,9 @@ return [
         // Resize mode: contain, crop, cover
         'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'),
         
-        // Default dimensions
-        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 2160),
-        'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
+        // Maximum allowed dimensions (hard limits - images will never exceed these)
+        'max_height' => env('FILE_MANAGER_MAX_HEIGHT', 2160),
+        'max_width' => env('FILE_MANAGER_MAX_WIDTH', 3840),
         
         // Files larger than this will be compressed (in bytes)
         'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB

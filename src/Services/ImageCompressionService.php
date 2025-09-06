@@ -30,6 +30,10 @@ class ImageCompressionService
     private int $timeout;
     
     private int $bgRemovalTimeout;
+    
+    private int $maxHeight;
+    
+    private int $maxWidth;
 
     public function __construct()
     {
@@ -43,6 +47,8 @@ class ImageCompressionService
         $this->defaultMode = config('file-manager.compression.mode', 'contain');
         $this->timeout = config('file-manager.compression.api.timeout', 30);
         $this->bgRemovalTimeout = config('file-manager.compression.api.bg_removal.timeout', 60);
+        $this->maxHeight = config('file-manager.compression.max_height', 2160);
+        $this->maxWidth = config('file-manager.compression.max_width', 3840);
     }
 
     /**
@@ -98,14 +104,29 @@ class ImageCompressionService
             // Use Intervention Image with GD
             $img = ImageManager::gd()->read($fileContent['data']['content']);
 
-            // Resize if dimensions provided
-            if ($height || $width) {
+            // Get original dimensions
+            $originalWidth = $img->width();
+            $originalHeight = $img->height();
+            
+            // Calculate enforced dimensions based on max constraints
+            $enforcedDimensions = $this->calculateEnforcedDimensions(
+                $originalWidth,
+                $originalHeight,
+                $width,
+                $height
+            );
+            
+            $finalWidth = $enforcedDimensions['width'];
+            $finalHeight = $enforcedDimensions['height'];
+
+            // Resize if dimensions need to be enforced or were explicitly provided
+            if ($finalWidth !== $originalWidth || $finalHeight !== $originalHeight) {
                 if ($mode === 'contain') {
-                    $img->scaleDown($width, $height);
+                    $img->scaleDown($finalWidth, $finalHeight);
                 } elseif ($mode === 'cover') {
-                    $img->cover($width ?? $img->width(), $height ?? $img->height());
+                    $img->cover($finalWidth, $finalHeight);
                 } elseif ($mode === 'crop') {
-                    $img->crop($width ?? $img->width(), $height ?? $img->height());
+                    $img->crop($finalWidth, $finalHeight);
                 }
             }
 
@@ -191,6 +212,23 @@ class ImageCompressionService
                 return $fileContent;
             }
             
+            // Get original image dimensions to calculate enforced dimensions
+            $originalImg = ImageManager::gd()->read($fileContent['data']['content']);
+            $originalWidth = $originalImg->width();
+            $originalHeight = $originalImg->height();
+            
+            // Calculate enforced dimensions based on max constraints
+            $enforcedDimensions = $this->calculateEnforcedDimensions(
+                $originalWidth,
+                $originalHeight,
+                $width,
+                $height
+            );
+            
+            // Use enforced dimensions for API call
+            $finalWidth = $enforcedDimensions['width'];
+            $finalHeight = $enforcedDimensions['height'];
+            
             // Determine which API to use
             $useBackgroundRemovalApi = $removeBg && !empty($this->bgRemovalApiUrl);
             $apiUrl = $useBackgroundRemovalApi ? $this->bgRemovalApiUrl : $this->apiUrl;
@@ -205,14 +243,14 @@ class ImageCompressionService
                         'message' => 'Background removal requested but no API configured',
                     ];
                 }
-                return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                return $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
             }
             
             // Check file size - skip API for files over 5MB to avoid timeouts (except for bg removal)
             $fileSizeInMb = strlen($fileContent['data']['content']) / (1024 * 1024);
             if ($fileSizeInMb > 5 && !$removeBg) {
                 // For large files, fall back to GD unless background removal is required
-                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                $gdResult = $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
                 if ($gdResult['success']) {
                     $gdResult['data']['compression_method'] = 'gd_fallback';
                     $gdResult['data']['api_fallback_reason'] = 'File too large for API (' . round($fileSizeInMb, 2) . ' MB)';
@@ -227,13 +265,10 @@ class ImageCompressionService
                 'quality' => $quality,
             ];
 
-            // Only add dimensions if they are explicitly provided
-            if ($height !== null) {
-                $params['height'] = $height;
-            }
-            
-            if ($width !== null) {
-                $params['width'] = $width;
+            // Add enforced dimensions if they differ from original (meaning constraints were applied or dimensions were explicitly requested)
+            if ($finalWidth !== $originalWidth || $finalHeight !== $originalHeight) {
+                $params['width'] = $finalWidth;
+                $params['height'] = $finalHeight;
             }
 
             // Add background removal parameter if requested
@@ -278,7 +313,7 @@ class ImageCompressionService
                 }
 
                 // Fallback to GD and mark it as a fallback
-                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+                $gdResult = $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
                 if ($gdResult['success']) {
                     $gdResult['data']['compression_method'] = 'gd_fallback';
                     $responseBody = $response->body();
@@ -345,7 +380,7 @@ class ImageCompressionService
             }
 
             // Fallback to GD and mark it as a fallback
-            $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+            $gdResult = $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
             if ($gdResult['success']) {
                 $gdResult['data']['compression_method'] = 'gd_fallback';
                 $gdResult['data']['api_fallback_reason'] = 'API exception: ' . $t->getMessage();
@@ -544,5 +579,54 @@ class ImageCompressionService
         }
         
         return $header;
+    }
+    
+    /**
+     * Calculate dimensions ensuring they don't exceed max constraints
+     * @param int $originalWidth Original image width
+     * @param int $originalHeight Original image height  
+     * @param int|null $requestedWidth Explicitly requested width (can be null)
+     * @param int|null $requestedHeight Explicitly requested height (can be null)
+     * @return array ['width' => int, 'height' => int]
+     */
+    private function calculateEnforcedDimensions(
+        int $originalWidth, 
+        int $originalHeight, 
+        ?int $requestedWidth = null, 
+        ?int $requestedHeight = null
+    ): array {
+        // Start with original dimensions
+        $width = $originalWidth;
+        $height = $originalHeight;
+        
+        // Apply requested dimensions if provided
+        if ($requestedWidth !== null) {
+            $width = $requestedWidth;
+        }
+        if ($requestedHeight !== null) {
+            $height = $requestedHeight;
+        }
+        
+        // Check if dimensions exceed maximum constraints
+        $exceedsMaxWidth = $width > $this->maxWidth;
+        $exceedsMaxHeight = $height > $this->maxHeight;
+        
+        if ($exceedsMaxWidth || $exceedsMaxHeight) {
+            // Calculate scaling factors for both dimensions
+            $widthScale = $this->maxWidth / $width;
+            $heightScale = $this->maxHeight / $height;
+            
+            // Use the more restrictive scale factor to maintain aspect ratio
+            $scale = min($widthScale, $heightScale);
+            
+            // Apply the scale factor
+            $width = (int) round($width * $scale);
+            $height = (int) round($height * $scale);
+        }
+        
+        return [
+            'width' => $width,
+            'height' => $height,
+        ];
     }
 }

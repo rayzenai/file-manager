@@ -99,6 +99,10 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     FILE_MANAGER_COMPRESSION_ENABLED=true
     FILE_MANAGER_COMPRESSION_QUALITY=85 # 1-100, quality level
     FILE_MANAGER_COMPRESSION_FORMAT=webp # webp, jpg, png, avif
+    
+    # Maximum image dimensions (images larger than this will be scaled down)
+    FILE_MANAGER_MAX_HEIGHT=2160  # Maximum height in pixels
+    FILE_MANAGER_MAX_WIDTH=3840   # Maximum width in pixels
 
     # Compression Method Settings
     FILE_MANAGER_COMPRESSION_METHOD=gd  # 'gd' for built-in PHP processing or 'api' for external service
@@ -197,9 +201,11 @@ return [
         'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85), // 1-95
         'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'), // webp, jpeg, jpg, png, avif
         'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'), // contain, crop, cover
-        'height' => env('FILE_MANAGER_COMPRESSION_HEIGHT', 2160),
-        'width' => env('FILE_MANAGER_COMPRESSION_WIDTH', null),
         'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB
+        
+        // Maximum allowed dimensions (hard limits - images will never exceed these)
+        'max_height' => env('FILE_MANAGER_MAX_HEIGHT', 2160),
+        'max_width' => env('FILE_MANAGER_MAX_WIDTH', 3840),
 
         // API settings for external compression
         'api' => [
