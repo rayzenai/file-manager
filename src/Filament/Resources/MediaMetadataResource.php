@@ -76,7 +76,7 @@ class MediaMetadataResource extends Resource
     }
 
     /**
-     * Get the count of inefficient images (>0.2 bytes per pixel, >10KB) with caching
+     * Get the count of inefficient images (>0.3 bytes per pixel, >10KB) with caching
      */
     protected static function getInefficientImagesCount(): int
     {
@@ -87,7 +87,7 @@ class MediaMetadataResource extends Resource
                 ->where('file_size', '>', 10 * 1024)
                 ->whereNotNull('width')
                 ->whereNotNull('height')
-                ->whereRaw('file_size > (width * height * 0.2)')
+                ->whereRaw('file_size > (width * height * 0.3)')
                 ->count()
         );
     }
@@ -761,12 +761,12 @@ class MediaMetadataResource extends Resource
             ])
             ->filters([
                 Filter::make('inefficient_images')
-                    ->label('Inefficient Images')
+                    ->label('Inefficient Images (>0.3 bytes per pixel, >10KB)')
                     ->query(fn (Builder $query): Builder => $query->where('mime_type', 'like', 'image/%')
                         ->where('file_size', '>', 10 * 1024)
                         ->whereNotNull('width')
                         ->whereNotNull('height')
-                        ->whereRaw('file_size > (width * height * 0.2)')
+                        ->whereRaw('file_size > (width * height * 0.3)')
                     )
                     ->toggle(),
                 Filter::make('large_files')
