@@ -13,6 +13,7 @@ class RemoveDuplicateMediaMetadataCommand extends Command
      */
     protected $signature = 'file-manager:remove-duplicates
                             {--dry-run : Preview duplicates without removing them}
+                            {--force : Remove duplicates without confirmation prompt}
                             {--chunk=1000 : Number of records to process at once}';
 
     /**
@@ -26,6 +27,7 @@ class RemoveDuplicateMediaMetadataCommand extends Command
     public function handle(): int
     {
         $dryRun = $this->option('dry-run');
+        $force = $this->option('force');
         $chunkSize = (int) $this->option('chunk');
 
         $this->info('🔍 Analyzing media metadata for duplicates...');
@@ -85,7 +87,7 @@ class RemoveDuplicateMediaMetadataCommand extends Command
             return self::SUCCESS;
         }
 
-        if (!$this->confirm("Are you sure you want to remove {$totalToRemove} duplicate records?")) {
+        if (!$force && !$this->confirm("Are you sure you want to remove {$totalToRemove} duplicate records?")) {
             $this->info('Operation cancelled.');
             return self::SUCCESS;
         }

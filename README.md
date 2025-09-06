@@ -1057,8 +1057,14 @@ php artisan file-manager:remove-duplicates --dry-run
 # Remove duplicate media metadata records
 php artisan file-manager:remove-duplicates
 
+# Remove duplicates without confirmation prompt (non-interactive)
+php artisan file-manager:remove-duplicates --force
+
 # Process with custom chunk size
 php artisan file-manager:remove-duplicates --chunk=500
+
+# Combine options for automated scripts
+php artisan file-manager:remove-duplicates --force --chunk=1000
 ```
 
 **What it does:**
@@ -1077,6 +1083,7 @@ php artisan file-manager:remove-duplicates --chunk=500
 -   ✅ **Verification** to confirm cleanup was successful
 -   🚀 **Progress bar** for large datasets
 -   💾 **Safe operation** - always keeps the oldest record
+-   🤖 **Non-interactive mode** with `--force` flag for automation
 
 **Example output:**
 
