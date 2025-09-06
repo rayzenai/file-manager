@@ -181,6 +181,7 @@ class MediaMetadataResource extends Resource
                     ->sortable(),
                 TextColumn::make('file_name')
                     ->label('File Name')
+                    ->toggleable()
                     ->searchable()
                     ->limit(50)
                     ->tooltip(fn ($state) => $state),
@@ -1097,16 +1098,53 @@ class MediaMetadataResource extends Resource
                                 ->required()
                                 ->default(fn (MediaMetadata $record): string => $record->file_name)
                                 ->helperText('Enter the full path and filename (e.g., uploads/images/photo.jpg)')
-                                ->rules(fn ($record) => [
+                                ->rules([
                                     'required',
                                     'string',
-                                    function (string $attribute, $value, \Closure $fail) use ($record) {
-                                        // Check if file already exists on S3 (only if different from current)
-                                        if ($value !== $record->file_name && Storage::disk('s3')->exists($value)) {
-                                            $fail('A file with this name already exists.');
-                                        }
-                                    },
-                                ]),
+                                ])
+                                ->suffixAction(
+                                    Action::make('check_file')
+                                        ->label('Check')
+                                        ->icon('heroicon-o-magnifying-glass')
+                                        ->color('info')
+                                        ->action(function ($state, $set) {
+                                            if (! $state) {
+                                                Notification::make()
+                                                    ->title('No filename provided')
+                                                    ->body('Please enter a filename first')
+                                                    ->warning()
+                                                    ->send();
+
+                                                return;
+                                            }
+
+                                            try {
+                                                $fileExists = Storage::disk('s3')->exists($state);
+
+                                                if ($fileExists) {
+                                                    Notification::make()
+                                                        ->title('File exists')
+                                                        ->body("✅ The file '{$state}' already exists on S3. Renaming will update metadata to point to this existing file.")
+                                                        ->success()
+                                                        ->duration(8000)
+                                                        ->send();
+                                                } else {
+                                                    Notification::make()
+                                                        ->title('File does not exist')
+                                                        ->body("❌ The file '{$state}' does not exist on S3. This will be a true rename operation.")
+                                                        ->info()
+                                                        ->duration(8000)
+                                                        ->send();
+                                                }
+                                            } catch (\Exception $e) {
+                                                Notification::make()
+                                                    ->title('Unable to check file')
+                                                    ->body("Error checking S3: {$e->getMessage()}")
+                                                    ->danger()
+                                                    ->send();
+                                            }
+                                        })
+                                ),
                         ])
                         ->action(function (MediaMetadata $record, array $data): void {
                             try {
@@ -1123,6 +1161,8 @@ class MediaMetadataResource extends Resource
 
                                     return;
                                 }
+
+                                $fileExists = Storage::disk('s3')->exists($newFileName);
 
                                 // Update the parent model's field
                                 $model = $record->mediable_type::find($record->mediable_id);
@@ -1148,9 +1188,17 @@ class MediaMetadataResource extends Resource
                                 // Update the metadata record
                                 $record->update(['file_name' => $newFileName]);
 
+                                $notificationTitle = $fileExists
+                                    ? 'Metadata updated to existing file'
+                                    : 'File renamed successfully';
+
+                                $notificationBody = $fileExists
+                                    ? "Metadata updated to point to existing file '{$newFileName}'."
+                                    : "Database updated from '{$oldFileName}' to '{$newFileName}'.";
+
                                 Notification::make()
-                                    ->title('File renamed successfully')
-                                    ->body("Database updated from '{$oldFileName}' to '{$newFileName}'.")
+                                    ->title($notificationTitle)
+                                    ->body($notificationBody)
                                     ->success()
                                     ->send();
 
