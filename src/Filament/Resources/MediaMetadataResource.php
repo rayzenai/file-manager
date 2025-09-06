@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kirantimsina\FileManager\Filament\Resources;
 
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -277,28 +278,29 @@ class MediaMetadataResource extends Resource
                             ->label('Processing Method')
                             ->options(function () {
                                 $options = [];
-                                
-                                $hasApi = !empty(config('file-manager.compression.api.url'));
-                                
+
+                                $hasApi = ! empty(config('file-manager.compression.api.url'));
+
                                 if ($hasApi) {
                                     $options['auto'] = 'Auto (Use API, fallback to GD)';
                                     $options['api'] = 'API Only (Fast compression)';
                                 }
-                                
+
                                 $options['gd'] = 'GD Library Only (Local processing)';
-                                
+
                                 return $options;
                             })
                             ->default(function () {
                                 $configMethod = config('file-manager.compression.method', 'api');
+
                                 // Map config values to form values
-                                return match($configMethod) {
+                                return match ($configMethod) {
                                     'gd' => 'gd',
                                     'api' => 'auto',  // 'api' in config means auto (with fallback)
                                     default => 'auto'
                                 };
                             })
-                            ->visible(fn () => !empty(config('file-manager.compression.api.url')))
+                            ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
                             ->helperText('Choose which compression method to use'),
                         FormToggle::make('replace_original')
                             ->label('Replace original files')
@@ -315,7 +317,7 @@ class MediaMetadataResource extends Resource
                             $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
                             config(['file-manager.compression.method' => $method]);
                         }
-                        
+
                         // Create compression service after config override
                         $compressionService = new ImageCompressionService;
                         $successCount = 0;
@@ -385,7 +387,7 @@ class MediaMetadataResource extends Resource
 
                         // Restore original compression method
                         config(['file-manager.compression.method' => $originalMethod]);
-                        
+
                         Notification::make()
                             ->title('Bulk compression completed')
                             ->body($notificationBody)
@@ -440,24 +442,24 @@ class MediaMetadataResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Refetch Metadata')
                     ->modalDescription(function (Collection $records): string {
-                        $service = new MetadataRefreshService();
+                        $service = new MetadataRefreshService;
                         $check = $service->checkBulkDiscrepancies($records);
-                        
+
                         $description = "Refetch metadata for {$records->count()} selected items";
-                        
+
                         if ($check['has_any_discrepancy']) {
                             $description .= "\n\n⚠️ {$check['discrepancy_count']} items have filename discrepancies!";
-                            if (!empty($check['examples'])) {
+                            if (! empty($check['examples'])) {
                                 $description .= "\nExamples:\n• " . implode("\n• ", $check['examples']);
                             }
                         }
-                        
+
                         return $description;
                     })
                     ->schema(function (Collection $records): array {
-                        $service = new MetadataRefreshService();
+                        $service = new MetadataRefreshService;
                         $check = $service->checkBulkDiscrepancies($records);
-                        
+
                         // Only show source selection if there are discrepancies
                         if ($check['has_any_discrepancy']) {
                             return [
@@ -472,27 +474,27 @@ class MediaMetadataResource extends Resource
                                     ->required(),
                             ];
                         }
-                        
+
                         // No discrepancies, no need to show selection
                         return [];
                     })
                     ->action(function (Collection $records, array $data): void {
-                        $service = new MetadataRefreshService();
-                        
+                        $service = new MetadataRefreshService;
+
                         // Check for discrepancies to determine source
                         $check = $service->checkBulkDiscrepancies($records);
                         $source = $check['has_any_discrepancy'] ? ($data['source'] ?? 'model') : 'model';
-                        
+
                         $result = $service->refreshBulk($records, $source);
-                        
+
                         // Build notification body
                         $notificationBody = "Processed {$result['success_count']} items successfully.";
-                        
+
                         if ($result['updated_count'] > 0) {
                             $notificationBody .= "\nUpdated {$result['updated_count']} items.";
-                            
+
                             // Show first few details
-                            if (!empty($result['details'])) {
+                            if (! empty($result['details'])) {
                                 $notificationBody .= "\n\n**Changes:**\n";
                                 $detailsToShow = array_slice($result['details'], 0, 3);
                                 foreach ($detailsToShow as $detail) {
@@ -504,7 +506,7 @@ class MediaMetadataResource extends Resource
                                 }
                             }
                         }
-                        
+
                         if ($result['failed_count'] > 0) {
                             $notificationBody .= "\n\n**Failed ({$result['failed_count']}):**\n";
                             $failedToShow = array_slice($result['failed_records'], 0, 3);
@@ -516,7 +518,7 @@ class MediaMetadataResource extends Resource
                                 $notificationBody .= "• ...and {$remaining} more\n";
                             }
                         }
-                        
+
                         Notification::make()
                             ->title('Bulk refetch completed')
                             ->body($notificationBody)
@@ -606,540 +608,565 @@ class MediaMetadataResource extends Resource
             ], layout: FiltersLayout::AboveContent)
             ->recordActions([
                 ViewAction::make(),
-                Action::make('open_in_panel')
-                    ->label('Open in Panel')
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->color('gray')
-                    ->visible(function (MediaMetadata $record): bool {
-                        $resources = static::findResourcesForModel($record->mediable_type);
 
-                        return count($resources) > 0;
-                    })
-                    ->action(function (MediaMetadata $record) use ($table): void {
-                        $resources = static::findResourcesForModel($record->mediable_type);
+                // Navigation Group
+                ActionGroup::make([
+                    Action::make('open_in_panel')
+                        ->label('Open in Panel')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->color('gray')
+                        ->visible(function (MediaMetadata $record): bool {
+                            $resources = static::findResourcesForModel($record->mediable_type);
 
-                        if (count($resources) === 1) {
-                            // Single resource - open directly in new tab
-                            $resource = $resources[0];
-                            $url = null;
+                            return count($resources) > 0;
+                        })
+                        ->action(function (MediaMetadata $record) use ($table): void {
+                            $resources = static::findResourcesForModel($record->mediable_type);
 
-                            try {
-                                $url = $resource::getUrl('edit', ['record' => $record->mediable_id]);
-                            } catch (\Exception $e) {
+                            if (count($resources) === 1) {
+                                // Single resource - open directly in new tab
+                                $resource = $resources[0];
+                                $url = null;
+
                                 try {
-                                    $url = $resource::getUrl('view', ['record' => $record->mediable_id]);
+                                    $url = $resource::getUrl('edit', ['record' => $record->mediable_id]);
                                 } catch (\Exception $e) {
-                                    $url = $resource::getUrl('index');
-                                }
-                            }
-
-                            if ($url) {
-                                // Use JavaScript to open in new tab
-                                $table->getLivewire()->js("window.open('{$url}', '_blank')");
-                            }
-                        }
-                    })
-                    ->modalHeading('Select Resource')
-                    ->modalDescription(fn (MediaMetadata $record) => "Multiple resources found for {$record->mediable_type}")
-                    ->modalSubmitActionLabel('Open in New Tab')
-                    ->schema(function (MediaMetadata $record): array {
-                        $resources = static::findResourcesForModel($record->mediable_type);
-
-                        if (count($resources) <= 1) {
-                            return [];
-                        }
-
-                        $options = [];
-                        foreach ($resources as $resource) {
-                            $resourceName = class_basename($resource);
-                            $panelId = null;
-
-                            // Try to identify which panel this resource belongs to
-                            try {
-                                $url = $resource::getUrl('index');
-                                if (str_contains($url, '/admin/')) {
-                                    $panelId = 'Admin';
-                                } elseif (str_contains($url, '/baker/')) {
-                                    $panelId = 'Baker';
-                                } elseif (str_contains($url, '/partner/')) {
-                                    $panelId = 'Partner';
-                                }
-                            } catch (\Exception $e) {
-                                // Ignore
-                            }
-
-                            $label = $resourceName;
-                            if ($panelId) {
-                                $label .= " ({$panelId} Panel)";
-                            }
-
-                            // Try to get the URL for this specific record
-                            try {
-                                $recordUrl = $resource::getUrl('edit', ['record' => $record->mediable_id]);
-                            } catch (\Exception $e) {
-                                try {
-                                    $recordUrl = $resource::getUrl('view', ['record' => $record->mediable_id]);
-                                } catch (\Exception $e) {
-                                    $recordUrl = $resource::getUrl('index');
-                                }
-                            }
-
-                            $options[$recordUrl] = $label;
-                        }
-
-                        return [
-                            Radio::make('resource_url')
-                                ->label('Select which resource to open')
-                                ->options($options)
-                                ->required(),
-                        ];
-                    })
-                    ->action(function (MediaMetadata $record, array $data) use ($table): void {
-                        if (! empty($data['resource_url'])) {
-                            // Use JavaScript to open in new tab
-                            $table->getLivewire()->js("window.open('{$data['resource_url']}', '_blank')");
-                        }
-                    }),
-                Action::make('resize')
-                    ->label('Resize')
-                    ->icon('heroicon-o-arrows-pointing-out')
-                    ->color('info')
-                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
-                    ->modalHeading('Resize Image')
-                    ->modalDescription(fn (MediaMetadata $record): string => "Resize all versions of: {$record->file_name}")
-                    ->action(function (MediaMetadata $record): void {
-                        try {
-                            // Dispatch resize job for this image
-                            ResizeImages::dispatch([$record->file_name]);
-
-                            Notification::make()
-                                ->title('Image resize queued')
-                                ->body('The image will be resized to all configured sizes.')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Resize failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    })
-                    ->requiresConfirmation(),
-
-                Action::make('compress')
-                    ->label('Compress')
-                    ->icon('heroicon-o-arrows-pointing-in')
-                    ->color('warning')
-                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
-                    ->modalHeading('Compress Image')
-                    ->modalDescription(fn (MediaMetadata $record): string => "Compress and replace: {$record->file_name}")
-                    ->schema([
-                        FormSelect::make('format')
-                            ->label('Output Format')
-                            ->options([
-                                'preserve' => 'Preserve Original Format',
-                                'webp' => 'WebP (Best compression)',
-                                'avif' => 'AVIF (Smaller files, newer format)',
-                                'jpg' => 'JPEG (Universal compatibility)',
-                                'png' => 'PNG (Lossless)',
-                            ])
-                            ->default('webp')
-                            ->helperText('WebP provides excellent compression with good quality. AVIF provides even better compression but has limited browser support.')
-                            ->required(),
-                        FormSelect::make('quality')
-                            ->label('Compression Quality')
-                            ->options([
-                                '100' => 'Maximum (100%)',
-                                '95' => 'Very High (95%)',
-                                '85' => 'High (85%) - Recommended',
-                                '75' => 'Medium (75%)',
-                                '65' => 'Low (65%)',
-                                '50' => 'Very Low (50%)',
-                            ])
-                            ->default('85')
-                            ->required(),
-                        FormSelect::make('compression_method')
-                            ->label('Processing Method')
-                            ->options(function () {
-                                $options = [];
-                                
-                                $hasApi = !empty(config('file-manager.compression.api.url'));
-                                
-                                if ($hasApi) {
-                                    $options['auto'] = 'Auto (Use API, fallback to GD)';
-                                    $options['api'] = 'API Only (Fast compression)';
-                                }
-                                
-                                $options['gd'] = 'GD Library Only (Local processing)';
-                                
-                                return $options;
-                            })
-                            ->default(function () {
-                                $configMethod = config('file-manager.compression.method', 'api');
-                                // Map config values to form values
-                                return match($configMethod) {
-                                    'gd' => 'gd',
-                                    'api' => 'auto',  // 'api' in config means auto (with fallback)
-                                    default => 'auto'
-                                };
-                            })
-                            ->visible(fn () => !empty(config('file-manager.compression.api.url')))
-                            ->helperText('Choose which compression method to use'),
-                        FormToggle::make('replace_original')
-                            ->label('Replace original file')
-                            ->helperText('This will permanently replace the original file with the compressed version')
-                            ->default(true),
-                        FormToggle::make('resize_after')
-                            ->label('Resize all versions after compression')
-                            ->default(true),
-                    ])
-                    ->action(function (MediaMetadata $record, array $data): void {
-                        try {
-                            // Override compression method if specified
-                            $originalMethod = config('file-manager.compression.method');
-                            if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
-                                $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
-                                config(['file-manager.compression.method' => $method]);
-                            }
-                            
-                            // Create compression service after config override
-                            $compressionService = new ImageCompressionService;
-                            $result = static::compressMediaRecord($record, $data, $compressionService);
-                            
-                            // Restore original compression method
-                            config(['file-manager.compression.method' => $originalMethod]);
-
-                            if ($result['success']) {
-                                $savedKb = round($result['saved'] / 1024, 2);
-                                $compressionRatio = round(($result['saved'] / $result['original_size']) * 100, 1);
-
-                                // Check compression method and show appropriate notification
-                                $compressionMethod = $result['compression_method'] ?? 'unknown';
-
-                                if ($compressionMethod === 'gd_fallback') {
-                                    // API failed, used GD as fallback
-                                    $reason = $result['api_fallback_reason'] ?? 'Unknown reason';
-                                    Notification::make()
-                                        ->warning()
-                                        ->title('API Compression Failed - Used GD Fallback')
-                                        ->body("API Error: {$reason}<br>
-                                               Compressed with GD: Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                        ->duration(8000)
-                                        ->send();
-                                } elseif ($compressionMethod === 'gd') {
-                                    // Direct GD compression
-                                    Notification::make()
-                                        ->success()
-                                        ->title('Image Compressed with GD')
-                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                        ->send();
-                                } elseif ($compressionMethod === 'api') {
-                                    // Successful API compression
-                                    Notification::make()
-                                        ->success()
-                                        ->title('Image Compressed via API')
-                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                        ->send();
-                                } else {
-                                    // Fallback for unknown method
-                                    Notification::make()
-                                        ->success()
-                                        ->title('Image compressed successfully')
-                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                        ->send();
-                                }
-                            } else {
-                                throw new \Exception($result['message'] ?? 'Compression failed');
-                            }
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Compression failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-
-                Action::make('refetch')
-                    ->label('Refetch')
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('info')
-                    ->modalHeading('Refetch Metadata')
-                    ->modalDescription(function (MediaMetadata $record): string {
-                        $service = new MetadataRefreshService();
-                        $discrepancy = $service->checkDiscrepancy($record);
-                        
-                        if ($discrepancy['has_discrepancy']) {
-                            $description = "⚠️ Discrepancy detected!\n";
-                            
-                            if ($discrepancy['is_array'] ?? false) {
-                                $description .= "Model field contains an array with " . count($discrepancy['array_files']) . " files:\n";
-                                foreach (array_slice($discrepancy['array_files'], 0, 5) as $i => $file) {
-                                    $description .= "  " . ($i + 1) . ". " . $file . "\n";
-                                }
-                                if (count($discrepancy['array_files']) > 5) {
-                                    $description .= "  ... and " . (count($discrepancy['array_files']) - 5) . " more\n";
-                                }
-                                $description .= "\nMetadata record: {$discrepancy['metadata_value']}";
-                            } else {
-                                $description .= "Model field: {$discrepancy['model_value']}\n";
-                                $description .= "Metadata: {$discrepancy['metadata_value']}";
-                            }
-                            
-                            return $description;
-                        }
-                        
-                        return "Refetch metadata for: {$record->file_name}";
-                    })
-                    ->schema(function (MediaMetadata $record): array {
-                        $service = new MetadataRefreshService();
-                        $discrepancy = $service->checkDiscrepancy($record);
-                        
-                        // Only show source selection if there's a discrepancy
-                        if ($discrepancy['has_discrepancy']) {
-                            $options = [];
-                            
-                            if ($discrepancy['is_array'] ?? false) {
-                                // For arrays, show each file as an option
-                                $arrayFiles = $discrepancy['array_files'] ?? [];
-                                if (!empty($arrayFiles)) {
-                                    foreach ($arrayFiles as $file) {
-                                        $shortName = strlen($file) > 60 ? '...' . substr($file, -57) : $file;
-                                        $options['array:' . $file] = "Model array: " . $shortName;
+                                    try {
+                                        $url = $resource::getUrl('view', ['record' => $record->mediable_id]);
+                                    } catch (\Exception $e) {
+                                        $url = $resource::getUrl('index');
                                     }
                                 }
-                                $options['metadata'] = "Keep metadata: " . $discrepancy['metadata_value'];
-                            } else {
-                                // For single values, show both options
-                                $options['model'] = "Use model's value: " . ($discrepancy['model_value'] ?? 'unknown');
-                                $options['metadata'] = "Use metadata's value: " . ($discrepancy['metadata_value'] ?? 'unknown');
+
+                                if ($url) {
+                                    // Use JavaScript to open in new tab
+                                    $table->getLivewire()->js("window.open('{$url}', '_blank')");
+                                }
                             }
-                            
+                        })
+                        ->modalHeading('Select Resource')
+                        ->modalDescription(fn (MediaMetadata $record) => "Multiple resources found for {$record->mediable_type}")
+                        ->modalSubmitActionLabel('Open in New Tab')
+                        ->schema(function (MediaMetadata $record): array {
+                            $resources = static::findResourcesForModel($record->mediable_type);
+
+                            if (count($resources) <= 1) {
+                                return [];
+                            }
+
+                            $options = [];
+                            foreach ($resources as $resource) {
+                                $resourceName = class_basename($resource);
+                                $panelId = null;
+
+                                // Try to identify which panel this resource belongs to
+                                try {
+                                    $url = $resource::getUrl('index');
+                                    if (str_contains($url, '/admin/')) {
+                                        $panelId = 'Admin';
+                                    } elseif (str_contains($url, '/baker/')) {
+                                        $panelId = 'Baker';
+                                    } elseif (str_contains($url, '/partner/')) {
+                                        $panelId = 'Partner';
+                                    }
+                                } catch (\Exception $e) {
+                                    // Ignore
+                                }
+
+                                $label = $resourceName;
+                                if ($panelId) {
+                                    $label .= " ({$panelId} Panel)";
+                                }
+
+                                // Try to get the URL for this specific record
+                                try {
+                                    $recordUrl = $resource::getUrl('edit', ['record' => $record->mediable_id]);
+                                } catch (\Exception $e) {
+                                    try {
+                                        $recordUrl = $resource::getUrl('view', ['record' => $record->mediable_id]);
+                                    } catch (\Exception $e) {
+                                        $recordUrl = $resource::getUrl('index');
+                                    }
+                                }
+
+                                $options[$recordUrl] = $label;
+                            }
+
                             return [
-                                Radio::make('source')
-                                    ->label('Choose which file to use')
+                                Radio::make('resource_url')
+                                    ->label('Select which resource to open')
                                     ->options($options)
-                                    ->default(array_key_first($options))
-                                    ->helperText('Select the correct file to use for refreshing metadata.')
                                     ->required(),
                             ];
-                        }
-                        
-                        // No discrepancy, no need to show selection
-                        return [];
-                    })
-                    ->action(function (MediaMetadata $record, array $data): void {
-                        $service = new MetadataRefreshService();
-                        
-                        // Check for discrepancy to determine source
-                        $discrepancy = $service->checkDiscrepancy($record);
-                        
-                        if ($discrepancy['has_discrepancy']) {
-                            $selectedSource = $data['source'] ?? 'model';
-                            
-                            // Handle array selection
-                            if (str_starts_with($selectedSource, 'array:')) {
-                                // Extract the selected file from the array
-                                $selectedFile = substr($selectedSource, 6);
-                                // Update the metadata to use this specific file
-                                $record->update(['file_name' => $selectedFile]);
-                                // Now refresh using this file
-                                $result = $service->refreshSingle($record, 'metadata');
-                            } else {
-                                // Regular model or metadata source
-                                $result = $service->refreshSingle($record, $selectedSource);
+                        })
+                        ->action(function (MediaMetadata $record, array $data) use ($table): void {
+                            if (! empty($data['resource_url'])) {
+                                // Use JavaScript to open in new tab
+                                $table->getLivewire()->js("window.open('{$data['resource_url']}', '_blank')");
                             }
-                        } else {
-                            // No discrepancy, use model
-                            $result = $service->refreshSingle($record, 'model');
-                        }
-                        
-                        if ($result['success']) {
-                            if ($result['updated'] ?? false) {
+                        }),
+                ])
+                    ->hiddenLabel()
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('gray')
+                    ->button(),
+
+                // Image Processing Group
+                ActionGroup::make([
+                    Action::make('resize')
+                        ->label('Resize')
+                        ->icon('heroicon-o-arrows-pointing-out')
+                        ->color('info')
+                        ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                        ->modalHeading('Resize Image')
+                        ->modalDescription(fn (MediaMetadata $record): string => "Resize all versions of: {$record->file_name}")
+                        ->action(function (MediaMetadata $record): void {
+                            try {
+                                // Dispatch resize job for this image
+                                ResizeImages::dispatch([$record->file_name]);
+
                                 Notification::make()
-                                    ->title('Metadata refetched successfully')
-                                    ->body($result['message'])
+                                    ->title('Image resize queued')
+                                    ->body('The image will be resized to all configured sizes.')
                                     ->success()
                                     ->send();
-                            } else {
+                            } catch (\Exception $e) {
                                 Notification::make()
-                                    ->title('No updates needed')
-                                    ->body($result['message'])
-                                    ->info()
+                                    ->title('Resize failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
                                     ->send();
                             }
-                        } else {
-                            Notification::make()
-                                ->title('Refetch failed')
-                                ->body($result['message'])
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                
-                Action::make('edit_seo')
-                    ->label('Edit SEO')
-                    ->icon('heroicon-o-magnifying-glass')
-                    ->color('success')
-                    ->modalHeading('Edit SEO Title')
-                    ->modalDescription(fn (MediaMetadata $record): string => "Optimize SEO for: {$record->file_name}")
-                    ->schema([
-                        TextInput::make('seo_title')
-                            ->label('SEO Title')
-                            ->placeholder('Enter SEO-friendly title')
-                            ->required()
-                            ->default(fn (MediaMetadata $record): ?string => $record->seo_title)
-                            ->maxLength(160)
-                            ->helperText('SEO-friendly title for search engines (recommended 50-160 characters)')
-                            ->live()
-                            ->afterStateUpdatedJs(<<<'JS'
-                                const count = ($state ?? '').length;
-                                const counter = document.querySelector('[data-seo-counter]');
-                                if (counter) {
-                                    counter.textContent = count + '/160';
-                                    counter.style.color = count > 160 ? '#ef4444' : (count < 50 ? '#f59e0b' : '#6b7280');
-                                }
-                            JS),
-                    ])
-                    ->action(function (MediaMetadata $record, array $data): void {
-                        try {
-                            $record->update(['seo_title' => $data['seo_title']]);
-                            
-                            Notification::make()
-                                ->title('SEO title updated')
-                                ->body('The SEO title has been updated successfully.')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Update failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                
-                Action::make('rename')
-                    ->label('Rename')
-                    ->icon('heroicon-o-pencil')
-                    ->color('primary')
-                    ->modalHeading('Rename File')
-                    ->modalDescription(fn (MediaMetadata $record): string => "Current name: {$record->file_name}")
-                    ->schema([
-                        TextInput::make('new_filename')
-                            ->label('New Filename')
-                            ->placeholder('Enter new filename with full path')
-                            ->required()
-                            ->default(fn (MediaMetadata $record): string => $record->file_name)
-                            ->helperText('Enter the full path and filename (e.g., uploads/images/photo.jpg)')
-                            ->rules(fn ($record) => [
-                                'required',
-                                'string',
-                                function (string $attribute, $value, \Closure $fail) use ($record) {
-                                    // Check if file already exists on S3 (only if different from current)
-                                    if ($value !== $record->file_name && Storage::disk('s3')->exists($value)) {
-                                        $fail('A file with this name already exists.');
+                        })
+                        ->requiresConfirmation(),
+
+                    Action::make('compress')
+                        ->label('Compress')
+                        ->icon('heroicon-o-arrows-pointing-in')
+                        ->color('warning')
+                        ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                        ->modalHeading('Compress Image')
+                        ->modalDescription(fn (MediaMetadata $record): string => "Compress and replace: {$record->file_name}")
+                        ->schema([
+                            FormSelect::make('format')
+                                ->label('Output Format')
+                                ->options([
+                                    'preserve' => 'Preserve Original Format',
+                                    'webp' => 'WebP (Best compression)',
+                                    'avif' => 'AVIF (Smaller files, newer format)',
+                                    'jpg' => 'JPEG (Universal compatibility)',
+                                    'png' => 'PNG (Lossless)',
+                                ])
+                                ->default('webp')
+                                ->helperText('WebP provides excellent compression with good quality. AVIF provides even better compression but has limited browser support.')
+                                ->required(),
+                            FormSelect::make('quality')
+                                ->label('Compression Quality')
+                                ->options([
+                                    '100' => 'Maximum (100%)',
+                                    '95' => 'Very High (95%)',
+                                    '85' => 'High (85%) - Recommended',
+                                    '75' => 'Medium (75%)',
+                                    '65' => 'Low (65%)',
+                                    '50' => 'Very Low (50%)',
+                                ])
+                                ->default('85')
+                                ->required(),
+                            FormSelect::make('compression_method')
+                                ->label('Processing Method')
+                                ->options(function () {
+                                    $options = [];
+
+                                    $hasApi = ! empty(config('file-manager.compression.api.url'));
+
+                                    if ($hasApi) {
+                                        $options['auto'] = 'Auto (Use API, fallback to GD)';
+                                        $options['api'] = 'API Only (Fast compression)';
                                     }
-                                },
-                            ]),
-                    ])
-                    ->action(function (MediaMetadata $record, array $data): void {
-                        try {
-                            $oldFileName = $record->file_name;
-                            $newFileName = $data['new_filename'];
 
-                            // Skip if same name
-                            if ($newFileName === $oldFileName) {
-                                Notification::make()
-                                    ->title('No changes made')
-                                    ->body('The filename is the same as before.')
-                                    ->warning()
-                                    ->send();
+                                    $options['gd'] = 'GD Library Only (Local processing)';
 
-                                return;
-                            }
+                                    return $options;
+                                })
+                                ->default(function () {
+                                    $configMethod = config('file-manager.compression.method', 'api');
 
-                            // Update the parent model's field
-                            $model = $record->mediable_type::find($record->mediable_id);
-                            if ($model) {
-                                $field = $record->mediable_field;
+                                    // Map config values to form values
+                                    return match ($configMethod) {
+                                        'gd' => 'gd',
+                                        'api' => 'auto',  // 'api' in config means auto (with fallback)
+                                        default => 'auto'
+                                    };
+                                })
+                                ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
+                                ->helperText('Choose which compression method to use'),
+                            FormToggle::make('replace_original')
+                                ->label('Replace original file')
+                                ->helperText('This will permanently replace the original file with the compressed version')
+                                ->default(true),
+                            FormToggle::make('resize_after')
+                                ->label('Resize all versions after compression')
+                                ->default(true),
+                        ])
+                        ->action(function (MediaMetadata $record, array $data): void {
+                            try {
+                                // Override compression method if specified
+                                $originalMethod = config('file-manager.compression.method');
+                                if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
+                                    $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
+                                    config(['file-manager.compression.method' => $method]);
+                                }
 
-                                // Handle array fields
-                                if (is_array($model->{$field})) {
-                                    $values = $model->{$field};
-                                    $key = array_search($oldFileName, $values);
-                                    if ($key !== false) {
-                                        $values[$key] = $newFileName;
-                                        $model->updateQuietly([$field => $values]);
+                                // Create compression service after config override
+                                $compressionService = new ImageCompressionService;
+                                $result = static::compressMediaRecord($record, $data, $compressionService);
+
+                                // Restore original compression method
+                                config(['file-manager.compression.method' => $originalMethod]);
+
+                                if ($result['success']) {
+                                    $savedKb = round($result['saved'] / 1024, 2);
+                                    $compressionRatio = round(($result['saved'] / $result['original_size']) * 100, 1);
+
+                                    // Check compression method and show appropriate notification
+                                    $compressionMethod = $result['compression_method'] ?? 'unknown';
+
+                                    if ($compressionMethod === 'gd_fallback') {
+                                        // API failed, used GD as fallback
+                                        $reason = $result['api_fallback_reason'] ?? 'Unknown reason';
+                                        Notification::make()
+                                            ->warning()
+                                            ->title('API Compression Failed - Used GD Fallback')
+                                            ->body("API Error: {$reason}<br>
+                                                   Compressed with GD: Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                            ->duration(8000)
+                                            ->send();
+                                    } elseif ($compressionMethod === 'gd') {
+                                        // Direct GD compression
+                                        Notification::make()
+                                            ->success()
+                                            ->title('Image Compressed with GD')
+                                            ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                            ->send();
+                                    } elseif ($compressionMethod === 'api') {
+                                        // Successful API compression
+                                        Notification::make()
+                                            ->success()
+                                            ->title('Image Compressed via API')
+                                            ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                            ->send();
+                                    } else {
+                                        // Fallback for unknown method
+                                        Notification::make()
+                                            ->success()
+                                            ->title('Image compressed successfully')
+                                            ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                            ->send();
                                     }
                                 } else {
-                                    // Single value field
-                                    if ($model->{$field} === $oldFileName) {
-                                        $model->updateQuietly([$field => $newFileName]);
+                                    throw new \Exception($result['message'] ?? 'Compression failed');
+                                }
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Compression failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Action::make('delete_resized')
+                        ->label('Delete Resized')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                        ->modalHeading('Delete Resized Versions')
+                        ->modalDescription(fn (MediaMetadata $record): string => "Delete all resized versions of: {$record->file_name}")
+                        ->modalContent(fn () => view('file-manager::actions.delete-resized-warning'))
+                        ->action(function (MediaMetadata $record): void {
+                            try {
+                                $fileName = $record->file_name;
+                                $pathParts = explode('/', $fileName);
+                                $name = array_pop($pathParts);
+                                $directory = implode('/', $pathParts);
+
+                                // Get configured image sizes
+                                $sizes = config('file-manager.image_sizes', []);
+                                $deletedCount = 0;
+
+                                foreach (array_keys($sizes) as $size) {
+                                    $resizedPath = "{$directory}/{$size}/{$name}";
+                                    if (Storage::disk('s3')->exists($resizedPath)) {
+                                        Storage::disk('s3')->delete($resizedPath);
+                                        $deletedCount++;
                                     }
                                 }
+
+                                Notification::make()
+                                    ->title('Resized versions deleted')
+                                    ->body("Deleted {$deletedCount} resized versions")
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Deletion failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
                             }
-
-                            // Update the metadata record
-                            $record->update(['file_name' => $newFileName]);
-
-                            Notification::make()
-                                ->title('File renamed successfully')
-                                ->body("Database updated from '{$oldFileName}' to '{$newFileName}'.")
-                                ->success()
-                                ->send();
-
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Rename failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-
-                Action::make('delete_resized')
-                    ->label('Delete Resized')
-                    ->icon('heroicon-o-trash')
-                    ->color('danger')
+                        })
+                        ->requiresConfirmation(),
+                ])
+                    ->label('Processing')
+                    ->icon('heroicon-o-photo')
+                    ->color('info')
                     ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
-                    ->modalHeading('Delete Resized Versions')
-                    ->modalDescription(fn (MediaMetadata $record): string => "Delete all resized versions of: {$record->file_name}")
-                    ->modalContent(fn () => view('file-manager::actions.delete-resized-warning'))
-                    ->action(function (MediaMetadata $record): void {
-                        try {
-                            $fileName = $record->file_name;
-                            $pathParts = explode('/', $fileName);
-                            $name = array_pop($pathParts);
-                            $directory = implode('/', $pathParts);
+                    ->button(),
 
-                            // Get configured image sizes
-                            $sizes = config('file-manager.image_sizes', []);
-                            $deletedCount = 0;
+                // Data Management Group
+                ActionGroup::make([
+                    Action::make('refetch')
+                        ->label('Refetch Metadata')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('info')
+                        ->modalHeading('Refetch Metadata')
+                        ->modalDescription(function (MediaMetadata $record): string {
+                            $service = new MetadataRefreshService;
+                            $discrepancy = $service->checkDiscrepancy($record);
 
-                            foreach (array_keys($sizes) as $size) {
-                                $resizedPath = "{$directory}/{$size}/{$name}";
-                                if (Storage::disk('s3')->exists($resizedPath)) {
-                                    Storage::disk('s3')->delete($resizedPath);
-                                    $deletedCount++;
+                            if ($discrepancy['has_discrepancy']) {
+                                $description = "⚠️ Discrepancy detected!\n";
+
+                                if ($discrepancy['is_array'] ?? false) {
+                                    $description .= 'Model field contains an array with ' . count($discrepancy['array_files']) . " files:\n";
+                                    foreach (array_slice($discrepancy['array_files'], 0, 5) as $i => $file) {
+                                        $description .= '  ' . ($i + 1) . '. ' . $file . "\n";
+                                    }
+                                    if (count($discrepancy['array_files']) > 5) {
+                                        $description .= '  ... and ' . (count($discrepancy['array_files']) - 5) . " more\n";
+                                    }
+                                    $description .= "\nMetadata record: {$discrepancy['metadata_value']}";
+                                } else {
+                                    $description .= "Model field: {$discrepancy['model_value']}\n";
+                                    $description .= "Metadata: {$discrepancy['metadata_value']}";
                                 }
+
+                                return $description;
                             }
 
-                            Notification::make()
-                                ->title('Resized versions deleted')
-                                ->body("Deleted {$deletedCount} resized versions")
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Deletion failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    })
-                    ->requiresConfirmation(),
+                            return "Refetch metadata for: {$record->file_name}";
+                        })
+                        ->schema(function (MediaMetadata $record): array {
+                            $service = new MetadataRefreshService;
+                            $discrepancy = $service->checkDiscrepancy($record);
+
+                            // Only show source selection if there's a discrepancy
+                            if ($discrepancy['has_discrepancy']) {
+                                $options = [];
+
+                                if ($discrepancy['is_array'] ?? false) {
+                                    // For arrays, show each file as an option
+                                    $arrayFiles = $discrepancy['array_files'] ?? [];
+                                    if (! empty($arrayFiles)) {
+                                        foreach ($arrayFiles as $file) {
+                                            $shortName = strlen($file) > 60 ? '...' . substr($file, -57) : $file;
+                                            $options['array:' . $file] = 'Model array: ' . $shortName;
+                                        }
+                                    }
+                                    $options['metadata'] = 'Keep metadata: ' . $discrepancy['metadata_value'];
+                                } else {
+                                    // For single values, show both options
+                                    $options['model'] = "Use model's value: " . ($discrepancy['model_value'] ?? 'unknown');
+                                    $options['metadata'] = "Use metadata's value: " . ($discrepancy['metadata_value'] ?? 'unknown');
+                                }
+
+                                return [
+                                    Radio::make('source')
+                                        ->label('Choose which file to use')
+                                        ->options($options)
+                                        ->default(array_key_first($options))
+                                        ->helperText('Select the correct file to use for refreshing metadata.')
+                                        ->required(),
+                                ];
+                            }
+
+                            // No discrepancy, no need to show selection
+                            return [];
+                        })
+                        ->action(function (MediaMetadata $record, array $data): void {
+                            $service = new MetadataRefreshService;
+
+                            // Check for discrepancy to determine source
+                            $discrepancy = $service->checkDiscrepancy($record);
+
+                            if ($discrepancy['has_discrepancy']) {
+                                $selectedSource = $data['source'] ?? 'model';
+
+                                // Handle array selection
+                                if (str_starts_with($selectedSource, 'array:')) {
+                                    // Extract the selected file from the array
+                                    $selectedFile = substr($selectedSource, 6);
+                                    // Update the metadata to use this specific file
+                                    $record->update(['file_name' => $selectedFile]);
+                                    // Now refresh using this file
+                                    $result = $service->refreshSingle($record, 'metadata');
+                                } else {
+                                    // Regular model or metadata source
+                                    $result = $service->refreshSingle($record, $selectedSource);
+                                }
+                            } else {
+                                // No discrepancy, use model
+                                $result = $service->refreshSingle($record, 'model');
+                            }
+
+                            if ($result['success']) {
+                                if ($result['updated'] ?? false) {
+                                    Notification::make()
+                                        ->title('Metadata refetched successfully')
+                                        ->body($result['message'])
+                                        ->success()
+                                        ->send();
+                                } else {
+                                    Notification::make()
+                                        ->title('No updates needed')
+                                        ->body($result['message'])
+                                        ->info()
+                                        ->send();
+                                }
+                            } else {
+                                Notification::make()
+                                    ->title('Refetch failed')
+                                    ->body($result['message'])
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Action::make('edit_seo')
+                        ->label('Edit SEO')
+                        ->icon('heroicon-o-magnifying-glass')
+                        ->color('success')
+                        ->modalHeading('Edit SEO Title')
+                        ->modalDescription(fn (MediaMetadata $record): string => "Optimize SEO for: {$record->file_name}")
+                        ->schema([
+                            TextInput::make('seo_title')
+                                ->label('SEO Title')
+                                ->placeholder('Enter SEO-friendly title')
+                                ->required()
+                                ->default(fn (MediaMetadata $record): ?string => $record->seo_title)
+                                ->maxLength(160)
+                                ->helperText('SEO-friendly title for search engines (recommended 50-160 characters)')
+                                ->live()
+                                ->afterStateUpdatedJs(<<<'JS'
+                                    const count = ($state ?? '').length;
+                                    const counter = document.querySelector('[data-seo-counter]');
+                                    if (counter) {
+                                        counter.textContent = count + '/160';
+                                        counter.style.color = count > 160 ? '#ef4444' : (count < 50 ? '#f59e0b' : '#6b7280');
+                                    }
+                                JS),
+                        ])
+                        ->action(function (MediaMetadata $record, array $data): void {
+                            try {
+                                $record->update(['seo_title' => $data['seo_title']]);
+
+                                Notification::make()
+                                    ->title('SEO title updated')
+                                    ->body('The SEO title has been updated successfully.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Update failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Action::make('rename')
+                        ->label('Rename File')
+                        ->icon('heroicon-o-pencil')
+                        ->color('primary')
+                        ->modalHeading('Rename File')
+                        ->modalDescription(fn (MediaMetadata $record): string => "Current name: {$record->file_name}")
+                        ->schema([
+                            TextInput::make('new_filename')
+                                ->label('New Filename')
+                                ->placeholder('Enter new filename with full path')
+                                ->required()
+                                ->default(fn (MediaMetadata $record): string => $record->file_name)
+                                ->helperText('Enter the full path and filename (e.g., uploads/images/photo.jpg)')
+                                ->rules(fn ($record) => [
+                                    'required',
+                                    'string',
+                                    function (string $attribute, $value, \Closure $fail) use ($record) {
+                                        // Check if file already exists on S3 (only if different from current)
+                                        if ($value !== $record->file_name && Storage::disk('s3')->exists($value)) {
+                                            $fail('A file with this name already exists.');
+                                        }
+                                    },
+                                ]),
+                        ])
+                        ->action(function (MediaMetadata $record, array $data): void {
+                            try {
+                                $oldFileName = $record->file_name;
+                                $newFileName = $data['new_filename'];
+
+                                // Skip if same name
+                                if ($newFileName === $oldFileName) {
+                                    Notification::make()
+                                        ->title('No changes made')
+                                        ->body('The filename is the same as before.')
+                                        ->warning()
+                                        ->send();
+
+                                    return;
+                                }
+
+                                // Update the parent model's field
+                                $model = $record->mediable_type::find($record->mediable_id);
+                                if ($model) {
+                                    $field = $record->mediable_field;
+
+                                    // Handle array fields
+                                    if (is_array($model->{$field})) {
+                                        $values = $model->{$field};
+                                        $key = array_search($oldFileName, $values);
+                                        if ($key !== false) {
+                                            $values[$key] = $newFileName;
+                                            $model->updateQuietly([$field => $values]);
+                                        }
+                                    } else {
+                                        // Single value field
+                                        if ($model->{$field} === $oldFileName) {
+                                            $model->updateQuietly([$field => $newFileName]);
+                                        }
+                                    }
+                                }
+
+                                // Update the metadata record
+                                $record->update(['file_name' => $newFileName]);
+
+                                Notification::make()
+                                    ->title('File renamed successfully')
+                                    ->body("Database updated from '{$oldFileName}' to '{$newFileName}'.")
+                                    ->success()
+                                    ->send();
+
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Rename failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+                ])
+                    ->label('Management')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->color('success')
+                    ->button(),
             ]);
     }
 
