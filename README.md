@@ -625,7 +625,7 @@ The package includes a powerful Filament resource for comprehensive media manage
 #### Advanced Filtering
 
 -   **Quick Filters**:
-    -   Inefficient Images (>0.2 bytes per pixel, >10KB) - Smart filter for images that would benefit from WebP compression
+    -   Inefficient Images (>0.3 bytes per pixel, >10KB) - Smart filter for images that would benefit from WebP compression
     -   Large Files (>500KB)
     -   Very Large Files (>2MB)
 -   **Model Type Filter**: Filter by specific models
