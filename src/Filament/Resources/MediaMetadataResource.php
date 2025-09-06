@@ -1534,7 +1534,7 @@ class MediaMetadataResource extends Resource
                 }
             }
 
-            // Update metadata
+            // Update metadata including dimensions from compression result
             $updateData = [
                 'file_size' => $result['data']['compressed_size'] ?? $record->file_size,
                 'metadata' => array_merge($record->metadata ?? [], [
@@ -1548,6 +1548,12 @@ class MediaMetadataResource extends Resource
                     ],
                 ]),
             ];
+
+            // Update dimensions if available from compression result
+            if (isset($result['data']['width']) && isset($result['data']['height'])) {
+                $updateData['width'] = $result['data']['width'];
+                $updateData['height'] = $result['data']['height'];
+            }
 
             if ($newFileName !== $fileName) {
                 $updateData['file_name'] = $newFileName;

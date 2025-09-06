@@ -153,9 +153,15 @@ class ImageCompressionService
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
             
             // Get final dimensions after processing
-            $finalImg = ImageManager::gd()->read($compressedContent);
-            $finalWidth = $finalImg->width();
-            $finalHeight = $finalImg->height();
+            try {
+                $finalImg = ImageManager::gd()->read($compressedContent);
+                $finalWidth = $finalImg->width();
+                $finalHeight = $finalImg->height();
+            } catch (\Exception $e) {
+                // If we can't read the compressed image dimensions, use the enforced dimensions
+                $finalWidth = $enforcedDimensions['width'];
+                $finalHeight = $enforcedDimensions['height'];
+            }
 
             return [
                 'success' => true,
@@ -330,15 +336,18 @@ class ImageCompressionService
             $compressedSize = strlen($compressedImage);
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
             
-            // Get dimensions of the compressed image
+            // Get dimensions of the compressed image (actual dimensions from the API result)
             try {
                 $compressedImg = ImageManager::gd()->read($compressedImage);
-                $finalWidth = $compressedImg->width();
-                $finalHeight = $compressedImg->height();
+                $actualWidth = $compressedImg->width();
+                $actualHeight = $compressedImg->height();
+                
+                // Use the actual dimensions from the compressed image
+                $finalWidth = $actualWidth;
+                $finalHeight = $actualHeight;
             } catch (\Exception $e) {
-                // If we can't read dimensions, set to null
-                $finalWidth = $width ?? null;
-                $finalHeight = $height ?? null;
+                // If we can't read dimensions, keep the enforced dimensions we calculated earlier
+                // $finalWidth and $finalHeight already contain the enforced dimensions
             }
 
             $apiType = $useBackgroundRemovalApi ? 'api_bg_removal' : 'api';
