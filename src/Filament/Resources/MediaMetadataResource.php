@@ -16,10 +16,6 @@ use Filament\Forms\Components\Toggle as FormToggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Illuminate\Support\Facades\Cache as CacheFacade;
-use Illuminate\Support\Str;
-use Kirantimsina\FileManager\Jobs\CompressImageJob;
-use Kirantimsina\FileManager\Jobs\RefreshAllMediaJob;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -32,9 +28,15 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Cache as CacheFacade;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages;
+use Kirantimsina\FileManager\FileManagerService;
+use Kirantimsina\FileManager\Jobs\CompressImageJob;
+use Kirantimsina\FileManager\Jobs\RefreshAllMediaJob;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
@@ -56,14 +58,14 @@ class MediaMetadataResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getLargeFilesCount();
+        $count = static::getInefficientImagesCount();
 
         return $count > 0 ? (string) $count : null;
     }
 
     public static function getNavigationBadgeColor(): ?string
     {
-        $count = static::getLargeFilesCount();
+        $count = static::getInefficientImagesCount();
 
         return match (true) {
             $count > 100 => 'danger',
@@ -74,14 +76,19 @@ class MediaMetadataResource extends Resource
     }
 
     /**
-     * Get the count of large files (>500KB) with caching
+     * Get the count of inefficient images (>0.2 bytes per pixel, >10KB) with caching
      */
-    protected static function getLargeFilesCount(): int
+    protected static function getInefficientImagesCount(): int
     {
         return (int) Cache::remember(
-            'media_metadata_large_files_count',
+            'media_metadata_inefficient_images_count',
             5 * 60, // Cache for 5 minutes
-            fn () => MediaMetadata::where('file_size', '>', 500 * 1024)->count()
+            fn () => MediaMetadata::where('mime_type', 'like', 'image/%')
+                ->where('file_size', '>', 10 * 1024)
+                ->whereNotNull('width')
+                ->whereNotNull('height')
+                ->whereRaw('file_size > (width * height * 0.2)')
+                ->count()
         );
     }
 
@@ -494,25 +501,26 @@ class MediaMetadataResource extends Resource
                         });
 
                         $jobCount = $imageRecords->count();
-                        
+
                         if ($jobCount === 0) {
                             Notification::make()
                                 ->title('No images selected')
                                 ->body('Please select at least one image file for compression.')
                                 ->warning()
                                 ->send();
+
                             return;
                         }
 
                         // Generate a unique batch ID
                         $batchId = Str::uuid()->toString();
-                        
+
                         // Initialize batch cache
                         CacheFacade::put("compression_batch_{$batchId}", [
                             'total' => $jobCount,
                             'completed' => 0,
                             'failed' => 0,
-                            'stats' => []
+                            'stats' => [],
                         ], 3600); // Cache for 1 hour
 
                         // Dispatch jobs for each image with batch tracking
@@ -668,25 +676,26 @@ class MediaMetadataResource extends Resource
                     ->modalDescription(fn (Collection $records): string => "Queue refresh jobs for {$records->count()} selected items. This will check file metadata, dimensions, and update records as needed.")
                     ->action(function (Collection $records): void {
                         $jobCount = $records->count();
-                        
+
                         if ($jobCount === 0) {
                             Notification::make()
                                 ->title('No records selected')
                                 ->body('Please select at least one record to refresh.')
                                 ->warning()
                                 ->send();
+
                             return;
                         }
 
                         // Generate a unique batch ID
                         $batchId = Str::uuid()->toString();
-                        
+
                         // Initialize batch cache
                         CacheFacade::put("refresh_batch_{$batchId}", [
                             'total' => $jobCount,
                             'completed' => 0,
                             'failed' => 0,
-                            'stats' => []
+                            'stats' => [],
                         ], 3600); // Cache for 1 hour
 
                         // Dispatch jobs for each record with batch tracking
@@ -700,6 +709,7 @@ class MediaMetadataResource extends Resource
                             ->success()
                             ->send();
                     }),
+
 
                 BulkAction::make('bulk_delete_resized')
                     ->label('Delete Resized Versions')
@@ -750,6 +760,15 @@ class MediaMetadataResource extends Resource
                     }),
             ])
             ->filters([
+                Filter::make('inefficient_images')
+                    ->label('Inefficient Images')
+                    ->query(fn (Builder $query): Builder => $query->where('mime_type', 'like', 'image/%')
+                        ->where('file_size', '>', 10 * 1024)
+                        ->whereNotNull('width')
+                        ->whereNotNull('height')
+                        ->whereRaw('file_size > (width * height * 0.2)')
+                    )
+                    ->toggle(),
                 Filter::make('large_files')
                     ->label('Large Files (>500KB)')
                     ->query(fn (Builder $query): Builder => $query->where('file_size', '>', 500 * 1024))
@@ -1258,6 +1277,148 @@ class MediaMetadataResource extends Resource
                             }
                         }),
 
+                    Action::make('delete_metadata')
+                        ->label('Delete Metadata')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->modalHeading('Delete Media Metadata')
+                        ->modalDescription(function (MediaMetadata $record) {
+                            $issues = [];
+
+                            // Check if file exists in S3
+                            $fileExists = false;
+                            try {
+                                $fileExists = Storage::disk('s3')->exists($record->file_name);
+                            } catch (\Exception $e) {
+                                $fileExists = false;
+                            }
+
+                            // Check if parent model references this file
+                            $modelExists = false;
+                            $fieldValue = null;
+                            $modelFound = false;
+                            try {
+                                $model = $record->mediable_type::find($record->mediable_id);
+                                if ($model) {
+                                    $modelFound = true;
+                                    $fieldValue = $model->{$record->mediable_field};
+                                    if (is_array($fieldValue)) {
+                                        $modelExists = in_array($record->file_name, $fieldValue);
+                                    } else {
+                                        $modelExists = $fieldValue === $record->file_name;
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                // Model class doesn't exist or other error
+                            }
+
+                            // Build the description with proper line breaks
+                            $lines = [];
+                            $lines[] = "📄 FILE ANALYSIS";
+                            $lines[] = "";
+                            $lines[] = "File Path: " . basename($record->file_name);
+                            $lines[] = "Full Path: " . $record->file_name;
+                            $lines[] = "";
+                            $lines[] = "═══════════════════════════════";
+                            $lines[] = "";
+
+                            // File existence check
+                            if ($fileExists) {
+                                $lines[] = "✅ S3 File Status: File exists in storage";
+                            } else {
+                                $lines[] = "❌ S3 File Status: File does NOT exist in storage";
+                                $issues[] = 'file_missing';
+                            }
+                            $lines[] = "";
+
+                            // Model reference check
+                            if (!$modelFound) {
+                                $lines[] = "❌ Parent Model: Model not found";
+                                $lines[] = "   Model Type: " . class_basename($record->mediable_type);
+                                $lines[] = "   Model ID: " . $record->mediable_id;
+                                $issues[] = 'model_missing';
+                            } elseif ($modelExists) {
+                                $lines[] = "✅ Parent Model: Model correctly references this file";
+                                $lines[] = "   Field: " . $record->mediable_field;
+                            } else {
+                                $lines[] = "❌ Parent Model: Model does NOT reference this file";
+                                $lines[] = "   Field: " . $record->mediable_field;
+                                if (is_array($fieldValue)) {
+                                    $fieldPreview = implode(', ', array_slice($fieldValue, 0, 2));
+                                    if (count($fieldValue) > 2) {
+                                        $fieldPreview .= ' ... +' . (count($fieldValue) - 2) . ' more';
+                                    }
+                                    $lines[] = "   Current Value: [" . $fieldPreview . "]";
+                                } else {
+                                    $currentValue = $fieldValue ?: '(null/empty)';
+                                    $lines[] = "   Current Value: " . $currentValue;
+                                }
+                                $issues[] = 'model_not_referenced';
+                            }
+                            $lines[] = "";
+                            $lines[] = "═══════════════════════════════";
+                            $lines[] = "";
+
+                            // Conclusion with clear recommendation
+                            if (empty($issues)) {
+                                $lines[] = "⚠️  WARNING";
+                                $lines[] = "";
+                                $lines[] = "Both the file and model reference exist.";
+                                $lines[] = "This record does NOT appear to be orphaned.";
+                                $lines[] = "";
+                                $lines[] = "RECOMMENDATION: Investigate further before deletion.";
+                            } elseif (count($issues) === 2) {
+                                $lines[] = "🗑️  SAFE TO DELETE";
+                                $lines[] = "";
+                                $lines[] = "This is a truly orphaned record:";
+                                $lines[] = "• File is missing from S3";
+                                $lines[] = "• Parent model doesn't reference it";
+                                $lines[] = "";
+                                $lines[] = "RECOMMENDATION: Safe to delete this metadata record.";
+                            } else {
+                                $lines[] = "⚠️  PARTIALLY ORPHANED";
+                                $lines[] = "";
+                                if (in_array('file_missing', $issues)) {
+                                    $lines[] = "File is missing but model still references it.";
+                                    $lines[] = "";
+                                    $lines[] = "You may want to:";
+                                    $lines[] = "• Restore the missing file, or";
+                                    $lines[] = "• Update the model to remove the reference";
+                                } else {
+                                    $lines[] = "File exists but model doesn't reference it.";
+                                    $lines[] = "";
+                                    $lines[] = "This might be:";
+                                    $lines[] = "• A sync issue that needs investigation";
+                                    $lines[] = "• An intentionally unused file";
+                                }
+                                $lines[] = "";
+                                $lines[] = "RECOMMENDATION: Use caution before deleting.";
+                            }
+
+                            $description = implode("<br>", $lines);
+
+                            return new HtmlString($description);
+                        })
+                        ->action(function (MediaMetadata $record): void {
+                            try {
+                                $fileName = $record->file_name;
+                                $record->delete();
+
+                                Notification::make()
+                                    ->title('Metadata deleted')
+                                    ->body("Successfully deleted metadata record for: {$fileName}")
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Delete failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        })
+                        ->requiresConfirmation(),
+
                     Action::make('rename')
                         ->label('Rename File')
                         ->icon('heroicon-o-pencil')
@@ -1377,20 +1538,20 @@ class MediaMetadataResource extends Resource
                                         }
                                     } catch (\Exception $e) {
                                         // Log but don't fail the rename if resized deletion fails
-                                        \Log::warning("Failed to delete old resized images during rename: " . $e->getMessage());
+                                        \Log::warning('Failed to delete old resized images during rename: ' . $e->getMessage());
                                     }
                                 }
 
                                 // Actually move/rename the file in S3 only if new file doesn't exist but old file does
-                                if (!$fileExists && Storage::disk('s3')->exists($oldFileName)) {
+                                if (! $fileExists && Storage::disk('s3')->exists($oldFileName)) {
                                     try {
                                         // Copy the file to new location
                                         Storage::disk('s3')->copy($oldFileName, $newFileName);
                                         // Delete the old file
                                         Storage::disk('s3')->delete($oldFileName);
                                     } catch (\Exception $e) {
-                                        \Log::error("Failed to move file in S3 during rename: " . $e->getMessage());
-                                        throw new \Exception("Failed to rename file in storage: " . $e->getMessage());
+                                        \Log::error('Failed to move file in S3 during rename: ' . $e->getMessage());
+                                        throw new \Exception('Failed to rename file in storage: ' . $e->getMessage());
                                     }
                                 }
 
@@ -1401,9 +1562,9 @@ class MediaMetadataResource extends Resource
                                 $resizeSuccess = true;
                                 if (str_starts_with($record->mime_type ?? '', 'image/')) {
                                     try {
-                                        \Kirantimsina\FileManager\FileManagerService::resizeImage($newFileName, false);
+                                        FileManagerService::resizeImage($newFileName, false);
                                     } catch (\Exception $e) {
-                                        \Log::error("Failed to resize image during rename: " . $e->getMessage());
+                                        \Log::error('Failed to resize image during rename: ' . $e->getMessage());
                                         $resizeSuccess = false;
                                     }
                                 }
@@ -1422,9 +1583,9 @@ class MediaMetadataResource extends Resource
                                         $notificationBody .= " Cleaned up {$deletedResizedCount} old resized versions.";
                                     }
                                     if ($resizeSuccess) {
-                                        $notificationBody .= " New resized versions generated successfully.";
+                                        $notificationBody .= ' New resized versions generated successfully.';
                                     } else {
-                                        $notificationBody .= " Warning: Failed to generate new resized versions - check logs.";
+                                        $notificationBody .= ' Warning: Failed to generate new resized versions - check logs.';
                                     }
                                 }
 
@@ -1511,7 +1672,7 @@ class MediaMetadataResource extends Resource
             $newFileName,
             (int) $data['quality'],
             null, // Let the service apply max height constraint automatically
-            null, // Let the service apply max width constraint automatically  
+            null, // Let the service apply max width constraint automatically
             $outputFormat,
             config('file-manager.compression.mode', 'contain'),
             's3'
@@ -1550,7 +1711,7 @@ class MediaMetadataResource extends Resource
             ];
 
             // Update dimensions if available from compression result
-            if (isset($result['data']['width']) && isset($result['data']['height'])) {
+            if (isset($result['data']['width'], $result['data']['height'])) {
                 $updateData['width'] = $result['data']['width'];
                 $updateData['height'] = $result['data']['height'];
             }
