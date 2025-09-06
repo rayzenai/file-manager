@@ -16,6 +16,10 @@ use Filament\Forms\Components\Toggle as FormToggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Illuminate\Support\Facades\Cache as CacheFacade;
+use Illuminate\Support\Str;
+use Kirantimsina\FileManager\Jobs\CompressImageJob;
+use Kirantimsina\FileManager\Jobs\RefreshAllMediaJob;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -485,88 +489,41 @@ class MediaMetadataResource extends Resource
                             ->default(true),
                     ])
                     ->action(function (Collection $records, array $data): void {
-                        // Override compression method if specified
-                        $originalMethod = config('file-manager.compression.method');
-                        if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
-                            $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
-                            config(['file-manager.compression.method' => $method]);
+                        $imageRecords = $records->filter(function ($record) {
+                            return str_starts_with($record->mime_type ?? '', 'image/');
+                        });
+
+                        $jobCount = $imageRecords->count();
+                        
+                        if ($jobCount === 0) {
+                            Notification::make()
+                                ->title('No images selected')
+                                ->body('Please select at least one image file for compression.')
+                                ->warning()
+                                ->send();
+                            return;
                         }
 
-                        // Create compression service after config override
-                        $compressionService = new ImageCompressionService;
-                        $successCount = 0;
-                        $failedCount = 0;
-                        $totalSaved = 0;
-                        $compressionDetails = [];
-                        $failedFiles = [];
+                        // Generate a unique batch ID
+                        $batchId = Str::uuid()->toString();
+                        
+                        // Initialize batch cache
+                        CacheFacade::put("compression_batch_{$batchId}", [
+                            'total' => $jobCount,
+                            'completed' => 0,
+                            'failed' => 0,
+                            'stats' => []
+                        ], 3600); // Cache for 1 hour
 
-                        foreach ($records as $record) {
-                            // Only process image files
-                            if (! str_starts_with($record->mime_type ?? '', 'image/')) {
-                                continue;
-                            }
-
-                            try {
-                                $result = static::compressMediaRecord($record, $data, $compressionService);
-
-                                if ($result['success']) {
-                                    // Store compression details for the notification
-                                    $originalKb = round($result['original_size'] / 1024);
-                                    $compressedKb = round($result['compressed_size'] / 1024);
-                                    $modelName = class_basename($record->mediable_type);
-                                    $compressionDetails[] = "{$modelName} {$record->mediable_id}: {$originalKb}KB → {$compressedKb}KB";
-
-                                    $totalSaved += $result['saved'];
-                                    $successCount++;
-                                } else {
-                                    throw new \Exception($result['message'] ?? 'Compression failed');
-                                }
-                            } catch (\Exception $e) {
-                                $failedCount++;
-                                $modelName = class_basename($record->mediable_type);
-                                $failedFiles[] = "{$modelName} {$record->mediable_id}";
-                            }
+                        // Dispatch jobs for each image with batch tracking
+                        foreach ($imageRecords as $record) {
+                            CompressImageJob::dispatch($record->id, $data, $batchId);
                         }
-
-                        $savedMb = round($totalSaved / (1024 * 1024), 2);
-
-                        // Build the detailed notification body
-                        $notificationBody = "Successfully compressed {$successCount} images. Saved {$savedMb} MB total.";
-
-                        // Add compression details (limit to first 5 to avoid huge notifications)
-                        if (count($compressionDetails) > 0) {
-                            $notificationBody .= "\n\n**Compression Results:**\n";
-                            $detailsToShow = array_slice($compressionDetails, 0, 5);
-                            foreach ($detailsToShow as $detail) {
-                                $notificationBody .= "• {$detail}\n";
-                            }
-                            if (count($compressionDetails) > 5) {
-                                $remaining = count($compressionDetails) - 5;
-                                $notificationBody .= "• ...and {$remaining} more\n";
-                            }
-                        }
-
-                        // Add failed files info
-                        if ($failedCount > 0) {
-                            $notificationBody .= "\n**Failed ({$failedCount}):**\n";
-                            $failedToShow = array_slice($failedFiles, 0, 3);
-                            foreach ($failedToShow as $failed) {
-                                $notificationBody .= "• {$failed}\n";
-                            }
-                            if (count($failedFiles) > 3) {
-                                $remaining = count($failedFiles) - 3;
-                                $notificationBody .= "• ...and {$remaining} more\n";
-                            }
-                        }
-
-                        // Restore original compression method
-                        config(['file-manager.compression.method' => $originalMethod]);
 
                         Notification::make()
-                            ->title('Bulk compression completed')
-                            ->body($notificationBody)
+                            ->title('Compression jobs queued')
+                            ->body("Queued {$jobCount} image compression jobs. You'll be notified of progress and completion.")
                             ->success()
-                            ->duration(10000) // Show for 10 seconds to allow reading details
                             ->send();
                     }),
 
@@ -698,6 +655,49 @@ class MediaMetadataResource extends Resource
                             ->body($notificationBody)
                             ->success()
                             ->duration(10000)
+                            ->send();
+                    }),
+
+                BulkAction::make('bulk_refresh_queued')
+                    ->label('Refresh All (Queued)')
+                    ->deselectRecordsAfterCompletion()
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('info')
+                    ->requiresConfirmation()
+                    ->modalHeading('Queue Refresh Jobs')
+                    ->modalDescription(fn (Collection $records): string => "Queue refresh jobs for {$records->count()} selected items. This will check file metadata, dimensions, and update records as needed.")
+                    ->action(function (Collection $records): void {
+                        $jobCount = $records->count();
+                        
+                        if ($jobCount === 0) {
+                            Notification::make()
+                                ->title('No records selected')
+                                ->body('Please select at least one record to refresh.')
+                                ->warning()
+                                ->send();
+                            return;
+                        }
+
+                        // Generate a unique batch ID
+                        $batchId = Str::uuid()->toString();
+                        
+                        // Initialize batch cache
+                        CacheFacade::put("refresh_batch_{$batchId}", [
+                            'total' => $jobCount,
+                            'completed' => 0,
+                            'failed' => 0,
+                            'stats' => []
+                        ], 3600); // Cache for 1 hour
+
+                        // Dispatch jobs for each record with batch tracking
+                        foreach ($records as $record) {
+                            RefreshAllMediaJob::dispatch($record->id, $batchId);
+                        }
+
+                        Notification::make()
+                            ->title('Refresh jobs queued')
+                            ->body("Queued {$jobCount} refresh jobs. You'll be notified of progress and completion.")
+                            ->success()
                             ->send();
                     }),
 

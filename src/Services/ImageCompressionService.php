@@ -249,14 +249,14 @@ class ImageCompressionService
                         'message' => 'Background removal requested but no API configured',
                     ];
                 }
-                return $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
+                return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
             }
             
             // Check file size - skip API for files over 5MB to avoid timeouts (except for bg removal)
             $fileSizeInMb = strlen($fileContent['data']['content']) / (1024 * 1024);
             if ($fileSizeInMb > 5 && !$removeBg) {
                 // For large files, fall back to GD unless background removal is required
-                $gdResult = $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
+                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
                 if ($gdResult['success']) {
                     $gdResult['data']['compression_method'] = 'gd_fallback';
                     $gdResult['data']['api_fallback_reason'] = 'File too large for API (' . round($fileSizeInMb, 2) . ' MB)';
@@ -317,7 +317,7 @@ class ImageCompressionService
                 }
 
                 // Fallback to GD and mark it as a fallback
-                $gdResult = $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
+                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
                 if ($gdResult['success']) {
                     $gdResult['data']['compression_method'] = 'gd_fallback';
                     $responseBody = $response->body();
@@ -387,7 +387,7 @@ class ImageCompressionService
             }
 
             // Fallback to GD and mark it as a fallback
-            $gdResult = $this->compressViaGd($image, $quality, $finalHeight, $finalWidth, $format, $mode);
+            $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
             if ($gdResult['success']) {
                 $gdResult['data']['compression_method'] = 'gd_fallback';
                 $gdResult['data']['api_fallback_reason'] = 'API exception: ' . $t->getMessage();

@@ -865,11 +865,178 @@ The package provides several powerful Artisan commands for managing your media f
 
 | Command                             | Purpose                                 | Key Features                                 |
 | ----------------------------------- | --------------------------------------- | -------------------------------------------- |
+| `file-manager:manage-sizes`         | Add/remove image sizes for all media   | Config checking, batch processing, dry run   |
+| `file-manager:refresh-all`          | Queue refresh jobs for all media       | Metadata sync, dimension updates, batch jobs |
 | `file-manager:populate-seo-titles`  | Generate SEO titles for media files     | Dry run, model filtering, chunked processing |
 | `file-manager:update-seo-titles`    | Update SEO titles when models change    | Model-specific updates, automatic tracking   |
 | `file-manager:populate-metadata`    | Create metadata for existing images     | Supports all models, progress tracking       |
 | `file-manager:remove-duplicates`    | Remove duplicate metadata records       | Safe cleanup, dry run preview                |
 | `file-manager:update-cache-headers` | Add cache headers to existing S3 images | Directory-specific, progress tracking        |
+
+---
+
+### Manage Image Sizes
+
+Add or remove image sizes for all media files in the media_metadata table. This command is useful when you need to add a new size to your configuration or clean up unused sizes.
+
+#### Adding a New Size
+
+```bash
+# Add a new size called 'xlarge' with 1440px height
+php artisan file-manager:manage-sizes add xlarge 1440
+
+# Preview what would be done without executing
+php artisan file-manager:manage-sizes add xlarge 1440 --dry-run
+
+# Skip confirmation prompts
+php artisan file-manager:manage-sizes add xlarge 1440 --force
+
+# Process in smaller chunks (useful for large datasets)
+php artisan file-manager:manage-sizes add xlarge 1440 --chunk=50
+```
+
+#### Removing an Existing Size
+
+```bash
+# Remove the 'xlarge' size and delete all associated files
+php artisan file-manager:manage-sizes remove xlarge
+
+# Preview what would be deleted
+php artisan file-manager:manage-sizes remove xlarge --dry-run
+
+# Remove without confirmation
+php artisan file-manager:manage-sizes remove xlarge --force
+```
+
+#### Key Features
+
+- **Safe Operations**: Dry-run mode lets you preview changes before executing
+- **Progress Tracking**: Real-time progress bar shows current status  
+- **Batch Processing**: Configurable chunk sizes for memory efficiency
+- **Error Handling**: Detailed error reporting for failed operations
+- **S3 Integration**: Automatically handles S3 file creation and deletion
+- **Format Support**: Uses configured compression format (WebP, JPEG, PNG, AVIF)
+
+#### Important Notes
+
+- **Configuration First Approach**: The command enforces configuration updates before operations:
+  - **Adding**: Blocks execution if size not in config, requires you to add it first
+  - **Removing**: Blocks execution if size still in config, requires you to remove it first
+  - This prevents orphaned files and ensures configuration consistency
+  
+- **Two-Step Process**: 
+  1. **Update your configuration** in `config/file-manager.php`
+  2. **Run the command** to process the files
+
+  ```php
+  'image_sizes' => [
+      'icon' => 64,
+      'small' => 120,
+      'xlarge' => 1440,  // Add your new size here
+  ],
+  ```
+
+- **Storage Requirements**: Adding sizes will increase storage usage as new files are created
+- **Processing Time**: Large datasets may take considerable time to process  
+- **File Cleanup**: Removing sizes permanently deletes the associated image files
+
+#### Example Output
+
+**Blocked when size not in config:**
+```bash
+$ php artisan file-manager:manage-sizes add hero 1800
+
+Size 'hero' is not found in your configuration.
+
+Please add it to config/file-manager.php first:
+'image_sizes' => [
+    // ... existing sizes ...
+    'hero' => 1800,
+],
+
+After updating your config, run this command again.
+```
+
+**Success after adding to config:**
+```bash
+$ php artisan file-manager:manage-sizes add hero 1800
+
+Size 'hero' with height 1800px already exists in configuration
+Add size 'hero' (1800px height) to 1,250 images? (yes/no) [no]:
+> yes
+
+ 1250/1250 [████████████████████████████████████████] 100%
+
+Processing completed:
+- Total processed: 1250
+- Succeeded: 1248  
+- Failed: 2
+
+Successfully created 'hero' sized images for 1248 files
+```
+
+---
+
+### Refresh All Media
+
+Queue refresh jobs to update metadata for all media files. This command checks file metadata, dimensions, and synchronizes database records with actual file states in S3 storage.
+
+```bash
+# Queue refresh jobs for all media metadata records
+php artisan file-manager:refresh-all
+
+# Preview what would be done without executing
+php artisan file-manager:refresh-all --dry-run
+
+# Skip confirmation prompts
+php artisan file-manager:refresh-all --force
+
+# Process in smaller chunks
+php artisan file-manager:refresh-all --chunk=50
+```
+
+#### What It Checks
+
+- **File Size Changes**: Updates file_size if different from S3
+- **MIME Type Changes**: Updates mime_type based on current file
+- **Image Dimensions**: Recalculates width/height for image files
+- **Model References**: Verifies parent models still reference the file
+
+#### Key Features
+
+- **Queued Processing**: Uses background jobs to avoid timeouts
+- **Progress Tracking**: Real-time notifications every 10 completed jobs
+- **Batch Processing**: Configurable chunk sizes for memory efficiency
+- **Safe Operations**: Dry-run mode to preview changes
+- **Error Handling**: Detailed logging and retry logic
+- **Non-Destructive**: Only updates metadata, doesn't modify files
+
+#### Example Output
+
+```bash
+$ php artisan file-manager:refresh-all
+
+Found 2,500 media metadata records to refresh
+Queue refresh jobs for 2,500 media records? (yes/no) [no]:
+> yes
+
+Dispatching refresh jobs...
+ 2500/2500 [████████████████████████████████████████] 100%
+
+Successfully queued 2,500 refresh jobs
+Batch ID: 9c8e1a5b-4d2f-4e8a-b1c3-9f7e2d6c8a4b
+You'll receive notifications about progress and completion
+
+Jobs will check each file for:
+- File size changes
+- MIME type changes  
+- Image dimension changes
+- Parent model reference consistency
+```
+
+#### GUI Alternative
+
+You can also use the **"Refresh All (Queued)"** bulk action in the MediaMetadata admin panel to refresh selected records through the UI.
 
 ---
 
