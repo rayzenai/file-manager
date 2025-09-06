@@ -104,7 +104,7 @@ return [
      * This will be used as the default value for thumbnailSize() method
      */
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
-
+    'default_card_size' => env('FILE_MANAGER_DEFAULT_CARD_SIZE', 'card'),
     /**
      * Cache Control Settings for Images
      * Configure browser and CDN caching for uploaded images

@@ -16,6 +16,8 @@ use Filament\Forms\Components\Toggle as FormToggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
@@ -26,6 +28,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
@@ -111,54 +114,132 @@ class MediaMetadataResource extends Resource
     {
         return $schema
             ->components([
-                TextEntry::make('mediable_type')
-                    ->label('Model Type')
-                    ->formatStateUsing(fn (string $state): string => class_basename($state)),
-                TextEntry::make('mediable_id')
-                    ->label('Model ID')
-                    ->numeric(),
-                TextEntry::make('mediable_field')
-                    ->label('Field'),
-                TextEntry::make('file_name')
-                    ->label('File Name')
-                    ->copyable(),
-                TextEntry::make('file_size')
-                    ->label('File Size')
-                    ->formatStateUsing(function ($state) {
-                        if (! $state) {
-                            return '-';
-                        }
+                Section::make('Media Preview')
+                    ->schema([
+                        TextEntry::make('file_name')
+                            ->label('Thumbnail')
+                            ->formatStateUsing(function ($state, MediaMetadata $record) {
+                                // Use FileManager to get the thumbnail path with configured size
+                                $thumbnailSize = config('file-manager.default_card_size', 'thumbnail');
+                                $thumbnailPath = FileManager::getMediaPath($state, $thumbnailSize);
+                                $thumbnailUrl = Storage::disk('s3')->url($thumbnailPath);
+                                $fullImageUrl = Storage::disk('s3')->url($state);
 
-                        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-                        $bytes = max($state, 0);
-                        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-                        $pow = min($pow, count($units) - 1);
-                        $bytes /= pow(1024, $pow);
+                                return "<a href='{$fullImageUrl}' target='_blank' class='block'>
+                                    <img src='{$thumbnailUrl}' 
+                                         alt='Thumbnail' 
+                                         class='max-w-[200px] max-h-[200px] object-contain rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer'
+                                         style='width: auto; height: auto;' />
+                                </a>";
+                            })
+                            ->html()
+                            ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/')),
 
-                        return round($bytes, 2) . ' ' . $units[$pow];
-                    }),
-                TextEntry::make('mime_type')
-                    ->label('MIME Type')
-                    ->badge()
-                    ->color(fn (string $state): string => match (true) {
-                        str_starts_with($state, 'image/') => 'success',
-                        str_starts_with($state, 'video/') => 'warning',
-                        str_starts_with($state, 'application/pdf') => 'danger',
-                        default => 'gray',
-                    }),
-                TextEntry::make('seo_title')
-                    ->label('SEO Title')
-                    ->badge()
-                    ->color('primary')
-                    ->copyable(),
-                TextEntry::make('metadata')
-                    ->label('Additional Metadata')
-                    ->formatStateUsing(fn ($state) => $state ? json_encode($state, JSON_PRETTY_PRINT) : '-')
-                    ->columnSpanFull(),
-                TextEntry::make('created_at')
-                    ->dateTime(),
-                TextEntry::make('updated_at')
-                    ->dateTime(),
+                        Grid::make(1)
+                            ->schema([
+                                TextEntry::make('file_name')
+                                    ->label('Media Link')
+                                    ->formatStateUsing(function ($state, MediaMetadata $record) {
+                                        $fileName = basename($state);
+
+                                        if (str_starts_with($record->mime_type ?? '', 'image/')) {
+                                            return "🖼️ {$fileName}";
+                                        } elseif (str_starts_with($record->mime_type ?? '', 'video/')) {
+                                            return "🎥 {$fileName}";
+                                        } elseif (str_starts_with($record->mime_type ?? '', 'application/pdf')) {
+                                            return "📄 {$fileName}";
+                                        } else {
+                                            return "📁 {$fileName}";
+                                        }
+                                    })
+                                    ->url(fn ($state) => Storage::disk('s3')->url($state))
+                                    ->openUrlInNewTab()
+                                    ->copyable()
+                                    ->copyMessage('Media URL copied!')
+                                    ->copyMessageDuration(3000),
+
+                                TextEntry::make('file_size')
+                                    ->label('File Size')
+                                    ->formatStateUsing(function ($state) {
+                                        if (! $state) {
+                                            return '-';
+                                        }
+
+                                        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                                        $bytes = max($state, 0);
+                                        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+                                        $pow = min($pow, count($units) - 1);
+                                        $bytes /= pow(1024, $pow);
+
+                                        return round($bytes, 2) . ' ' . $units[$pow];
+                                    })
+                                    ->badge()
+                                    ->color('info'),
+
+                                TextEntry::make('mime_type')
+                                    ->label('Type')
+                                    ->badge()
+                                    ->color(fn (string $state): string => match (true) {
+                                        str_starts_with($state, 'image/') => 'success',
+                                        str_starts_with($state, 'video/') => 'warning',
+                                        str_starts_with($state, 'application/pdf') => 'danger',
+                                        default => 'gray',
+                                    }),
+                            ])
+                            ->extraAttributes(['style' => 'padding-left: 1rem;']),
+                    ])
+                    ->columns(2),
+
+                Section::make('Model Information')
+                    ->schema([
+                        TextEntry::make('mediable_type')
+                            ->label('Model Type')
+                            ->formatStateUsing(fn (string $state): string => class_basename($state)),
+                        TextEntry::make('mediable_id')
+                            ->label('Model ID')
+                            ->numeric(),
+                        TextEntry::make('mediable_field')
+                            ->label('Field'),
+                    ])
+                    ->columns(3),
+
+                Section::make('File Details')
+                    ->schema([
+                        TextEntry::make('file_name')
+                            ->label('File Path')
+                            ->copyable(),
+                        TextEntry::make('width')
+                            ->label('Width')
+                            ->formatStateUsing(fn ($state) => $state ? $state . 'px' : '-')
+                            ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/')),
+                        TextEntry::make('height')
+                            ->label('Height')
+                            ->formatStateUsing(fn ($state) => $state ? $state . 'px' : '-')
+                            ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/')),
+                        TextEntry::make('seo_title')
+                            ->label('SEO Title')
+                            ->badge()
+                            ->color('primary')
+                            ->copyable()
+                            ->placeholder('No SEO title set'),
+                    ])
+                    ->columns(2),
+
+                Section::make('Additional Information')
+                    ->schema([
+                        TextEntry::make('metadata')
+                            ->label('Additional Metadata')
+                            ->formatStateUsing(fn ($state) => $state ? json_encode($state, JSON_PRETTY_PRINT) : 'No additional metadata')
+                            ->columnSpanFull(),
+                        TextEntry::make('created_at')
+                            ->label('Created')
+                            ->dateTime(),
+                        TextEntry::make('updated_at')
+                            ->label('Last Updated')
+                            ->dateTime(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
             ]);
     }
 
