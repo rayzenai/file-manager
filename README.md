@@ -99,7 +99,7 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     FILE_MANAGER_COMPRESSION_ENABLED=true
     FILE_MANAGER_COMPRESSION_QUALITY=85 # 1-100, quality level
     FILE_MANAGER_COMPRESSION_FORMAT=webp # webp, jpg, png, avif
-    
+
     # Maximum image dimensions (images larger than this will be scaled down)
     FILE_MANAGER_MAX_HEIGHT=2160  # Maximum height in pixels
     FILE_MANAGER_MAX_WIDTH=3840   # Maximum width in pixels
@@ -169,6 +169,7 @@ return [
 
     // Default thumbnail size for MediaColumn components
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
+    'default_card_size' => env('FILE_MANAGER_DEFAULT_CARD_SIZE', 'card'),
 
     // Cache Control Headers for Images
     'cache' => [
@@ -202,7 +203,7 @@ return [
         'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'), // webp, jpeg, jpg, png, avif
         'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'), // contain, crop, cover
         'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB
-        
+
         // Maximum allowed dimensions (hard limits - images will never exceed these)
         'max_height' => env('FILE_MANAGER_MAX_HEIGHT', 2160),
         'max_width' => env('FILE_MANAGER_MAX_WIDTH', 3840),
@@ -549,28 +550,34 @@ This will:
 -   Enable uploading new images that will replace existing attachments
 -   Handle HasMany, HasOne, and BelongsTo relationships automatically
 
-#### Default Thumbnail Size
+#### Default Sizes
 
-You can configure the default thumbnail size for all `MediaColumn` components by setting the `default_thumbnail_size` in your configuration:
+You can configure default sizes for MediaColumn components in your configuration:
 
 ```php
 // config/file-manager.php
-'default_thumbnail_size' => 'thumb', // Use 'thumb' instead of 'icon' as default
+'default_thumbnail_size' => 'thumb', // Default for thumbnail displays
+'default_card_size' => 'large',     // Default for card displays
 ```
 
-Or via environment variable:
+Or via environment variables:
 
 ```env
 FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE=thumb
+FILE_MANAGER_DEFAULT_CARD_SIZE=large
 ```
 
-Individual columns can still override this default by calling the `thumbnailSize()` method:
+**Available size configurations:**
+
+-   **`default_thumbnail_size`**: Used for thumbnail displays in table columns (default: `'icon'`)
+-   **`default_card_size`**: Used for larger preview displays like modals (default: `'card'`)
+
+Individual columns can still override these defaults (limited to thumbnail size only):
 
 ```php
 MediaModalColumn::make('image')
     ->thumbnailSize('large') // This overrides the default
 
-// Or for URL column
 MediaUrlColumn::make('image')
     ->thumbnailSize('large') // This overrides the default
 ```
@@ -854,6 +861,18 @@ php artisan queue:monitor
 
 ## Artisan Commands
 
+The package provides several powerful Artisan commands for managing your media files and metadata:
+
+| Command                             | Purpose                                 | Key Features                                 |
+| ----------------------------------- | --------------------------------------- | -------------------------------------------- |
+| `file-manager:populate-seo-titles`  | Generate SEO titles for media files     | Dry run, model filtering, chunked processing |
+| `file-manager:update-seo-titles`    | Update SEO titles when models change    | Model-specific updates, automatic tracking   |
+| `file-manager:populate-metadata`    | Create metadata for existing images     | Supports all models, progress tracking       |
+| `file-manager:remove-duplicates`    | Remove duplicate metadata records       | Safe cleanup, dry run preview                |
+| `file-manager:update-cache-headers` | Add cache headers to existing S3 images | Directory-specific, progress tracking        |
+
+---
+
 ### Populate SEO Titles
 
 Generate SEO-optimized titles for existing media files based on their parent model data:
@@ -1044,22 +1063,23 @@ php artisan file-manager:remove-duplicates --chunk=500
 
 **What it does:**
 
-- Identifies duplicate records based on: `mediable_type` + `mediable_id` + `mediable_field` + `file_name`
-- Shows you a preview of duplicates with counts and details
-- Keeps the **oldest record** in each duplicate group (by `created_at` and `id`)
-- Removes all other duplicates in each group
-- Provides verification that cleanup was successful
+-   Identifies duplicate records based on: `mediable_type` + `mediable_id` + `mediable_field` + `file_name`
+-   Shows you a preview of duplicates with counts and details
+-   Keeps the **oldest record** in each duplicate group (by `created_at` and `id`)
+-   Removes all other duplicates in each group
+-   Provides verification that cleanup was successful
 
 **Features:**
 
-- 🔍 **Dry run mode** to preview what will be removed
-- 📊 **Detailed reporting** showing duplicate groups and counts  
-- 📋 **Sample preview** of duplicates before removal
-- ✅ **Verification** to confirm cleanup was successful
-- 🚀 **Progress bar** for large datasets
-- 💾 **Safe operation** - always keeps the oldest record
+-   🔍 **Dry run mode** to preview what will be removed
+-   📊 **Detailed reporting** showing duplicate groups and counts
+-   📋 **Sample preview** of duplicates before removal
+-   ✅ **Verification** to confirm cleanup was successful
+-   🚀 **Progress bar** for large datasets
+-   💾 **Safe operation** - always keeps the oldest record
 
 **Example output:**
+
 ```
 🔍 Analyzing media metadata for duplicates...
 Found 15 groups of duplicates containing 45 total records.
@@ -1075,10 +1095,11 @@ Will remove 30 duplicate records (keeping the oldest in each group).
 ```
 
 This command is useful when:
-- You've imported data that created duplicate metadata entries
-- Migration issues caused duplicate records
-- Multiple processes created metadata for the same files
-- You want to clean up your database before important operations
+
+-   You've imported data that created duplicate metadata entries
+-   Migration issues caused duplicate records
+-   Multiple processes created metadata for the same files
+-   You want to clean up your database before important operations
 
 ### Update Cache Headers for Existing Images
 
