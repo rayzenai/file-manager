@@ -1027,6 +1027,59 @@ This command will:
 4. Dispatch jobs to handle large datasets efficiently
 5. Extract file information including size, mime type, and dimensions
 
+### Remove Duplicate Media Metadata
+
+Clean up duplicate media metadata records from your database:
+
+```bash
+# Preview duplicates without removing them (dry run)
+php artisan file-manager:remove-duplicates --dry-run
+
+# Remove duplicate media metadata records
+php artisan file-manager:remove-duplicates
+
+# Process with custom chunk size
+php artisan file-manager:remove-duplicates --chunk=500
+```
+
+**What it does:**
+
+- Identifies duplicate records based on: `mediable_type` + `mediable_id` + `mediable_field` + `file_name`
+- Shows you a preview of duplicates with counts and details
+- Keeps the **oldest record** in each duplicate group (by `created_at` and `id`)
+- Removes all other duplicates in each group
+- Provides verification that cleanup was successful
+
+**Features:**
+
+- 🔍 **Dry run mode** to preview what will be removed
+- 📊 **Detailed reporting** showing duplicate groups and counts  
+- 📋 **Sample preview** of duplicates before removal
+- ✅ **Verification** to confirm cleanup was successful
+- 🚀 **Progress bar** for large datasets
+- 💾 **Safe operation** - always keeps the oldest record
+
+**Example output:**
+```
+🔍 Analyzing media metadata for duplicates...
+Found 15 groups of duplicates containing 45 total records.
+Will remove 30 duplicate records (keeping the oldest in each group).
+
+📋 Sample duplicates found:
++----------+----+-------+----------------------+-------+---------------------+
+| Model    | ID | Field | Filename            | Count | Oldest Record       |
++----------+----+-------+----------------------+-------+---------------------+
+| Product  | 123| image | product-image.webp  |   4   | 2024-01-15 10:30:00 |
+| User     | 456| avatar| user-avatar.jpg     |   3   | 2024-01-16 14:22:15 |
++----------+----+-------+----------------------+-------+---------------------+
+```
+
+This command is useful when:
+- You've imported data that created duplicate metadata entries
+- Migration issues caused duplicate records
+- Multiple processes created metadata for the same files
+- You want to clean up your database before important operations
+
 ### Update Cache Headers for Existing Images
 
 Retroactively add cache control headers to existing images in S3:

@@ -6,6 +6,7 @@ namespace Kirantimsina\FileManager;
 
 use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
 use Kirantimsina\FileManager\Commands\PopulateSeoTitlesCommand;
+use Kirantimsina\FileManager\Commands\RemoveDuplicateMediaMetadataCommand;
 use Kirantimsina\FileManager\Commands\TestCompressionApiCommand;
 use Kirantimsina\FileManager\Commands\UpdateImageCacheHeadersCommand;
 use Kirantimsina\FileManager\Commands\UpdateSeoTitlesCommand;
@@ -35,6 +36,7 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasCommands([
                 PopulateMediaMetadataCommand::class,
                 PopulateSeoTitlesCommand::class,
+                RemoveDuplicateMediaMetadataCommand::class,
                 TestCompressionApiCommand::class,
                 UpdateImageCacheHeadersCommand::class,
                 UpdateSeoTitlesCommand::class,
