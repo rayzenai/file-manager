@@ -271,11 +271,9 @@ class ImageCompressionService
                 'quality' => $quality,
             ];
 
-            // Add enforced dimensions if they differ from original (meaning constraints were applied or dimensions were explicitly requested)
-            if ($finalWidth !== $originalWidth || $finalHeight !== $originalHeight) {
-                $params['width'] = $finalWidth;
-                $params['height'] = $finalHeight;
-            }
+            // Always send dimensions to API (API requires these parameters)
+            $params['width'] = $finalWidth;
+            $params['height'] = $finalHeight;
 
             // Add background removal parameter if requested
             if ($removeBg) {
