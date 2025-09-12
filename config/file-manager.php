@@ -59,29 +59,6 @@ return [
             ],
         ],
     ],
-    
-    /**
-     * PDF Compression Settings
-     */
-    'pdf_compression' => [
-        'enabled' => env('FILE_MANAGER_PDF_COMPRESSION_ENABLED', true),
-        
-        // Automatically compress PDFs on upload
-        'auto_compress' => env('FILE_MANAGER_PDF_AUTO_COMPRESS', true),
-        
-        // Compression quality: 'screen', 'ebook', 'printer', 'prepress'
-        // screen = 72dpi (smallest file size, web viewing)
-        // ebook = 150dpi (good for reading on devices)
-        // printer = 300dpi (good quality for printing)
-        // prepress = 300dpi (high quality, minimal compression)
-        'quality' => env('FILE_MANAGER_PDF_QUALITY', 'ebook'),
-        
-        // Convert to grayscale (reduces file size further)
-        'grayscale' => env('FILE_MANAGER_PDF_GRAYSCALE', false),
-        
-        // Maximum file size before compression is applied (in bytes)
-        'threshold' => env('FILE_MANAGER_PDF_COMPRESSION_THRESHOLD', 500 * 1024), // 500KB
-    ],
 
     /**
      * Media Metadata Settings
