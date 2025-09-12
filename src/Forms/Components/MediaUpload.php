@@ -208,7 +208,7 @@ class MediaUpload extends FileUpload
         // Mark this as an image component
         $this->image();
 
-        // Allowed file types (images + videos).
+        // Allowed file types (images + videos + PDFs).
         $this->acceptedFileTypes([
             'image/webp',
             'image/avif',
@@ -222,6 +222,7 @@ class MediaUpload extends FileUpload
             'video/webm',
             'video/mpeg',
             'video/quicktime',
+            'application/pdf',
         ]);
 
         // Preview height
@@ -260,15 +261,27 @@ class MediaUpload extends FileUpload
             }
 
             $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
+            $isPdf = $file->getMimeType() === 'application/pdf' || $file->extension() === 'pdf';
 
-            // Videos are handled normally
-            if ($isVideo) {
+            // Videos and PDFs are handled normally (no compression)
+            if ($isVideo || $isPdf) {
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
                 $fullPath = "{$directory}/{$filename}";
-                $file->storeAs($directory, $filename, [
+                
+                // Build storage options
+                $storageOptions = [
                     'disk' => 's3',
                     'visibility' => 'public',
-                ]);
+                    'ContentType' => $file->getMimeType(),
+                ];
+                
+                // Add cache headers if enabled (for PDFs too)
+                $cacheControl = FileManagerService::buildCacheControlHeader();
+                if ($cacheControl) {
+                    $storageOptions['CacheControl'] = $cacheControl;
+                }
+                
+                $file->storeAs($directory, $filename, $storageOptions);
 
                 $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
@@ -354,6 +367,11 @@ class MediaUpload extends FileUpload
         // Skip compression for videos
         $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
         if ($isVideo) {
+            return false;
+        }
+
+        // Skip compression for PDFs
+        if ($file->getMimeType() === 'application/pdf' || $file->extension() === 'pdf') {
             return false;
         }
 
