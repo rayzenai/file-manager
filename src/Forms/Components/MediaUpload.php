@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
+use Kirantimsina\FileManager\Services\PdfCompressionService;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MediaUpload extends FileUpload
@@ -62,6 +63,16 @@ class MediaUpload extends FileUpload
      * Field name to use for SEO title from the model
      */
     protected ?string $seoTitleField = null;
+
+    /**
+     * PDF compression quality setting
+     */
+    protected ?string $pdfQuality = null;
+
+    /**
+     * Whether to convert PDF to grayscale
+     */
+    protected bool $pdfGrayscale = false;
 
     /**
      * Set whether to upload original or resize.
@@ -199,6 +210,87 @@ class MediaUpload extends FileUpload
     }
 
     /**
+     * Configure for PDF uploads with optional compression
+     * This sets up the component specifically for PDF files
+     */
+    public function pdf(): static
+    {
+        // Set accepted file types to only PDFs
+        $this->acceptedFileTypes(['application/pdf']);
+        
+        // PDFs should typically not be resized like images
+        $this->uploadOriginal(true);
+        
+        return $this;
+    }
+
+    /**
+     * Set PDF compression quality
+     * Options: 'screen', 'ebook', 'printer', 'prepress'
+     */
+    public function pdfQuality(string $quality): static
+    {
+        if (!in_array($quality, ['screen', 'ebook', 'printer', 'prepress'])) {
+            throw new \InvalidArgumentException("Invalid PDF quality: {$quality}. Must be screen, ebook, printer, or prepress.");
+        }
+        
+        $this->pdfQuality = $quality;
+        
+        return $this;
+    }
+
+    /**
+     * Convenience method for screen quality PDFs (smallest file size)
+     */
+    public function pdfScreen(): static
+    {
+        return $this->pdfQuality('screen');
+    }
+
+    /**
+     * Convenience method for ebook quality PDFs (balanced)
+     */
+    public function pdfEbook(): static
+    {
+        return $this->pdfQuality('ebook');
+    }
+
+    /**
+     * Convenience method for printer quality PDFs (high quality)
+     */
+    public function pdfPrinter(): static
+    {
+        return $this->pdfQuality('printer');
+    }
+
+    /**
+     * Convenience method for prepress quality PDFs (highest quality)
+     */
+    public function pdfPrepress(): static
+    {
+        return $this->pdfQuality('prepress');
+    }
+
+    /**
+     * Convert PDF to grayscale (reduces file size)
+     */
+    public function pdfGrayscale(bool $grayscale = true): static
+    {
+        $this->pdfGrayscale = $grayscale;
+        
+        return $this;
+    }
+
+    /**
+     * Convenience method to compress PDF with specific quality
+     * Alias for pdfQuality()
+     */
+    public function compressPdf(string $quality = 'ebook'): static
+    {
+        return $this->pdfQuality($quality);
+    }
+
+    /**
      * This is called automatically by Filament when the component is constructed.
      */
     protected function setUp(): void
@@ -263,8 +355,8 @@ class MediaUpload extends FileUpload
             $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
             $isPdf = $file->getMimeType() === 'application/pdf' || $file->extension() === 'pdf';
 
-            // Videos and PDFs are handled normally (no compression)
-            if ($isVideo || $isPdf) {
+            // Videos are handled normally (no compression)
+            if ($isVideo) {
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
                 $fullPath = "{$directory}/{$filename}";
                 
@@ -286,6 +378,36 @@ class MediaUpload extends FileUpload
                 $this->createMetadata($model, $this->getName(), $fullPath, $file);
 
                 return $fullPath;
+            }
+            
+            // Handle PDF compression if enabled
+            if ($isPdf) {
+                if (config('file-manager.pdf_compression.enabled') && 
+                    config('file-manager.pdf_compression.auto_compress') &&
+                    $file->getSize() > config('file-manager.pdf_compression.threshold', 500 * 1024)) {
+                    
+                    return $this->handlePdfCompression($file, $get, $model, $directory);
+                } else {
+                    // Upload PDF without compression
+                    $filename = (string) FileManagerService::filename($file, static::tag($get), 'pdf');
+                    $fullPath = "{$directory}/{$filename}";
+                    
+                    $storageOptions = [
+                        'disk' => 's3',
+                        'visibility' => 'public',
+                        'ContentType' => 'application/pdf',
+                    ];
+                    
+                    $cacheControl = FileManagerService::buildCacheControlHeader();
+                    if ($cacheControl) {
+                        $storageOptions['CacheControl'] = $cacheControl;
+                    }
+                    
+                    $file->storeAs($directory, $filename, $storageOptions);
+                    $this->createMetadata($model, $this->getName(), $fullPath, $file);
+                    
+                    return $fullPath;
+                }
             }
 
             // Check if we should use compression service
@@ -723,5 +845,130 @@ class MediaUpload extends FileUpload
         }
 
         return MediaMetadata::updateOrCreateFor($model, $field, $data);
+    }
+    
+    /**
+     * Handle PDF compression
+     */
+    protected function handlePdfCompression(
+        TemporaryUploadedFile $file,
+        $get,
+        $model,
+        string $directory
+    ): string {
+        try {
+            $pdfService = new PdfCompressionService();
+            
+            // Use component settings if set, otherwise fall back to config
+            $quality = $this->pdfQuality ?? config('file-manager.pdf_compression.quality', 'ebook');
+            $grayScale = $this->pdfGrayscale || config('file-manager.pdf_compression.grayscale', false);
+            
+            $filename = (string) FileManagerService::filename($file, static::tag($get), 'pdf');
+            $fullPath = "{$directory}/{$filename}";
+            
+            // Compress and save the PDF
+            $result = $pdfService->compressAndSave(
+                $file,
+                $fullPath,
+                $quality,
+                $grayScale,
+                's3'
+            );
+            
+            if ($result['success']) {
+                // Format file sizes for display
+                $originalSizeFormatted = $this->formatBytes($result['data']['original_size'] ?? 0);
+                $compressedSizeFormatted = $this->formatBytes($result['data']['compressed_size'] ?? 0);
+                $compressionRatio = $result['data']['compression_ratio'] ?? '0%';
+                
+                Notification::make()
+                    ->success()
+                    ->title('PDF Compressed Successfully')
+                    ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                           Saved: {$compressionRatio}<br>
+                           Quality: {$quality}")
+                    ->duration(5000)
+                    ->send();
+                
+                // Create metadata with PDF compression info
+                if ($this->trackMetadata && config('file-manager.media_metadata.enabled') && $model) {
+                    $metadata = $this->createMetadata($model, $this->getName(), $fullPath, $file);
+                    
+                    if ($metadata) {
+                        $metadata->update([
+                            'file_size' => $result['data']['compressed_size'] ?? $file->getSize(),
+                            'metadata' => array_merge($metadata->metadata ?? [], [
+                                'pdf_compression' => [
+                                    'original_size' => $result['data']['original_size'] ?? null,
+                                    'compressed_size' => $result['data']['compressed_size'] ?? null,
+                                    'compression_ratio' => $result['data']['compression_ratio'] ?? null,
+                                    'quality' => $quality,
+                                    'grayscale' => $grayScale,
+                                    'method' => $result['data']['method'] ?? 'unknown',
+                                    'compressed_at' => now()->toIso8601String(),
+                                ],
+                            ]),
+                        ]);
+                    }
+                }
+                
+                return $fullPath;
+            } else {
+                // Compression failed, show error and upload original
+                Notification::make()
+                    ->warning()
+                    ->title('PDF Compression Failed')
+                    ->body('Error: ' . ($result['message'] ?? 'Unknown error') . '<br>
+                           Uploading original PDF without compression.')
+                    ->duration(8000)
+                    ->send();
+                
+                // Upload original PDF
+                $storageOptions = [
+                    'disk' => 's3',
+                    'visibility' => 'public',
+                    'ContentType' => 'application/pdf',
+                ];
+                
+                $cacheControl = FileManagerService::buildCacheControlHeader();
+                if ($cacheControl) {
+                    $storageOptions['CacheControl'] = $cacheControl;
+                }
+                
+                $file->storeAs($directory, $filename, $storageOptions);
+                $this->createMetadata($model, $this->getName(), $fullPath, $file);
+                
+                return $fullPath;
+            }
+            
+        } catch (Exception $e) {
+            // Handle any exceptions
+            Notification::make()
+                ->danger()
+                ->title('PDF Processing Error')
+                ->body('Exception: ' . $e->getMessage())
+                ->duration(8000)
+                ->send();
+            
+            // Fallback to regular upload
+            $filename = (string) FileManagerService::filename($file, static::tag($get), 'pdf');
+            $fullPath = "{$directory}/{$filename}";
+            
+            $storageOptions = [
+                'disk' => 's3',
+                'visibility' => 'public',
+                'ContentType' => 'application/pdf',
+            ];
+            
+            $cacheControl = FileManagerService::buildCacheControlHeader();
+            if ($cacheControl) {
+                $storageOptions['CacheControl'] = $cacheControl;
+            }
+            
+            $file->storeAs($directory, $filename, $storageOptions);
+            $this->createMetadata($model, $this->getName(), $fullPath, $file);
+            
+            return $fullPath;
+        }
     }
 }
