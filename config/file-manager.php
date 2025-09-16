@@ -93,10 +93,11 @@ return [
         'small' => 120,     // 120px height for small thumbnails
         'thumb' => 240,     // 240px height for thumbnails
         'card' => 360,      // 360px height for card images
-        'medium' => 480,    // 480px height for medium images
-        'large' => 720,     // 720px height for large images
-        'full' => 1080,     // 1080px height for full size
-        'ultra' => 2160,    // 2160px height for ultra HD
+        'sd' => 480,    // 480px height for medium images
+        'hd' => 720,     // 720px height for large images
+        'fhd' => 1080,     // 1080px height for full size
+        'qhd' => 1440,    // 1440px height for 2.5K images
+        // 'uhd' => 2160,    // 2160px height for 4K images
     ],
 
     /**
