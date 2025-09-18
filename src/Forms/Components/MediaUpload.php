@@ -222,6 +222,9 @@ class MediaUpload extends FileUpload
             'video/webm',
             'video/mpeg',
             'video/quicktime',
+            'video/x-m4v',
+            'video/3gpp',
+            'video/3gpp2',
             'application/pdf',
         ]);
 
