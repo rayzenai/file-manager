@@ -147,9 +147,10 @@ return [
     // Maximum upload dimensions
     'max-upload-height' => '5120', // pixels
     'max-upload-width' => '5120',  // pixels
-    'max-upload-size' => '8192',   // KB - Default/fallback
-    'max-upload-size-image' => '8192',   // KB - Max size for image uploads (8 MB)
-    'max-upload-size-video' => '102400',  // KB - Max size for video uploads (100 MB)
+
+    // File upload size limits by type
+    'max-upload-size-image' => '8192',     // KB - Max size for image uploads (8 MB)
+    'max-upload-size-video' => '102400',   // KB - Max size for video uploads (100 MB)
     'max-upload-size-document' => '20480', // KB - Max size for document uploads (20 MB)
 
     // Model to directory mappings (supports full class names)

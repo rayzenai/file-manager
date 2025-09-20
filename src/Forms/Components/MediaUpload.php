@@ -532,7 +532,7 @@ class MediaUpload extends FileUpload
         }
 
         // Default to image size limit
-        return intval(config('file-manager.max-upload-size-image', config('file-manager.max-upload-size', 8192)));
+        return intval(config('file-manager.max-upload-size-image', 8192));
     }
 
     /**
