@@ -631,7 +631,7 @@ class MediaUpload extends FileUpload
                 if (! $modelId) {
                     // For new models, add a delay to ensure the model is saved first
                     // and store the field name for later retrieval
-                    $job->delay(now()->addSeconds(15)); // Increased delay to 15 seconds
+                    $job->delay(now()->addSeconds(5)); // Set delay to 5 seconds
 
                     // Store a reference to the video field and path for post-save processing
                     if ($model && is_object($model)) {
