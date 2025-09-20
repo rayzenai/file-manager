@@ -78,7 +78,17 @@ class MediaPage extends Component
         if (request('field')) {
             $this->field = [request('field')];
         } else {
-            $this->field = $record->hasImagesTraitFields();
+            // Get all media fields from the model
+            if (method_exists($record, 'mediaFieldsToWatch')) {
+                $fields = $record->mediaFieldsToWatch();
+                $this->field = array_merge(
+                    $fields['images'] ?? [],
+                    $fields['videos'] ?? [],
+                    $fields['documents'] ?? []
+                );
+            } else {
+                $this->field = [];
+            }
             // TODO: Right now, we are showing only one image. Instead, we need to show all by fetching all the fields.
         }
 

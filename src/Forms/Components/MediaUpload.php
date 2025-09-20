@@ -357,9 +357,11 @@ class MediaUpload extends FileUpload
                 ->imageResizeUpscale(false);
         }
 
-        // Make the file openable and set max size
+        // Make the file openable and set max size based on field type
         $this->openable()
-            ->maxSize(intval(config('file-manager.max-upload-size')));
+            ->maxSize(function () {
+                return $this->getMaxSizeForFieldType();
+            });
 
         // Handle the saving logic
         $this->saveUploadedFileUsing(function (TemporaryUploadedFile $file, $get, $model) {
@@ -505,6 +507,32 @@ class MediaUpload extends FileUpload
         }
 
         return false;
+    }
+
+    /**
+     * Get max file size based on field type
+     */
+    protected function getMaxSizeForFieldType(): int
+    {
+        // Check if the field is a video field
+        $model = $this->getRecord();
+        if ($model && is_object($model) && method_exists($model, 'isVideoField')) {
+            $fieldName = $this->getName();
+            if ($model->isVideoField($fieldName)) {
+                return intval(config('file-manager.max-upload-size-video', 102400));
+            }
+        }
+
+        // Check if the field is a document field
+        if ($model && is_object($model) && method_exists($model, 'isDocumentField')) {
+            $fieldName = $this->getName();
+            if ($model->isDocumentField($fieldName)) {
+                return intval(config('file-manager.max-upload-size-document', 20480));
+            }
+        }
+
+        // Default to image size limit
+        return intval(config('file-manager.max-upload-size-image', config('file-manager.max-upload-size', 8192)));
     }
 
     /**

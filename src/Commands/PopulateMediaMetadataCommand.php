@@ -41,9 +41,9 @@ class PopulateMediaMetadataCommand extends Command
 
             $model = new $modelClass;
 
-            // Check if model has HasImages trait
-            if (! method_exists($model, 'hasImagesTraitFields')) {
-                $this->warn("Model {$modelClass} does not use HasImages trait. Skipping...");
+            // Check if model has HasMultimedia trait
+            if (! method_exists($model, 'mediaFieldsToWatch')) {
+                $this->warn("Model {$modelClass} does not use HasMultimedia trait. Skipping...");
 
                 continue;
             }
@@ -191,9 +191,14 @@ class PopulateMediaMetadataCommand extends Command
             return [$specificField];
         }
 
-        // Get fields from HasImages trait
-        if (method_exists($model, 'hasImagesTraitFields')) {
-            return $model->hasImagesTraitFields();
+        // Get fields from HasMultimedia trait
+        if (method_exists($model, 'mediaFieldsToWatch')) {
+            $fields = $model->mediaFieldsToWatch();
+            return array_merge(
+                $fields['images'] ?? [],
+                $fields['videos'] ?? [],
+                $fields['documents'] ?? []
+            );
         }
 
         return [];

@@ -7,7 +7,13 @@ return [
 
     'max-upload-width' => '5120', // in pixels
 
-    'max-upload-size' => '8192', // in KB
+    'max-upload-size' => '8192', // in KB - Default for images
+
+    'max-upload-size-image' => '8192', // in KB - Max size for image uploads (8 MB)
+
+    'max-upload-size-video' => '102400', // in KB - Max size for video uploads (100 MB)
+
+    'max-upload-size-document' => '20480', // in KB - Max size for document uploads (20 MB)
 
     // The ModelName => path syntax is used to store the uploaded files in the respective folder
     'model' => [
