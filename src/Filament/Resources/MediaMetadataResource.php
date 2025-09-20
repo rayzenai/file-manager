@@ -38,6 +38,7 @@ use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\CompressImageJob;
 use Kirantimsina\FileManager\Jobs\RefreshAllMediaJob;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
+use Kirantimsina\FileManager\Jobs\CompressVideoJob;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
 use Kirantimsina\FileManager\Services\MetadataRefreshService;
@@ -487,10 +488,6 @@ class MediaMetadataResource extends Resource
                             })
                             ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
                             ->helperText('Choose which compression method to use'),
-                        FormToggle::make('replace_original')
-                            ->label('Replace original files')
-                            ->helperText('This will permanently replace the original files with compressed versions')
-                            ->default(true),
                         FormToggle::make('resize_after')
                             ->label('Resize all versions after compression')
                             ->default(true),
@@ -993,10 +990,6 @@ class MediaMetadataResource extends Resource
                                 })
                                 ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
                                 ->helperText('Choose which compression method to use'),
-                            FormToggle::make('replace_original')
-                                ->label('Replace original file')
-                                ->helperText('This will permanently replace the original file with the compressed version')
-                                ->default(true),
                             FormToggle::make('resize_after')
                                 ->label('Resize all versions after compression')
                                 ->default(true),
@@ -1109,11 +1102,167 @@ class MediaMetadataResource extends Resource
                             }
                         })
                         ->requiresConfirmation(),
+
+                    // Compress Video Action
+                    Action::make('compress_video')
+                        ->label('Compress Video')
+                        ->icon('heroicon-o-film')
+                        ->color('warning')
+                        ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'video/'))
+                        ->modalHeading('Compress Video')
+                        ->modalDescription(fn (MediaMetadata $record): string => "Compress and optimize: {$record->file_name}")
+                        ->schema([
+                            FormSelect::make('format')
+                                ->label('Output Format')
+                                ->options([
+                                    'webm' => 'WebM (VP9) - Best for web, smaller files',
+                                    'mp4' => 'MP4 (H.264) - Universal compatibility',
+                                ])
+                                ->default('webm')
+                                ->helperText('WebM provides better compression but limited browser support. MP4 works everywhere.')
+                                ->required(),
+                            FormSelect::make('quality_preset')
+                                ->label('Quality Preset')
+                                ->options([
+                                    'high' => 'High Quality (1500 kbps, CRF 20)',
+                                    'medium' => 'Medium Quality (1000 kbps, CRF 30) - Recommended',
+                                    'low' => 'Low Quality (600 kbps, CRF 40)',
+                                    'custom' => 'Custom Settings',
+                                ])
+                                ->default('medium')
+                                ->reactive()
+                                ->required(),
+                            TextInput::make('bitrate')
+                                ->label('Video Bitrate (kbps)')
+                                ->numeric()
+                                ->default(1000)
+                                ->visible(fn ($get) => $get('quality_preset') === 'custom')
+                                ->helperText('Higher bitrate = better quality but larger file'),
+                            TextInput::make('crf')
+                                ->label('CRF (Constant Rate Factor)')
+                                ->numeric()
+                                ->default(30)
+                                ->visible(fn ($get) => $get('quality_preset') === 'custom')
+                                ->helperText('0-63: Lower = better quality. 23 = high, 30 = medium, 40 = low'),
+                            FormSelect::make('resolution')
+                                ->label('Maximum Resolution')
+                                ->options([
+                                    '1080' => '1080p (Full HD)',
+                                    '720' => '720p (HD)',
+                                    '480' => '480p (SD)',
+                                    'original' => 'Keep Original',
+                                ])
+                                ->default('1080')
+                                ->required(),
+                            FormSelect::make('preset')
+                                ->label('Encoding Speed')
+                                ->options([
+                                    'ultrafast' => 'Ultra Fast (lower quality)',
+                                    'fast' => 'Fast',
+                                    'medium' => 'Medium (balanced)',
+                                    'slow' => 'Slow (better quality)',
+                                ])
+                                ->default('medium')
+                                ->helperText('Slower encoding = better compression')
+                                ->required(),
+                        ])
+                        ->action(function (MediaMetadata $record, array $data): void {
+                            try {
+                                // Determine quality settings based on preset
+                                $bitrate = $data['bitrate'] ?? 1000;
+                                $crf = $data['crf'] ?? 30;
+
+                                if ($data['quality_preset'] !== 'custom') {
+                                    switch ($data['quality_preset']) {
+                                        case 'high':
+                                            $bitrate = 1500;
+                                            $crf = 20;
+                                            break;
+                                        case 'low':
+                                            $bitrate = 600;
+                                            $crf = 40;
+                                            break;
+                                        default: // medium
+                                            $bitrate = 1000;
+                                            $crf = 30;
+                                    }
+                                }
+
+                                // Determine max dimensions based on resolution
+                                $maxWidth = null;
+                                $maxHeight = null;
+                                if ($data['resolution'] !== 'original') {
+                                    switch ($data['resolution']) {
+                                        case '1080':
+                                            $maxWidth = 1920;
+                                            $maxHeight = 1080;
+                                            break;
+                                        case '720':
+                                            $maxWidth = 1280;
+                                            $maxHeight = 720;
+                                            break;
+                                        case '480':
+                                            $maxWidth = 854;
+                                            $maxHeight = 480;
+                                            break;
+                                    }
+                                }
+
+                                // Get the video path (ensure no leading slash for S3)
+                                $videoPath = ltrim($record->file_name, '/');
+
+                                // Generate output path with new extension based on format
+                                $pathInfo = pathinfo($videoPath);
+
+                                // Extract base filename and generate new unique name
+                                $filename = $pathInfo['filename'];
+                                // Remove existing timestamp pattern if present
+                                $filename = preg_replace('/-\d{10}-[a-zA-Z0-9]{6}$/', '', $filename);
+
+                                // Generate a new unique suffix
+                                $timestamp = time();
+                                $randomString = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6);
+                                $outputPath = $pathInfo['dirname'] . '/' . $filename . '-' . $timestamp . '-' . $randomString . '.' . $data['format'];
+                                $outputPath = ltrim($outputPath, '/');
+
+                                // Dispatch compression job
+                                CompressVideoJob::dispatch(
+                                    $videoPath,
+                                    $outputPath,
+                                    $data['format'],
+                                    $bitrate,
+                                    $maxWidth,
+                                    $maxHeight,
+                                    $data['preset'],
+                                    $crf,
+                                    's3', // disk
+                                    $record->mediable_type,
+                                    $record->mediable_id,
+                                    $record->mediable_field,
+                                    true, // always replace original
+                                    true // always delete original after compression
+                                );
+
+                                Notification::make()
+                                    ->success()
+                                    ->title('Video compression queued')
+                                    ->body("The video will be compressed in the background. This may take a few minutes.")
+                                    ->send();
+
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Compression failed')
+                                    ->body($e->getMessage())
+                                    ->send();
+                            }
+                        })
+                        ->requiresConfirmation(),
                 ])
                     ->label('Processing')
                     ->icon('heroicon-o-photo')
                     ->color('info')
-                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/'))
+                    ->visible(fn (MediaMetadata $record): bool => str_starts_with($record->mime_type ?? '', 'image/') || str_starts_with($record->mime_type ?? '', 'video/'))
                     ->button(),
 
                 // Data Management Group

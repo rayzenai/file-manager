@@ -108,8 +108,16 @@ class CompressVideoJob implements ShouldQueue
             // Determine output path if not provided
             if (! $this->outputPath) {
                 $outputFormat = $this->outputFormat ?? config('file-manager.video_compression.format', 'webm');
-                // Use same filename with new extension (no _compressed suffix)
-                $this->outputPath = $pathInfo['dirname'] . '/' . $pathInfo['filename'] . '.' . $outputFormat;
+
+                // Extract the base filename (remove any existing timestamp/random suffixes)
+                $filename = $pathInfo['filename'];
+                // Remove existing timestamp pattern (e.g., -1734567890-AbC123)
+                $filename = preg_replace('/-\d{10}-[a-zA-Z0-9]{6}$/', '', $filename);
+
+                // Generate a new unique suffix
+                $timestamp = time();
+                $randomString = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6);
+                $this->outputPath = $pathInfo['dirname'] . '/' . $filename . '-' . $timestamp . '-' . $randomString . '.' . $outputFormat;
             }
 
             // Use a temp path for compression to avoid conflicts
@@ -143,10 +151,19 @@ class CompressVideoJob implements ShouldQueue
 
             // Handle replace original logic
             if ($this->replaceOriginal) {
-                // Move the compressed file to final location
+                // Move the compressed file to final location (always different name now)
                 Storage::disk($this->disk)->move($actualOutputPath, $this->outputPath);
 
-                // Delete original file
+                // Verify the file was saved successfully
+                if (!Storage::disk($this->disk)->exists($this->outputPath)) {
+                    Log::error('Failed to save compressed video', [
+                        'temp_path' => $actualOutputPath,
+                        'final_path' => $this->outputPath,
+                    ]);
+                    throw new \Exception("Failed to save compressed video");
+                }
+
+                // Delete the original video since we have a new compressed one
                 Storage::disk($this->disk)->delete($this->videoPath);
 
                 // Update model if provided
@@ -217,8 +234,14 @@ class CompressVideoJob implements ShouldQueue
 
             // If no model found yet and we have the class and field, try to find by video path
             if (! $model && $this->modelClass && $this->modelField) {
-                // Try to find the model that has this video path
-                $model = $this->modelClass::where($this->modelField, $this->videoPath)->first();
+                // Normalize paths for comparison (remove leading slashes)
+                $normalizedVideoPath = ltrim($this->videoPath, '/');
+
+                // Try to find the model that has this video path (check both with and without leading slash)
+                $model = $this->modelClass::where($this->modelField, $normalizedVideoPath)
+                    ->orWhere($this->modelField, '/' . $normalizedVideoPath)
+                    ->first();
+
                 if ($model) {
                     $this->modelId = $model->id;
                     Log::info('Found model by video path', [
@@ -226,11 +249,13 @@ class CompressVideoJob implements ShouldQueue
                         'model_id' => $model->id,
                         'field' => $this->modelField,
                         'path' => $this->videoPath,
+                        'normalized_path' => $normalizedVideoPath,
                     ]);
                 } else {
                     // As a last resort, try to find the most recent model with this field value
                     // This helps when multiple entities might have the same video temporarily
-                    $model = $this->modelClass::where($this->modelField, $this->videoPath)
+                    $model = $this->modelClass::where($this->modelField, $normalizedVideoPath)
+                        ->orWhere($this->modelField, '/' . $normalizedVideoPath)
                         ->orderBy('created_at', 'desc')
                         ->first();
                     if ($model) {
@@ -240,6 +265,7 @@ class CompressVideoJob implements ShouldQueue
                             'model_id' => $model->id,
                             'field' => $this->modelField,
                             'path' => $this->videoPath,
+                            'normalized_path' => $normalizedVideoPath,
                         ]);
                     }
                 }
@@ -256,19 +282,25 @@ class CompressVideoJob implements ShouldQueue
                 return false;
             }
 
-            // Update the field with new path
+            // Update the field with new path (ensure no leading slash for S3)
+            $normalizedNewPath = ltrim($newPath, '/');
             $fieldValue = $model->{$this->modelField};
 
             if (is_array($fieldValue)) {
-                // Handle array of videos
-                $index = array_search($this->videoPath, $fieldValue);
+                // Handle array of videos - need to find the old path (with or without leading slash)
+                $normalizedVideoPath = ltrim($this->videoPath, '/');
+                $index = array_search($normalizedVideoPath, $fieldValue);
+                if ($index === false) {
+                    // Try with leading slash
+                    $index = array_search('/' . $normalizedVideoPath, $fieldValue);
+                }
                 if ($index !== false) {
-                    $fieldValue[$index] = $newPath;
+                    $fieldValue[$index] = $normalizedNewPath;
                     $model->{$this->modelField} = $fieldValue;
                 }
             } else {
                 // Single video field
-                $model->{$this->modelField} = $newPath;
+                $model->{$this->modelField} = $normalizedNewPath;
             }
 
             $model->save();
