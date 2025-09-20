@@ -13,11 +13,12 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 -   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
 -   🗜️ **Smart Compression** - WebP/AVIF conversion with configurable quality settings
--   🎬 **Video Compression** - FFmpeg-based video optimization with WebM/MP4 output
+-   🎬 **Video Compression** - FFmpeg-based video optimization with WebM/MP4 output, H.264/H.265/VP9 codecs
 -   🎭 **AI Background Removal** - Remove backgrounds from images using Cloud Run API
 -   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
 -   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
 -   ⚡ **Cache Control Headers** - Configurable browser/CDN caching for optimal performance
+-   📏 **Smart File Size Limits** - Automatic detection and different limits for images (8MB), videos (100MB), and documents (20MB)
 -   🛠️ **Artisan Commands** - CLI tools for populating metadata with progress tracking
 -   📁 **Media Metadata Resource** - Dedicated admin page for managing media with bulk operations
 -   🖼️ **Image Processor Page** - Interactive tool for testing compression and processing settings
@@ -146,7 +147,10 @@ return [
     // Maximum upload dimensions
     'max-upload-height' => '5120', // pixels
     'max-upload-width' => '5120',  // pixels
-    'max-upload-size' => '8192',   // KB
+    'max-upload-size' => '8192',   // KB - Default/fallback
+    'max-upload-size-image' => '8192',   // KB - Max size for image uploads (8 MB)
+    'max-upload-size-video' => '102400',  // KB - Max size for video uploads (100 MB)
+    'max-upload-size-document' => '20480', // KB - Max size for document uploads (20 MB)
 
     // Model to directory mappings (supports full class names)
     'model' => [
@@ -239,32 +243,50 @@ return [
 
 ## Usage in Models
 
-### Using the HasImages Trait
+### Using the HasMultimedia Trait
 
-The `HasImages` trait automatically handles image resizing when images are uploaded or updated:
+The `HasMultimedia` trait automatically handles media file processing including image resizing, video compression, and document management:
 
 ```php
-use Kirantimsina\FileManager\Traits\HasImages;
+use Kirantimsina\FileManager\Traits\HasMultimedia;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    use HasImages;
+    use HasMultimedia;
 
     protected $fillable = [
         'name',
         'image',        // Single image field
         'gallery',      // Multiple images field
+        'demo_video',   // Video field
+        'manual_pdf',   // Document field
     ];
 
     protected $casts = [
         'gallery' => 'array', // Cast array fields
     ];
 
-    // Define which fields contain images for automatic resizing. Use `public` so that this is accessible by view helpers
-    public function hasImagesTraitFields(): array
+    /**
+     * Define which fields contain media files and their types
+     * Required by HasMultimedia trait for automatic processing
+     */
+    public function mediaFieldsToWatch(): array
     {
-        return ['image', 'gallery'];
+        return [
+            'images' => ['image', 'gallery'],
+            'videos' => ['demo_video', 'promo_video'],
+            'documents' => ['manual_pdf', 'specifications'],
+        ];
+    }
+
+    /**
+     * Optional: Define which field should be used for SEO title generation
+     * Remove this method if SEO titles are not needed for this model
+     */
+    public function seoTitleField(): string
+    {
+        return 'name'; // or 'meta_title', 'seo_title', etc.
     }
 }
 ```
@@ -274,8 +296,11 @@ class Product extends Model
 -   Automatically generates multiple sizes when images are saved
 -   Handles both single images and arrays of images
 -   Smart diffing - only resizes truly new images
--   Automatic cleanup of old images when replaced
+-   Automatic cleanup of old media files when replaced
 -   Queue-based processing for better performance
+-   Video compression with configurable codecs and quality
+-   Document file support without unwanted processing
+-   Automatic file type detection based on field configuration
 
 ## Usage in Filament Resources
 
@@ -1039,8 +1064,9 @@ php artisan queue:monitor
 **Available Jobs:**
 
 -   `ResizeImages` - Generate multiple sizes for uploaded images
--   `DeleteImages` - Clean up images and all their sizes
--   `PopulateMediaMetadataJob` - Populate media metadata for existing images
+-   `DeleteMedia` - Clean up all media files (images, videos, documents) and their sizes
+-   `PopulateMediaMetadataJob` - Populate media metadata for existing media files
+-   `CompressVideoJob` - Asynchronously compress and optimize video files
 
 ## Artisan Commands
 
@@ -1270,16 +1296,16 @@ php artisan file-manager:update-seo-titles --model=Product --id=123
 php artisan file-manager:update-seo-titles --chunk=200
 ```
 
-#### Automatic Updates with HasImages Trait
+#### Automatic Updates with HasMultimedia Trait
 
-The `HasImages` trait now includes automatic SEO title updates. Simply define which field to use for SEO titles in your model:
+The `HasMultimedia` trait now includes automatic SEO title updates. Simply define which field to use for SEO titles in your model:
 
 ```php
-use Kirantimsina\FileManager\Traits\HasImages;
+use Kirantimsina\FileManager\Traits\HasMultimedia;
 
 class Product extends Model
 {
-    use HasImages;
+    use HasMultimedia;
 
     /**
      * Define which field should be used for SEO title generation
@@ -1293,11 +1319,13 @@ class Product extends Model
 }
 ```
 
-The HasImages trait now provides:
+The HasMultimedia trait now provides:
 
 -   Automatic image resizing for configured sizes
--   Media metadata tracking
+-   Video compression with queue processing
+-   Media metadata tracking for all file types
 -   **Automatic SEO title updates** when the field returned by `seoTitleField()` changes
+-   Smart file type detection and processing based on field configuration
 
 **How SEO Titles Work:**
 
@@ -1318,7 +1346,16 @@ The HasImages trait now provides:
 // Product model - wants SEO titles from meta_title
 class Product extends Model
 {
-    use HasImages;
+    use HasMultimedia;
+
+    public function mediaFieldsToWatch(): array
+    {
+        return [
+            'images' => ['image', 'gallery'],
+            'videos' => ['demo_video'],
+            'documents' => ['manual_pdf'],
+        ];
+    }
 
     public function seoTitleField(): string
     {
@@ -1329,7 +1366,16 @@ class Product extends Model
 // Blog model - wants SEO titles from title field
 class Blog extends Model
 {
-    use HasImages;
+    use HasMultimedia;
+
+    public function mediaFieldsToWatch(): array
+    {
+        return [
+            'images' => ['featured_image', 'cover_image'],
+            'videos' => [],
+            'documents' => [],
+        ];
+    }
 
     public function seoTitleField(): string
     {
@@ -1340,17 +1386,18 @@ class Blog extends Model
 // Order model - no SEO titles needed (internal use)
 class Order extends Model
 {
-    use HasImages;
+    use HasMultimedia;
+
+    public function mediaFieldsToWatch(): array
+    {
+        return [
+            'images' => ['receipt'],
+            'videos' => [],
+            'documents' => ['invoice_pdf'],
+        ];
+    }
 
     // No seoTitleField() method = no SEO titles for media
-}
-
-// CartItem model - no SEO titles needed
-class CartItem extends Model
-{
-    use HasImages;
-
-    // No seoTitleField() method = media won't have SEO titles
 }
 ```
 
@@ -1392,7 +1439,7 @@ php artisan file-manager:populate-metadata --dry-run
 
 This command will:
 
-1. Scan configured models that use the HasImages trait
+1. Scan configured models that use the HasMultimedia trait
 2. Process records in batches to avoid memory issues
 3. Create MediaMetadata records for existing images
 4. **Automatically fix incorrect MIME types** for existing records
@@ -1576,9 +1623,12 @@ This is useful when:
 -   You want to optimize storage by keeping only original images
 -   You're using an external service for image processing
 
-### Exclude Certain Fields from Resizing
+### Exclude Certain Fields from Processing
 
-Videos and certain file types are automatically excluded from resizing.
+The HasMultimedia trait automatically determines the appropriate processing based on field type:
+- **Image fields**: Automatic resizing to configured sizes
+- **Video fields**: Optional compression with FFmpeg
+- **Document fields**: No processing, upload as-is
 
 ### Handling Nested Arrays
 
@@ -1602,7 +1652,7 @@ $checkout->items = [
 
 ### Duplicate resize jobs
 
--   Use `moveTempImageWithoutResize()` when the model has `HasImages` trait
+-   Use `moveTempImageWithoutResize()` when the model has `HasMultimedia` trait
 -   The trait automatically handles resizing on create/update
 
 ### WebP conversion failing
