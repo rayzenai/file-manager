@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager;
 
+use Kirantimsina\FileManager\Commands\CompressVideosCommand;
 use Kirantimsina\FileManager\Commands\ManageMediaSizesCommand;
 use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
 use Kirantimsina\FileManager\Commands\PopulateSeoTitlesCommand;
@@ -33,9 +34,10 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasViews()
             ->hasMigrations([
                 '2025_01_09_000001_create_media_metadata_table',
-                '2025_01_09_000002_add_seo_title_to_media_metadata'
+                '2025_01_09_000002_add_seo_title_to_media_metadata',
             ])
             ->hasCommands([
+                CompressVideosCommand::class,
                 ManageMediaSizesCommand::class,
                 PopulateMediaMetadataCommand::class,
                 PopulateSeoTitlesCommand::class,
@@ -46,7 +48,7 @@ class FileManagerServiceProvider extends PackageServiceProvider
                 UpdateSeoTitlesCommand::class,
             ]);
     }
-    
+
     public function packageBooted(): void
     {
         // Register Livewire components

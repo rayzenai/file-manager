@@ -23,7 +23,11 @@
         "illuminate/support": "^10.0||^11.0|^12.0",
         "intervention/image": "^3.9",
         "league/flysystem-aws-s3-v3": "^3.29",
+        "php-ffmpeg/php-ffmpeg": "^1.2",
         "spatie/laravel-package-tools": "^1.16"
+    },
+    "suggest": {
+        "ext-ffmpeg": "Required for video compression functionality"
     },
     "require-dev": {
         "laravel/pint": "^1.14",

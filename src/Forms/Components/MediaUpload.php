@@ -10,10 +10,13 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Kirantimsina\FileManager\FileManagerService;
+use Kirantimsina\FileManager\Jobs\CompressVideoJob;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
+use Kirantimsina\FileManager\Services\VideoCompressionService;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class MediaUpload extends FileUpload
@@ -62,6 +65,28 @@ class MediaUpload extends FileUpload
      * Field name to use for SEO title from the model
      */
     protected ?string $seoTitleField = null;
+
+    /**
+     * Whether to compress videos
+     */
+    protected bool $compressVideo = false;
+
+    /**
+     * Video compression settings
+     */
+    protected ?string $videoFormat = null;
+
+    protected ?int $videoBitrate = null;
+
+    protected ?int $videoMaxWidth = null;
+
+    protected ?int $videoMaxHeight = null;
+
+    protected ?string $videoPreset = null;
+
+    protected ?int $videoCrf = null;
+
+    protected bool $videoAsync = true;
 
     /**
      * Set whether to upload original or resize.
@@ -199,6 +224,99 @@ class MediaUpload extends FileUpload
     }
 
     /**
+     * Enable video compression
+     */
+    public function compressVideo(bool $compress = true): static
+    {
+        $this->compressVideo = $compress;
+
+        return $this;
+    }
+
+    /**
+     * Set video output format
+     */
+    public function videoFormat(string $format): static
+    {
+        if (! in_array($format, ['webm', 'mp4'])) {
+            throw new \InvalidArgumentException("Invalid video format: {$format}. Must be 'webm' or 'mp4'.");
+        }
+        $this->videoFormat = $format;
+
+        return $this;
+    }
+
+    /**
+     * Set video bitrate in kbps
+     */
+    public function videoBitrate(int $bitrate): static
+    {
+        $this->videoBitrate = $bitrate;
+
+        return $this;
+    }
+
+    /**
+     * Set video max dimensions
+     */
+    public function videoMaxDimensions(?int $width = null, ?int $height = null): static
+    {
+        $this->videoMaxWidth = $width;
+        $this->videoMaxHeight = $height;
+
+        return $this;
+    }
+
+    /**
+     * Set video encoding preset
+     */
+    public function videoPreset(string $preset): static
+    {
+        if (! in_array($preset, ['ultrafast', 'fast', 'medium', 'slow', 'veryslow'])) {
+            throw new \InvalidArgumentException("Invalid video preset: {$preset}.");
+        }
+        $this->videoPreset = $preset;
+
+        return $this;
+    }
+
+    /**
+     * Set video CRF (Constant Rate Factor)
+     */
+    public function videoCrf(int $crf): static
+    {
+        $this->videoCrf = $crf;
+
+        return $this;
+    }
+
+    /**
+     * Set whether to compress video asynchronously
+     */
+    public function videoAsync(bool $async = true): static
+    {
+        $this->videoAsync = $async;
+
+        return $this;
+    }
+
+    /**
+     * Convert videos to WebM format
+     */
+    public function toWebm(): static
+    {
+        return $this->compressVideo()->videoFormat('webm');
+    }
+
+    /**
+     * Convert videos to MP4 format
+     */
+    public function toMp4(): static
+    {
+        return $this->compressVideo()->videoFormat('mp4');
+    }
+
+    /**
      * This is called automatically by Filament when the component is constructed.
      */
     protected function setUp(): void
@@ -266,7 +384,12 @@ class MediaUpload extends FileUpload
             $isVideo = Str::lower(Arr::first(explode('/', $file->getMimeType()))) === 'video';
             $isPdf = $file->getMimeType() === 'application/pdf' || $file->extension() === 'pdf';
 
-            // Videos and PDFs are handled normally (no compression)
+            // Handle video compression if enabled
+            if ($isVideo && $this->shouldCompressVideo()) {
+                return $this->handleVideoCompression($file, $get, $model, $directory);
+            }
+
+            // Videos (without compression) and PDFs are handled normally
             if ($isVideo || $isPdf) {
                 $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
                 $fullPath = "{$directory}/{$filename}";
@@ -355,6 +478,254 @@ class MediaUpload extends FileUpload
         }
 
         return $get('name');
+    }
+
+    /**
+     * Check if we should compress video
+     */
+    protected function shouldCompressVideo(): bool
+    {
+        // If video compression is explicitly enabled on this component
+        if ($this->compressVideo) {
+            return true;
+        }
+
+        // If video compression is disabled globally
+        if (! config('file-manager.video_compression.enabled', true)) {
+            return false;
+        }
+
+        // Check if the current field is defined as a video field in the model
+        $model = $this->getRecord();
+        if ($model && is_object($model) && method_exists($model, 'isVideoField')) {
+            $fieldName = $this->getName();
+            if ($model->isVideoField($fieldName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Handle video compression
+     */
+    protected function handleVideoCompression(
+        TemporaryUploadedFile $file,
+        $get,
+        $model,
+        string $directory
+    ): string {
+        try {
+            // Determine output format
+            $outputFormat = $this->videoFormat ?? config('file-manager.video_compression.format', 'webm');
+            $extension = $outputFormat;
+
+            $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
+            $fullPath = "{$directory}/{$filename}";
+
+            // Check if we should compress asynchronously
+            if ($this->videoAsync) {
+                // For async compression, upload the original and dispatch a job
+                // We'll return the original path and let the job handle the compression
+
+                // Upload the original video
+                $originalFilename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
+                $originalPath = "{$directory}/{$originalFilename}";
+
+                // Build storage options
+                $storageOptions = [
+                    'disk' => 's3',
+                    'visibility' => 'public',
+                    'ContentType' => $file->getMimeType(),
+                ];
+
+                $file->storeAs($directory, $originalFilename, $storageOptions);
+
+                // Create metadata for the original file
+                $this->createMetadata($model, $this->getName(), $originalPath, $file);
+
+                // Prepare model information for the job
+                $modelClass = null;
+                $modelId = null;
+                $modelField = $this->getName();
+
+                if ($model) {
+                    if (is_object($model)) {
+                        $modelClass = get_class($model);
+                        $modelId = $model->id ?? null;
+                    } elseif (is_string($model)) {
+                        $modelClass = $model;
+                    }
+                }
+
+                // Determine if we should replace the original
+                // Only replace if we have a model ID (existing entity)
+                $shouldReplace = (bool) $modelId;
+
+                // Always dispatch the job, but with a delay for new models
+                // This gives time for the model to be saved
+                $job = new CompressVideoJob(
+                    $originalPath,
+                    null, // Let the job determine output path
+                    $outputFormat,
+                    $this->videoBitrate,
+                    $this->videoMaxWidth,
+                    $this->videoMaxHeight,
+                    $this->videoPreset,
+                    $this->videoCrf,
+                    's3',
+                    $modelClass,
+                    $modelId,
+                    $modelField,
+                    $shouldReplace, // Only replace for existing models
+                    true // Delete original after successful compression
+                );
+
+                if (! $modelId) {
+                    // For new models, add a delay to ensure the model is saved first
+                    // and store the field name for later retrieval
+                    $job->delay(now()->addSeconds(15)); // Increased delay to 15 seconds
+
+                    // Store a reference to the video field and path for post-save processing
+                    if ($model && is_object($model)) {
+                        // We'll store this in a static property that can be accessed after save
+                        if (! isset($model->pendingVideoFields)) {
+                            $model->pendingVideoFields = [];
+                        }
+                        $model->pendingVideoFields[$modelField] = $originalPath;
+                    }
+
+                    Log::info('Video compression job dispatched with delay for new model', [
+                        'model_class' => $modelClass,
+                        'field' => $modelField,
+                        'path' => $originalPath,
+                        'delay' => '10 seconds',
+                    ]);
+                } else {
+                    Log::info('Video compression job dispatched', [
+                        'model_class' => $modelClass,
+                        'model_id' => $modelId,
+                        'field' => $modelField,
+                        'path' => $originalPath,
+                    ]);
+                }
+
+                dispatch($job);
+
+                Notification::make()
+                    ->title('Video Upload Complete')
+                    ->body('Your video has been uploaded. Compression will begin shortly.')
+                    ->info()
+                    ->send();
+
+                // Return the original path (will be replaced after compression)
+                return $originalPath;
+            } else {
+                // Synchronous compression
+                $videoService = new VideoCompressionService;
+
+                // Check if FFmpeg is available first
+                if (! $videoService->isFFmpegAvailable()) {
+                    Notification::make()
+                        ->title('FFmpeg Not Installed')
+                        ->body('Video compression requires FFmpeg. Please install it using: brew install ffmpeg (macOS) or apt-get install ffmpeg (Linux)')
+                        ->warning()
+                        ->persistent()
+                        ->send();
+
+                    // Fall back to regular upload without compression
+                    $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
+                    $fullPath = "{$directory}/{$filename}";
+
+                    $storageOptions = [
+                        'disk' => 's3',
+                        'visibility' => 'public',
+                        'ContentType' => $file->getMimeType(),
+                    ];
+
+                    $file->storeAs($directory, $filename, $storageOptions);
+                    $this->createMetadata($model, $this->getName(), $fullPath, $file);
+
+                    return $fullPath;
+                }
+
+                // Get file content
+                $tempPath = $file->getRealPath();
+                if (! file_exists($tempPath)) {
+                    $tempPath = $file->path();
+                }
+
+                // Compress and save
+                $result = $videoService->compressAndSave(
+                    $tempPath,
+                    $fullPath,
+                    $outputFormat,
+                    $this->videoBitrate,
+                    $this->videoMaxWidth,
+                    $this->videoMaxHeight,
+                    $this->videoPreset,
+                    $this->videoCrf,
+                    's3'
+                );
+
+                if (! $result['success']) {
+                    throw new Exception('Video compression failed: ' . $result['message']);
+                }
+
+                // Create metadata with compression info
+                if ($this->trackMetadata && config('file-manager.media_metadata.enabled', true) && $model && is_object($model)) {
+                    MediaMetadata::create([
+                        'mediable_type' => get_class($model),
+                        'mediable_id' => $model->id,
+                        'mediable_field' => $this->getName(),
+                        'file_name' => $fullPath,
+                        'mime_type' => 'video/' . $outputFormat,
+                        'file_size' => $result['data']['compressed_size'],
+                        'width' => $result['data']['width'] ?? null,
+                        'height' => $result['data']['height'] ?? null,
+                        'metadata' => [
+                            'compression_ratio' => $result['data']['compression_ratio'],
+                            'video_bitrate' => $result['data']['video_bitrate'],
+                            'duration' => $result['data']['duration'] ?? null,
+                            'compression_method' => 'ffmpeg',
+                            'created_via' => 'MediaUpload',
+                            'created_at' => now()->toIso8601String(),
+                        ],
+                    ]);
+                }
+
+                Notification::make()
+                    ->title('Video Compressed Successfully')
+                    ->body('Compression ratio: ' . $result['data']['compression_ratio'])
+                    ->success()
+                    ->send();
+
+                return $fullPath;
+            }
+        } catch (Exception $e) {
+            // If compression fails, fall back to original upload
+            Notification::make()
+                ->title('Video Compression Failed')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            // Upload original file
+            $filename = (string) FileManagerService::filename($file, static::tag($get), $file->extension());
+            $fullPath = "{$directory}/{$filename}";
+
+            $storageOptions = [
+                'disk' => 's3',
+                'visibility' => 'public',
+                'ContentType' => $file->getMimeType(),
+            ];
+
+            $file->storeAs($directory, $filename, $storageOptions);
+            $this->createMetadata($model, $this->getName(), $fullPath, $file);
+
+            return $fullPath;
+        }
     }
 
     /**
@@ -665,7 +1036,7 @@ class MediaUpload extends FileUpload
 
         // Skip metadata creation if model is not a valid instance with an ID
         // This happens during creation of new records
-        if (! $model || is_string($model) || ! isset($model->id)) {
+        if (! $model || ! is_object($model) || ! isset($model->id)) {
             return null;
         }
 

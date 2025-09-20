@@ -13,6 +13,7 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 -   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
 -   🗜️ **Smart Compression** - WebP/AVIF conversion with configurable quality settings
+-   🎬 **Video Compression** - FFmpeg-based video optimization with WebM/MP4 output
 -   🎭 **AI Background Removal** - Remove backgrounds from images using Cloud Run API
 -   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
 -   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
@@ -51,6 +52,7 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 -   Laravel 10.0+
 -   Filament 4.0+
 -   AWS S3 configured (or S3-compatible storage)
+-   FFmpeg (optional, required for video compression)
 
 ## Installation
 
@@ -842,6 +844,186 @@ $result = $service->compressExisting(
     -   Background removal requests go to the specialized background removal API (slower but more features)
     -   Falls back to GD if API is unavailable
 
+### Video Compression Service
+
+The package now includes comprehensive video compression capabilities using FFmpeg to convert and optimize video files.
+
+**Prerequisites:**
+```bash
+# Install FFmpeg on your system
+# macOS:
+brew install ffmpeg
+
+# Ubuntu/Debian:
+sudo apt-get update
+sudo apt-get install ffmpeg
+
+# CentOS/RHEL:
+sudo yum install ffmpeg
+
+# Windows:
+# Download from https://ffmpeg.org/download.html
+```
+
+**Configuration:**
+```env
+# Video Compression Settings
+FILE_MANAGER_VIDEO_COMPRESSION_ENABLED=true
+FILE_MANAGER_VIDEO_COMPRESSION_METHOD=ffmpeg
+FILE_MANAGER_VIDEO_COMPRESSION_FORMAT=webm     # webm or mp4
+FILE_MANAGER_VIDEO_CODEC=libvpx-vp9            # libvpx-vp9, libvpx, libx264, libx265
+FILE_MANAGER_AUDIO_CODEC=libopus               # libopus, libvorbis, aac
+FILE_MANAGER_VIDEO_BITRATE=1000                # kbps
+FILE_MANAGER_AUDIO_BITRATE=128                 # kbps
+FILE_MANAGER_VIDEO_MAX_WIDTH=1920
+FILE_MANAGER_VIDEO_MAX_HEIGHT=1080
+FILE_MANAGER_VIDEO_FRAME_RATE=30
+FILE_MANAGER_VIDEO_PRESET=medium               # ultrafast, fast, medium, slow, veryslow
+FILE_MANAGER_VIDEO_CRF=30                      # 0-63, lower = better quality
+FILE_MANAGER_VIDEO_THREADS=4
+FILE_MANAGER_VIDEO_TIMEOUT=3600                # seconds
+FILE_MANAGER_VIDEO_THUMBNAIL=true
+FILE_MANAGER_VIDEO_THUMBNAIL_TIME=1.0          # seconds into video
+```
+
+**Using Video Compression in Forms:**
+```php
+use Kirantimsina\FileManager\Forms\Components\MediaUpload;
+
+MediaUpload::make('video')
+    ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime'])
+    ->compressVideo()                  // Enable video compression
+    ->videoFormat('webm')              // Output format: webm or mp4
+    ->videoBitrate(800)                // Video bitrate in kbps
+    ->videoMaxDimensions(1280, 720)   // Max width and height
+    ->videoPreset('fast')              // Encoding preset
+    ->videoCrf(28)                     // Quality (0-63, lower = better)
+    ->videoAsync(true)                 // Process asynchronously (recommended)
+
+// Convenience methods
+MediaUpload::make('product_video')
+    ->toWebm()                         // Convert to WebM format
+    ->videoMaxDimensions(1920, 1080)  // Full HD max
+
+MediaUpload::make('demo_video')
+    ->toMp4()                          // Convert to MP4 format
+    ->videoBitrate(1500)               // Higher quality
+```
+
+**Programmatic Video Compression:**
+```php
+use Kirantimsina\FileManager\Services\VideoCompressionService;
+
+$service = new VideoCompressionService();
+
+// Compress a video
+$result = $service->compress(
+    video: '/path/to/video.mp4',
+    outputFormat: 'webm',
+    videoBitrate: 1000,
+    maxWidth: 1280,
+    maxHeight: 720,
+    preset: 'medium',
+    crf: 30
+);
+
+// Compress and save to S3
+$result = $service->compressAndSave(
+    video: '/path/to/video.mp4',
+    outputPath: 'videos/compressed.webm',
+    outputFormat: 'webm',
+    videoBitrate: 800,
+    maxWidth: 1920,
+    maxHeight: 1080,
+    preset: 'fast',
+    crf: 28,
+    disk: 's3'
+);
+
+// Get video metadata without compression
+$metadata = $service->getVideoMetadata('/path/to/video.mp4');
+// Returns: width, height, duration, bitrate, size, format, codecs, frame_rate
+```
+
+**Async Video Processing with Queue:**
+```php
+use Kirantimsina\FileManager\Jobs\CompressVideoJob;
+
+// Dispatch video compression job
+CompressVideoJob::dispatch(
+    videoPath: 'uploads/large-video.mp4',
+    outputPath: 'videos/optimized.webm',
+    outputFormat: 'webm',
+    videoBitrate: 1000,
+    maxWidth: 1920,
+    maxHeight: 1080,
+    preset: 'medium',
+    crf: 30,
+    disk: 's3',
+    modelClass: Product::class,        // Optional: link to model
+    modelId: 123,                       // Optional: model ID
+    modelField: 'demo_video',          // Optional: field name
+    replaceOriginal: true,             // Replace original file
+    deleteOriginal: false              // Delete original after compression
+);
+```
+
+**Bulk Video Compression Command:**
+```bash
+# Compress all videos in media metadata
+php artisan file-manager:compress-videos
+
+# Compress videos with specific settings
+php artisan file-manager:compress-videos \
+    --format=webm \
+    --bitrate=800 \
+    --max-width=1280 \
+    --max-height=720 \
+    --preset=fast \
+    --crf=28
+
+# Compress videos from specific model/field
+php artisan file-manager:compress-videos \
+    --model="App\Models\Product" \
+    --field=demo_video
+
+# Compress videos in specific directory
+php artisan file-manager:compress-videos \
+    --path=uploads/videos
+
+# Options
+--replace              # Replace original files
+--delete-original      # Delete original after compression
+--async                # Use queue for processing
+--dry-run              # Preview without actual compression
+--limit=10             # Process only 10 videos
+```
+
+**Video Format Recommendations:**
+
+| Format | Video Codec | Audio Codec | Use Case | Pros | Cons |
+|--------|------------|-------------|----------|------|------|
+| **WebM** | VP9 | Opus | Modern web | Better compression, open source | Limited browser support (no Safari) |
+| **WebM** | VP8 | Vorbis | Legacy web | Wider browser support | Larger files than VP9 |
+| **MP4** | H.264 | AAC | Universal | Maximum compatibility | Larger files, licensing |
+| **MP4** | H.265/HEVC | AAC | High quality | 50% smaller than H.264 | Limited browser support |
+
+**Preset Performance Guide:**
+
+- **ultrafast**: Fastest encoding, largest files, lowest quality
+- **fast**: Good balance for real-time processing
+- **medium**: Default, balanced quality and speed
+- **slow**: Better quality, smaller files, longer processing
+- **veryslow**: Best compression, smallest files, very slow
+
+**CRF (Constant Rate Factor) Guidelines:**
+
+- **0-17**: Visually lossless (very large files)
+- **18-23**: High quality (recommended for high-quality content)
+- **24-30**: Good quality (recommended for web)
+- **31-40**: Acceptable quality (smaller files)
+- **41-63**: Low quality (very small files)
+
 ## Queue Jobs
 
 The package uses queued jobs for better performance:
@@ -870,7 +1052,7 @@ The package provides several powerful Artisan commands for managing your media f
 | `file-manager:refresh-all`          | Queue refresh jobs for all media       | Metadata sync, dimension updates, batch jobs |
 | `file-manager:populate-seo-titles`  | Generate SEO titles for media files     | Dry run, model filtering, chunked processing |
 | `file-manager:update-seo-titles`    | Update SEO titles when models change    | Model-specific updates, automatic tracking   |
-| `file-manager:populate-metadata`    | Create metadata for existing images     | Supports all models, progress tracking       |
+| `file-manager:populate-metadata`    | Create metadata for existing images     | Auto-fixes MIME types, progress tracking     |
 | `file-manager:remove-duplicates`    | Remove duplicate metadata records       | Safe cleanup, dry run preview                |
 | `file-manager:update-cache-headers` | Add cache headers to existing S3 images | Directory-specific, progress tracking        |
 

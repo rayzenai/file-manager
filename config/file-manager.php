@@ -107,13 +107,72 @@ return [
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
     'default_card_size' => env('FILE_MANAGER_DEFAULT_CARD_SIZE', 'card'),
     /**
+     * Video Compression Settings
+     */
+    'video_compression' => [
+        'enabled' => env('FILE_MANAGER_VIDEO_COMPRESSION_ENABLED', true),
+
+        // Compression method: 'ffmpeg' or 'api'
+        'method' => env('FILE_MANAGER_VIDEO_COMPRESSION_METHOD', 'ffmpeg'),
+
+        // Output format: 'webm' (recommended) or 'mp4'
+        'format' => env('FILE_MANAGER_VIDEO_COMPRESSION_FORMAT', 'webm'),
+
+        // Video codec: 'libvpx-vp9' (WebM/VP9), 'libvpx' (WebM/VP8), 'libx264' (H.264), 'libx265' (H.265/HEVC)
+        'video_codec' => env('FILE_MANAGER_VIDEO_CODEC', 'libvpx-vp9'),
+
+        // Audio codec: 'libopus' (WebM), 'libvorbis' (WebM), 'aac' (MP4)
+        'audio_codec' => env('FILE_MANAGER_AUDIO_CODEC', 'libopus'),
+
+        // Video bitrate in kbps (lower = smaller file, lower quality)
+        'video_bitrate' => env('FILE_MANAGER_VIDEO_BITRATE', 1000),
+
+        // Audio bitrate in kbps
+        'audio_bitrate' => env('FILE_MANAGER_AUDIO_BITRATE', 128),
+
+        // Maximum dimensions (videos will be scaled down if larger)
+        'max_width' => env('FILE_MANAGER_VIDEO_MAX_WIDTH', 1920),
+        'max_height' => env('FILE_MANAGER_VIDEO_MAX_HEIGHT', 1080),
+
+        // Frame rate limit (0 = no limit)
+        'frame_rate' => env('FILE_MANAGER_VIDEO_FRAME_RATE', 30),
+
+        // Encoding preset (ultrafast, fast, medium, slow, veryslow)
+        // Slower presets give better compression
+        'preset' => env('FILE_MANAGER_VIDEO_PRESET', 'medium'),
+
+        // Constant Rate Factor (0-51 for H.264, 0-63 for VP9, lower = better quality)
+        'crf' => env('FILE_MANAGER_VIDEO_CRF', 30),
+
+        // Enable two-pass encoding for better quality (slower)
+        'two_pass' => env('FILE_MANAGER_VIDEO_TWO_PASS', false),
+
+        // Number of threads to use for encoding
+        'threads' => env('FILE_MANAGER_VIDEO_THREADS', 4),
+
+        // FFmpeg binary paths (leave null to use system default)
+        'ffmpeg_path' => env('FILE_MANAGER_FFMPEG_PATH'),
+        'ffprobe_path' => env('FILE_MANAGER_FFPROBE_PATH'),
+
+        // Processing timeout in seconds (for large videos)
+        'timeout' => env('FILE_MANAGER_VIDEO_TIMEOUT', 3600),
+
+        // Generate thumbnail from video
+        'generate_thumbnail' => env('FILE_MANAGER_VIDEO_THUMBNAIL', true),
+        'thumbnail_time' => env('FILE_MANAGER_VIDEO_THUMBNAIL_TIME', 1.0), // seconds into video
+
+        // Files larger than this will be compressed (in bytes)
+        'threshold' => env('FILE_MANAGER_VIDEO_COMPRESSION_THRESHOLD', 5 * 1024 * 1024), // 5MB
+    ],
+
+    /**
      * Cache Control Settings for Images
      * Configure browser and CDN caching for uploaded images
      */
     'cache' => [
         // Enable cache headers for images
         'enabled' => env('FILE_MANAGER_CACHE_ENABLED', true),
-        
+
         // Cache duration in seconds (default: 31536000 = 1 year)
         // Common values:
         // 3600 = 1 hour
@@ -122,12 +181,12 @@ return [
         // 2592000 = 30 days
         // 31536000 = 1 year
         'max_age' => env('FILE_MANAGER_CACHE_MAX_AGE', 31536000),
-        
+
         // Cache control directive
         // Options: 'public' (can be cached by browsers and CDNs)
         //          'private' (only cached by browsers, not CDNs)
         'visibility' => env('FILE_MANAGER_CACHE_VISIBILITY', 'public'),
-        
+
         // Whether to use immutable directive (tells browsers the file will never change)
         // This is recommended for versioned/hashed filenames
         'immutable' => env('FILE_MANAGER_CACHE_IMMUTABLE', true),
