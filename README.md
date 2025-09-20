@@ -178,7 +178,7 @@ return [
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
     'default_card_size' => env('FILE_MANAGER_DEFAULT_CARD_SIZE', 'card'),
 
-    // Cache Control Headers for Images
+    // Cache Control Headers for Media Files
     'cache' => [
         'enabled' => env('FILE_MANAGER_CACHE_ENABLED', true),
 
@@ -379,16 +379,28 @@ MediaUpload::make('product_image')
 
 **Available Methods:**
 
+**Image Methods:**
 -   `quality(int $quality)`: Set compression quality (1-95, default: from config)
 -   `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif', 'original')
--   `toWebp()`: Convert to WebP format
--   `toAvif()`: Convert to AVIF format, might not be avaialble with GD
+-   `toWebp()`: Convert images to WebP format
+-   `toAvif()`: Convert images to AVIF format (might not be available with GD)
 -   `keepOriginalFormat()`: Compress but keep the original file format
 -   `uploadOriginal()`: Skip ALL processing - no compression, no resizing, no format conversion
 -   `trackMetadata()`: Enable/disable metadata tracking
 -   `removeBg()`: Enable background removal (API only)
 -   `driver('gd'|'api')`: Choose compression driver
 -   `resize()`: Enable Filament's built-in resizing (opposite of uploadOriginal)
+
+**Video Methods:**
+-   `toWebm()`: Complete WebM setup with optimal settings (1000kbps, 1080p, CRF 30)
+-   `toMp4()`: Complete MP4 setup with optimal settings (1500kbps, 1080p, CRF 23)
+-   `compressVideo()`: Enable video compression
+-   `videoFormat('webm'|'mp4')`: Set video output format
+-   `videoBitrate(int)`: Set video bitrate in kbps
+-   `videoMaxDimensions(width, height)`: Set maximum video dimensions
+-   `videoPreset('ultrafast'|'fast'|'medium'|'slow'|'veryslow')`: Encoding speed/quality trade-off
+-   `videoCrf(int)`: Set quality (0-63, lower = better)
+-   `videoAsync(bool)`: Enable async processing (recommended)
 
 **Important Notes:**
 
@@ -916,6 +928,14 @@ FILE_MANAGER_VIDEO_THUMBNAIL_TIME=1.0          # seconds into video
 ```php
 use Kirantimsina\FileManager\Forms\Components\MediaUpload;
 
+// Quick setup with optimal settings (recommended)
+MediaUpload::make('promo_video')
+    ->toWebm()  // Complete WebM configuration with optimal settings
+
+MediaUpload::make('demo_video')
+    ->toMp4()   // Complete MP4 configuration with optimal settings
+
+// Manual configuration for custom requirements
 MediaUpload::make('video')
     ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime'])
     ->compressVideo()                  // Enable video compression
@@ -925,16 +945,29 @@ MediaUpload::make('video')
     ->videoPreset('fast')              // Encoding preset
     ->videoCrf(28)                     // Quality (0-63, lower = better)
     ->videoAsync(true)                 // Process asynchronously (recommended)
-
-// Convenience methods
-MediaUpload::make('product_video')
-    ->toWebm()                         // Convert to WebM format
-    ->videoMaxDimensions(1920, 1080)  // Full HD max
-
-MediaUpload::make('demo_video')
-    ->toMp4()                          // Convert to MP4 format
-    ->videoBitrate(1500)               // Higher quality
 ```
+
+**Convenience Helper Methods:**
+
+The package provides two convenient helper methods that configure all video settings with a single call:
+
+**`toWebm()`** - Optimized for web delivery with WebM format:
+- Accepts common video formats (MP4, WebM, QuickTime, M4V)
+- Outputs WebM format with VP9 codec
+- 1000 kbps bitrate for balanced quality/size
+- 1920x1080 max dimensions (Full HD)
+- Medium preset for optimal encoding speed
+- CRF 30 for good compression
+- Async processing enabled
+
+**`toMp4()`** - Universal compatibility with MP4 format:
+- Accepts common video formats (MP4, WebM, QuickTime, M4V)
+- Outputs MP4 format with H.264 codec
+- 1500 kbps bitrate for better quality
+- 1920x1080 max dimensions (Full HD)
+- Medium preset for optimal encoding speed
+- CRF 23 for higher quality
+- Async processing enabled
 
 **Programmatic Video Compression:**
 ```php
@@ -1675,7 +1708,7 @@ $checkout->items = [
 
 ### Cache Control Configuration
 
-The package automatically adds cache headers to all uploaded images for optimal performance:
+The package automatically adds cache headers to all uploaded media files for optimal performance:
 
 ```env
 # Disable cache headers (not recommended)
@@ -1693,7 +1726,7 @@ FILE_MANAGER_CACHE_VISIBILITY=private
 FILE_MANAGER_CACHE_IMMUTABLE=false
 ```
 
-All images uploaded to S3 will automatically include these cache headers:
+All media files uploaded to S3 will automatically include these cache headers:
 
 -   `Cache-Control: public, max-age=31536000, immutable` (default)
 -   Proper `Content-Type` based on actual file format

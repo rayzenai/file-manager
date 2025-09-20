@@ -301,19 +301,37 @@ class MediaUpload extends FileUpload
     }
 
     /**
-     * Convert videos to WebM format
+     * Convert videos to WebM format with optimal settings
+     * Sets up complete video configuration for WebM output
      */
     public function toWebm(): static
     {
-        return $this->compressVideo()->videoFormat('webm');
+        return $this
+            ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v'])
+            ->compressVideo()
+            ->videoFormat('webm')
+            ->videoBitrate(1000)
+            ->videoMaxDimensions(1920, 1080)
+            ->videoPreset('medium')
+            ->videoCrf(30)
+            ->videoAsync(true);
     }
 
     /**
-     * Convert videos to MP4 format
+     * Convert videos to MP4 format with optimal settings
+     * Sets up complete video configuration for MP4 output
      */
     public function toMp4(): static
     {
-        return $this->compressVideo()->videoFormat('mp4');
+        return $this
+            ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v'])
+            ->compressVideo()
+            ->videoFormat('mp4')
+            ->videoBitrate(1500)  // Slightly higher bitrate for MP4
+            ->videoMaxDimensions(1920, 1080)
+            ->videoPreset('medium')
+            ->videoCrf(23)  // Lower CRF for better quality in MP4
+            ->videoAsync(true);
     }
 
     /**

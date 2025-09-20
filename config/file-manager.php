@@ -169,11 +169,11 @@ return [
     ],
 
     /**
-     * Cache Control Settings for Images
-     * Configure browser and CDN caching for uploaded images
+     * Cache Control Settings for Media Files
+     * Configure browser and CDN caching for all uploaded media (images, videos, documents)
      */
     'cache' => [
-        // Enable cache headers for images
+        // Enable cache headers for all media files
         'enabled' => env('FILE_MANAGER_CACHE_ENABLED', true),
 
         // Cache duration in seconds (default: 31536000 = 1 year)
