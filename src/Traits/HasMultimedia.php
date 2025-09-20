@@ -132,6 +132,11 @@ trait HasMultimedia
                         continue;
                     }
 
+                    // Skip external URLs (YouTube, Vimeo, etc.)
+                    if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://')) {
+                        continue;
+                    }
+
                     // Determine media type
                     $mimeType = null;
                     if ($model->isVideoField($field)) {
@@ -156,6 +161,7 @@ trait HasMultimedia
                         'file_name' => $image,
                     ], [
                         'mime_type' => $mimeType,
+                        'file_size' => 0, // Default value for now, should be updated when actual file info is available
                         'metadata' => [
                             'seo_title' => $seoTitle,
                             'created_at' => now()->toIso8601String(),
