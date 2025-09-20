@@ -1205,14 +1205,32 @@ php artisan file-manager:populate-metadata --dry-run
 -   Memory-efficient chunked processing
 -   Dry-run mode for testing
 -   Synchronous mode for immediate processing
+-   **Automatic MIME type correction** for existing records
+-   **Enhanced MIME type detection** for WebP/AVIF formats
 
 This command will:
 
 1. Scan configured models that use the HasImages trait
 2. Process records in batches to avoid memory issues
 3. Create MediaMetadata records for existing images
-4. Dispatch jobs to handle large datasets efficiently
-5. Extract file information including size, mime type, and dimensions
+4. **Automatically fix incorrect MIME types** for existing records
+5. Dispatch jobs to handle large datasets efficiently
+6. Extract file information including size, mime type, and dimensions
+
+#### MIME Type Detection
+
+The package includes robust MIME type detection that:
+
+- **Trusts file extensions** for WebP and AVIF formats (PHP's built-in detection often confuses these)
+- **Automatically fixes mismatches** when running `populate-metadata` command
+- **Uses multiple detection methods** in priority order:
+  1. Extension-based for WebP/AVIF (most reliable for these formats)
+  2. PHP's `finfo` functions for other file types
+  3. `mime_content_type()` as fallback
+  4. `getimagesize()` for image validation
+  5. Extension mapping as last resort
+
+This ensures that files like `.webp` are correctly identified as `image/webp` and not incorrectly labeled as `image/avif` or `binary/octet-stream`.
 
 ### Remove Duplicate Media Metadata
 

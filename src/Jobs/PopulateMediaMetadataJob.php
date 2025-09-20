@@ -59,13 +59,23 @@ class PopulateMediaMetadataJob implements ShouldQueue
                     }
 
                     // Check if metadata already exists
-                    $exists = MediaMetadata::where('mediable_type', $this->modelClass)
+                    $existingMetadata = MediaMetadata::where('mediable_type', $this->modelClass)
                         ->where('mediable_id', $record->id)
                         ->where('mediable_field', $field)
                         ->where('file_name', $image)
-                        ->exists();
+                        ->first();
 
-                    if ($exists) {
+                    // If exists, check if mime type needs fixing
+                    if ($existingMetadata) {
+                        $fileInfo = $this->getFileInfo($image);
+                        if ($fileInfo && $existingMetadata->mime_type !== $fileInfo['mime_type']) {
+                            Log::info("Fixing mime type for {$image}: {$existingMetadata->mime_type} -> {$fileInfo['mime_type']}");
+                            $existingMetadata->update([
+                                'mime_type' => $fileInfo['mime_type'],
+                                'width' => $fileInfo['width'] ?? $existingMetadata->width,
+                                'height' => $fileInfo['height'] ?? $existingMetadata->height,
+                            ]);
+                        }
                         continue;
                     }
 
@@ -114,7 +124,16 @@ class PopulateMediaMetadataJob implements ShouldQueue
             }
 
             $size = $disk->size($path);
-            $mimeType = $disk->mimeType($path);
+
+            // Get file content for better mime type detection
+            $fileContent = $disk->get($path);
+
+            // Create a temporary file for accurate mime type and dimension detection
+            $tempPath = tempnam(sys_get_temp_dir(), 'media_');
+            file_put_contents($tempPath, $fileContent);
+
+            // Use multiple methods to detect MIME type for better accuracy
+            $mimeType = $this->detectMimeType($tempPath, $path);
 
             // Get dimensions if it's an image
             $width = null;
@@ -122,19 +141,23 @@ class PopulateMediaMetadataJob implements ShouldQueue
 
             if (str_starts_with($mimeType, 'image/')) {
                 try {
-                    // Download file temporarily to get dimensions
-                    $tempPath = tempnam(sys_get_temp_dir(), 'img');
-                    file_put_contents($tempPath, $disk->get($path));
-
                     if ($imageInfo = getimagesize($tempPath)) {
                         $width = $imageInfo[0];
                         $height = $imageInfo[1];
-                    }
 
-                    unlink($tempPath);
+                        // getimagesize also returns mime type, use it as fallback if needed
+                        if (!empty($imageInfo['mime']) && $mimeType === 'application/octet-stream') {
+                            $mimeType = $imageInfo['mime'];
+                        }
+                    }
                 } catch (\Exception $e) {
                     Log::warning("Could not get image dimensions for {$path}: " . $e->getMessage());
                 }
+            }
+
+            // Clean up temp file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
             }
 
             return [
@@ -148,5 +171,117 @@ class PopulateMediaMetadataJob implements ShouldQueue
 
             return null;
         }
+    }
+
+    /**
+     * Detect MIME type using multiple methods for better accuracy
+     */
+    private function detectMimeType(string $tempPath, string $originalPath): string
+    {
+        // Get file extension first
+        $extension = strtolower(pathinfo($originalPath, PATHINFO_EXTENSION));
+
+        // Priority 1: Extension-based detection for known problematic formats
+        // WebP and AVIF can be misidentified by other methods
+        if ($extension === 'webp') {
+            return 'image/webp';
+        }
+        if ($extension === 'avif') {
+            return 'image/avif';
+        }
+
+        // Priority 2: Use finfo (most reliable for actual file content)
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $tempPath);
+            finfo_close($finfo);
+
+            // Don't trust finfo for WebP/AVIF - it often gets them wrong
+            if ($mimeType && $mimeType !== 'application/octet-stream') {
+                // Double-check: if extension is webp but mime is avif, trust extension
+                if ($extension === 'webp' && $mimeType === 'image/avif') {
+                    return 'image/webp';
+                }
+                if ($extension === 'avif' && $mimeType === 'image/webp') {
+                    return 'image/avif';
+                }
+                return $mimeType;
+            }
+        }
+
+        // Priority 3: Use mime_content_type (fallback)
+        if (function_exists('mime_content_type')) {
+            $mimeType = mime_content_type($tempPath);
+            if ($mimeType && $mimeType !== 'application/octet-stream') {
+                // Same double-check for WebP/AVIF
+                if ($extension === 'webp' && $mimeType === 'image/avif') {
+                    return 'image/webp';
+                }
+                if ($extension === 'avif' && $mimeType === 'image/webp') {
+                    return 'image/avif';
+                }
+                return $mimeType;
+            }
+        }
+
+        // Priority 4: For images, try getimagesize
+        $imageInfo = @getimagesize($tempPath);
+        if ($imageInfo && !empty($imageInfo['mime'])) {
+            // Same double-check for WebP/AVIF
+            if ($extension === 'webp' && $imageInfo['mime'] !== 'image/webp') {
+                return 'image/webp';
+            }
+            if ($extension === 'avif' && $imageInfo['mime'] !== 'image/avif') {
+                return 'image/avif';
+            }
+            return $imageInfo['mime'];
+        }
+
+        // Priority 5: Fallback to extension-based detection
+        $extensionMimeTypes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'bmp' => 'image/bmp',
+            'ico' => 'image/x-icon',
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'txt' => 'text/plain',
+            'html' => 'text/html',
+            'css' => 'text/css',
+            'js' => 'application/javascript',
+            'json' => 'application/json',
+            'xml' => 'application/xml',
+            'mp4' => 'video/mp4',
+            'avi' => 'video/x-msvideo',
+            'mov' => 'video/quicktime',
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'zip' => 'application/zip',
+            'rar' => 'application/x-rar-compressed',
+        ];
+
+        if (isset($extensionMimeTypes[$extension])) {
+            return $extensionMimeTypes[$extension];
+        }
+
+        // Last resort: use Storage facade's mime type
+        try {
+            $storageMimeType = Storage::disk()->mimeType($originalPath);
+            if ($storageMimeType) {
+                return $storageMimeType;
+            }
+        } catch (\Exception $e) {
+            // Ignore and use default
+        }
+
+        // Default fallback
+        return 'application/octet-stream';
     }
 }
