@@ -408,7 +408,7 @@ class ImageCompressionService
         ?int $width = null,
         ?string $format = null,
         ?string $mode = null,
-        string $disk = 's3',
+        ?string $disk = null,
         bool $removeBg = false
     ): array {
         try {
@@ -420,7 +420,7 @@ class ImageCompressionService
             // Use putFileAs for more reliable S3 uploads
             try {
                 // Prepare storage options with cache headers for S3
-                if ($disk === 's3') {
+                if (($disk ?: config('filesystems.default')) === 's3') {
                     // Determine content type based on format
                     $contentType = match($format) {
                         'jpeg', 'jpg' => 'image/jpeg',
@@ -443,13 +443,13 @@ class ImageCompressionService
                         }
                     }
                     
-                    $saved = Storage::disk($disk)->put(
+                    $saved = Storage::disk($disk ?: config('filesystems.default'))->put(
                         $outputPath,
                         $result['data']['compressed_image'],
                         $storageOptions
                     );
                 } else {
-                    $saved = Storage::disk($disk)->put(
+                    $saved = Storage::disk($disk ?: config('filesystems.default'))->put(
                         $outputPath,
                         $result['data']['compressed_image']
                     );
@@ -526,11 +526,11 @@ class ImageCompressionService
             // Handle file path from storage
             if (is_string($image)) {
                 // Check if it's a storage path
-                if (Storage::disk('s3')->exists($image)) {
+                if (Storage::disk(config('filesystems.default'))->exists($image)) {
                     return [
                         'success' => true,
                         'data' => [
-                            'content' => Storage::disk('s3')->get($image),
+                            'content' => Storage::disk(config('filesystems.default'))->get($image),
                             'filename' => basename($image),
                         ],
                     ];

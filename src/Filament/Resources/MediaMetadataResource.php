@@ -139,11 +139,11 @@ class MediaMetadataResource extends Resource
                                 // Check if FileManager returned a full URL or just a path
                                 $thumbnailUrl = str_starts_with($thumbnailPath, 'http')
                                     ? $thumbnailPath
-                                    : Storage::disk('s3')->url($thumbnailPath);
+                                    : Storage::disk(config('filesystems.default'))->url($thumbnailPath);
 
                                 $fullImageUrl = str_starts_with($state, 'http')
                                     ? $state
-                                    : Storage::disk('s3')->url($state);
+                                    : Storage::disk(config('filesystems.default'))->url($state);
 
                                 return "<a href='{$fullImageUrl}' target='_blank' class='block'>
                                     <img src='{$thumbnailUrl}' 
@@ -172,7 +172,7 @@ class MediaMetadataResource extends Resource
                                             return "📁 {$fileName}";
                                         }
                                     })
-                                    ->url(fn ($state) => Storage::disk('s3')->url($state))
+                                    ->url(fn ($state) => Storage::disk(config('filesystems.default'))->url($state))
                                     ->openUrlInNewTab()
                                     ->copyable()
                                     ->copyMessage('Media URL copied!')
@@ -738,8 +738,8 @@ class MediaMetadataResource extends Resource
 
                                 foreach (array_keys($sizes) as $size) {
                                     $resizedPath = "{$directory}/{$size}/{$name}";
-                                    if (Storage::disk('s3')->exists($resizedPath)) {
-                                        Storage::disk('s3')->delete($resizedPath);
+                                    if (Storage::disk(config('filesystems.default'))->exists($resizedPath)) {
+                                        Storage::disk(config('filesystems.default'))->delete($resizedPath);
                                         $totalDeleted++;
                                     }
                                 }
@@ -1082,8 +1082,8 @@ class MediaMetadataResource extends Resource
 
                                 foreach (array_keys($sizes) as $size) {
                                     $resizedPath = "{$directory}/{$size}/{$name}";
-                                    if (Storage::disk('s3')->exists($resizedPath)) {
-                                        Storage::disk('s3')->delete($resizedPath);
+                                    if (Storage::disk(config('filesystems.default'))->exists($resizedPath)) {
+                                        Storage::disk(config('filesystems.default'))->delete($resizedPath);
                                         $deletedCount++;
                                     }
                                 }
@@ -1235,7 +1235,7 @@ class MediaMetadataResource extends Resource
                                     $maxHeight,
                                     $data['preset'],
                                     $crf,
-                                    's3', // disk
+                                    config('filesystems.default'), // disk
                                     $record->mediable_type,
                                     $record->mediable_id,
                                     $record->mediable_field,
@@ -1437,7 +1437,7 @@ class MediaMetadataResource extends Resource
                             // Check if file exists in S3
                             $fileExists = false;
                             try {
-                                $fileExists = Storage::disk('s3')->exists($record->file_name);
+                                $fileExists = Storage::disk(config('filesystems.default'))->exists($record->file_name);
                             } catch (\Exception $e) {
                                 $fileExists = false;
                             }
@@ -1602,7 +1602,7 @@ class MediaMetadataResource extends Resource
                                             }
 
                                             try {
-                                                $fileExists = Storage::disk('s3')->exists($state);
+                                                $fileExists = Storage::disk(config('filesystems.default'))->exists($state);
 
                                                 if ($fileExists) {
                                                     Notification::make()
@@ -1645,7 +1645,7 @@ class MediaMetadataResource extends Resource
                                     return;
                                 }
 
-                                $fileExists = Storage::disk('s3')->exists($newFileName);
+                                $fileExists = Storage::disk(config('filesystems.default'))->exists($newFileName);
 
                                 // Update the parent model's field
                                 $model = $record->mediable_type::find($record->mediable_id);
@@ -1680,8 +1680,8 @@ class MediaMetadataResource extends Resource
                                         $sizes = config('file-manager.image_sizes', []);
                                         foreach (array_keys($sizes) as $size) {
                                             $oldResizedPath = "{$directory}/{$size}/{$oldName}";
-                                            if (Storage::disk('s3')->exists($oldResizedPath)) {
-                                                Storage::disk('s3')->delete($oldResizedPath);
+                                            if (Storage::disk(config('filesystems.default'))->exists($oldResizedPath)) {
+                                                Storage::disk(config('filesystems.default'))->delete($oldResizedPath);
                                                 $deletedResizedCount++;
                                             }
                                         }
@@ -1692,12 +1692,12 @@ class MediaMetadataResource extends Resource
                                 }
 
                                 // Actually move/rename the file in S3 only if new file doesn't exist but old file does
-                                if (! $fileExists && Storage::disk('s3')->exists($oldFileName)) {
+                                if (! $fileExists && Storage::disk(config('filesystems.default'))->exists($oldFileName)) {
                                     try {
                                         // Copy the file to new location
-                                        Storage::disk('s3')->copy($oldFileName, $newFileName);
+                                        Storage::disk(config('filesystems.default'))->copy($oldFileName, $newFileName);
                                         // Delete the old file
-                                        Storage::disk('s3')->delete($oldFileName);
+                                        Storage::disk(config('filesystems.default'))->delete($oldFileName);
                                     } catch (\Exception $e) {
                                         \Log::error('Failed to move file in S3 during rename: ' . $e->getMessage());
                                         throw new \Exception('Failed to rename file in storage: ' . $e->getMessage());
@@ -1785,7 +1785,7 @@ class MediaMetadataResource extends Resource
         $fileName = $record->file_name;
 
         // Download the original file from S3
-        $originalContent = Storage::disk('s3')->get($fileName);
+        $originalContent = Storage::disk(config('filesystems.default'))->get($fileName);
         $tempPath = sys_get_temp_dir() . '/' . uniqid('compress_') . '.tmp';
         file_put_contents($tempPath, $originalContent);
 
@@ -1824,7 +1824,7 @@ class MediaMetadataResource extends Resource
             null, // Let the service apply max width constraint automatically
             $outputFormat,
             config('file-manager.compression.mode', 'contain'),
-            's3'
+            config('filesystems.default')
         );
 
         @unlink($tempPath);
@@ -1832,14 +1832,14 @@ class MediaMetadataResource extends Resource
         if ($result['success']) {
             // If replacing and format changed, delete old file
             if ($data['replace_original'] && $newFileName !== $fileName) {
-                Storage::disk('s3')->delete($fileName);
+                Storage::disk(config('filesystems.default'))->delete($fileName);
 
                 // Delete resized versions
                 $sizes = config('file-manager.image_sizes', []);
                 foreach (array_keys($sizes) as $size) {
                     $resizedPath = "{$directory}/{$size}/{$pathInfo['basename']}";
-                    if (Storage::disk('s3')->exists($resizedPath)) {
-                        Storage::disk('s3')->delete($resizedPath);
+                    if (Storage::disk(config('filesystems.default'))->exists($resizedPath)) {
+                        Storage::disk(config('filesystems.default'))->delete($resizedPath);
                     }
                 }
             }

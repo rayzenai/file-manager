@@ -202,7 +202,7 @@ class CompressVideosCommand extends Command
     private function findVideosFromPath()
     {
         $path = $this->option('path');
-        $files = Storage::disk('s3')->files($path);
+        $files = Storage::disk(config('filesystems.default'))->files($path);
 
         $videos = collect();
         $videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm', 'm4v', 'mpg', 'mpeg'];
@@ -214,7 +214,7 @@ class CompressVideosCommand extends Command
                 $videos->push((object) [
                     'file_name' => $file,
                     'mime_type' => $this->guessMimeType($extension),
-                    'file_size' => Storage::disk('s3')->size($file),
+                    'file_size' => Storage::disk(config('filesystems.default'))->size($file),
                 ]);
             }
         }
@@ -285,7 +285,7 @@ class CompressVideosCommand extends Command
                     $maxHeight,
                     $preset,
                     $crf,
-                    's3',
+                    config('filesystems.default'),
                     $video->mediable_type ?? null,
                     $video->mediable_id ?? null,
                     $video->mediable_field ?? null,
@@ -313,7 +313,7 @@ class CompressVideosCommand extends Command
                     $maxHeight,
                     $preset,
                     $crf,
-                    's3'
+                    config('filesystems.default')
                 );
 
                 if ($result['success']) {
@@ -324,7 +324,7 @@ class CompressVideosCommand extends Command
 
                     // Handle replace/delete options
                     if ($replace || $deleteOriginal) {
-                        Storage::disk('s3')->delete($video->file_name);
+                        Storage::disk(config('filesystems.default'))->delete($video->file_name);
                         $this->info('     🗑️ Original deleted');
                     }
 

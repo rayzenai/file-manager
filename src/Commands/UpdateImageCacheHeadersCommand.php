@@ -71,7 +71,7 @@ class UpdateImageCacheHeadersCommand extends Command
         $this->info("Processing directory: {$directory}");
         
         try {
-            $files = Storage::disk('s3')->files($directory, true);
+            $files = Storage::disk(config('filesystems.default'))->files($directory, true);
             $imageFiles = $this->filterImageFiles($files);
             
             $this->info("Found " . count($imageFiles) . " image files");

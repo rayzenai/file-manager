@@ -96,7 +96,7 @@ class RefreshAllMediaJob implements ShouldQueue
         $fileName = $record->file_name;
         
         // Check if file exists in S3
-        if (!Storage::disk('s3')->exists($fileName)) {
+        if (!Storage::disk(config('filesystems.default'))->exists($fileName)) {
             return [
                 'success' => false,
                 'message' => "File not found in S3: {$fileName}"
@@ -105,8 +105,8 @@ class RefreshAllMediaJob implements ShouldQueue
 
         // Get fresh file metadata from S3
         try {
-            $fileSize = Storage::disk('s3')->size($fileName);
-            $mimeType = Storage::disk('s3')->mimeType($fileName) ?? 'application/octet-stream';
+            $fileSize = Storage::disk(config('filesystems.default'))->size($fileName);
+            $mimeType = Storage::disk(config('filesystems.default'))->mimeType($fileName) ?? 'application/octet-stream';
             
             $changes = [];
             $updateData = [];
@@ -126,7 +126,7 @@ class RefreshAllMediaJob implements ShouldQueue
             // For images, check dimensions
             if (str_starts_with($mimeType, 'image/')) {
                 try {
-                    $fileContent = Storage::disk('s3')->get($fileName);
+                    $fileContent = Storage::disk(config('filesystems.default'))->get($fileName);
                     $imageData = getimagesizefromstring($fileContent);
                     
                     if ($imageData !== false) {

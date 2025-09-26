@@ -169,20 +169,20 @@ class CompressImageJob implements ShouldQueue
             null, // width - let service handle max constraints  
             $outputFormat,
             config('file-manager.compression.mode', 'contain'),
-            's3'
+            config('filesystems.default')
         );
 
         if ($result['success']) {
             // If replacing and format changed, delete old file
             if ($replaceOriginal && $newFileName !== $fileName) {
-                Storage::disk('s3')->delete($fileName);
+                Storage::disk(config('filesystems.default'))->delete($fileName);
 
                 // Delete resized versions
                 $sizes = config('file-manager.image_sizes', []);
                 foreach (array_keys($sizes) as $size) {
                     $resizedPath = "{$directory}/{$size}/{$pathInfo['basename']}";
-                    if (Storage::disk('s3')->exists($resizedPath)) {
-                        Storage::disk('s3')->delete($resizedPath);
+                    if (Storage::disk(config('filesystems.default'))->exists($resizedPath)) {
+                        Storage::disk(config('filesystems.default'))->delete($resizedPath);
                     }
                 }
             }

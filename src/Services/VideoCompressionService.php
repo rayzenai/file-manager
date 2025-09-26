@@ -340,7 +340,7 @@ class VideoCompressionService
         ?int $maxHeight = null,
         ?string $preset = null,
         ?int $crf = null,
-        string $disk = 's3'
+        ?string $disk = null
     ): array {
         try {
             $result = $this->compress($video, $outputFormat, $videoBitrate, $maxWidth, $maxHeight, $preset, $crf);
@@ -365,7 +365,7 @@ class VideoCompressionService
             ];
 
             // Add cache headers if enabled
-            if ($disk === 's3' && config('file-manager.cache.enabled', true)) {
+            if (($disk ?: config('filesystems.default')) === 's3' && config('file-manager.cache.enabled', true)) {
                 $cacheControl = $this->buildCacheControlHeader();
                 if ($cacheControl) {
                     $storageOptions['CacheControl'] = $cacheControl;
@@ -373,7 +373,7 @@ class VideoCompressionService
             }
 
             // Save compressed video
-            $saved = Storage::disk($disk)->put(
+            $saved = Storage::disk($disk ?: config('filesystems.default'))->put(
                 $outputPath,
                 $result['data']['compressed_video'],
                 $storageOptions
@@ -507,11 +507,11 @@ class VideoCompressionService
             // Handle file path from storage
             if (is_string($video)) {
                 // Check if it's a storage path
-                if (Storage::disk('s3')->exists($video)) {
+                if (Storage::disk(config('filesystems.default'))->exists($video)) {
                     return [
                         'success' => true,
                         'data' => [
-                            'content' => Storage::disk('s3')->get($video),
+                            'content' => Storage::disk(config('filesystems.default'))->get($video),
                             'filename' => basename($video),
                         ],
                     ];

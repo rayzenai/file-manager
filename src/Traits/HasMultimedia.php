@@ -326,7 +326,7 @@ trait HasMultimedia
             $filename = FileManagerService::filename($uploadedFile, $modelName, $extension);
             $fullPath = "{$directory}/{$filename}";
 
-            Storage::disk('s3')->put($fullPath, file_get_contents($tempFile), 'public');
+            Storage::disk(config('filesystems.default'))->put($fullPath, file_get_contents($tempFile), 'public');
 
             unlink($tempFile);
 

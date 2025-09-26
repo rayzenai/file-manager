@@ -416,7 +416,7 @@ class MediaUpload extends FileUpload
 
                 // Build storage options
                 $storageOptions = [
-                    'disk' => 's3',
+                    'disk' => config('filesystems.default'),
                     'visibility' => 'public',
                     'ContentType' => $file->getMimeType(),
                 ];
@@ -447,7 +447,7 @@ class MediaUpload extends FileUpload
 
             // Build storage options
             $storageOptions = [
-                'disk' => 's3',
+                'disk' => config('filesystems.default'),
                 'visibility' => 'public',
                 'ContentType' => $file->getMimeType(),
             ];
@@ -581,7 +581,7 @@ class MediaUpload extends FileUpload
 
                 // Build storage options
                 $storageOptions = [
-                    'disk' => 's3',
+                    'disk' => config('filesystems.default'),
                     'visibility' => 'public',
                     'ContentType' => $file->getMimeType(),
                 ];
@@ -620,7 +620,7 @@ class MediaUpload extends FileUpload
                     $this->videoMaxHeight,
                     $this->videoPreset,
                     $this->videoCrf,
-                    's3',
+                    config('filesystems.default'),
                     $modelClass,
                     $modelId,
                     $modelField,
@@ -685,7 +685,7 @@ class MediaUpload extends FileUpload
                     $fullPath = "{$directory}/{$filename}";
 
                     $storageOptions = [
-                        'disk' => 's3',
+                        'disk' => config('filesystems.default'),
                         'visibility' => 'public',
                         'ContentType' => $file->getMimeType(),
                     ];
@@ -712,7 +712,7 @@ class MediaUpload extends FileUpload
                     $this->videoMaxHeight,
                     $this->videoPreset,
                     $this->videoCrf,
-                    's3'
+                    config('filesystems.default')
                 );
 
                 if (! $result['success']) {
@@ -762,7 +762,7 @@ class MediaUpload extends FileUpload
             $fullPath = "{$directory}/{$filename}";
 
             $storageOptions = [
-                'disk' => 's3',
+                'disk' => config('filesystems.default'),
                 'visibility' => 'public',
                 'ContentType' => $file->getMimeType(),
             ];
@@ -897,7 +897,7 @@ class MediaUpload extends FileUpload
                 config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
                 $outputFormat,
                 config('file-manager.compression.mode'),
-                's3',
+                config('filesystems.default'),
                 $shouldRemoveBackground  // Pass the evaluated removeBg flag
             );
 
@@ -954,7 +954,7 @@ class MediaUpload extends FileUpload
                 config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
                 $outputFormat,
                 config('file-manager.compression.mode'),
-                's3',
+                config('filesystems.default'),
                 $shouldRemoveBackground
             );
 
@@ -1053,7 +1053,7 @@ class MediaUpload extends FileUpload
 
         // Build storage options for fallback
         $storageOptions = [
-            'disk' => 's3',
+            'disk' => config('filesystems.default'),
             'visibility' => 'public',
             'ContentType' => $file->getMimeType(),
         ];

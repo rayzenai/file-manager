@@ -289,11 +289,11 @@ class ManageMediaSizesCommand extends Command
         $quality = (int) config('file-manager.compression.quality', 85);
 
         // Get the file content from S3
-        if (!Storage::disk('s3')->exists($mainPath)) {
+        if (!Storage::disk(config('filesystems.default'))->exists($mainPath)) {
             throw new Exception("Main image file not found in S3: {$mainPath}");
         }
 
-        $fileContent = Storage::disk('s3')->get($mainPath);
+        $fileContent = Storage::disk(config('filesystems.default'))->get($mainPath);
 
         // Use Intervention Image to resize
         $img = ImageManager::gd()->read($fileContent);
@@ -327,7 +327,7 @@ class ManageMediaSizesCommand extends Command
         $sizedPath = "{$directory}/{$filename}_{$sizeName}.{$newExtension}";
 
         // Save the resized image to S3
-        $saved = Storage::disk('s3')->put($sizedPath, $resizedContent, [
+        $saved = Storage::disk(config('filesystems.default'))->put($sizedPath, $resizedContent, [
             'visibility' => 'public',
             'ContentType' => $this->getContentType($newExtension),
         ]);
@@ -356,8 +356,8 @@ class ManageMediaSizesCommand extends Command
         foreach ($extensions as $ext) {
             $sizedPath = "{$directory}/{$filename}_{$sizeName}.{$ext}";
             
-            if (Storage::disk('s3')->exists($sizedPath)) {
-                Storage::disk('s3')->delete($sizedPath);
+            if (Storage::disk(config('filesystems.default'))->exists($sizedPath)) {
+                Storage::disk(config('filesystems.default'))->delete($sizedPath);
                 $deleted = true;
             }
         }

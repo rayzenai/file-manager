@@ -69,7 +69,7 @@ class CompressVideoJob implements ShouldQueue
         ?int $maxHeight = null,
         ?string $preset = null,
         ?int $crf = null,
-        string $disk = 's3',
+        ?string $disk = null,
         ?string $modelClass = null,
         ?int $modelId = null,
         ?string $modelField = null,
@@ -84,7 +84,7 @@ class CompressVideoJob implements ShouldQueue
         $this->maxHeight = $maxHeight;
         $this->preset = $preset;
         $this->crf = $crf;
-        $this->disk = $disk;
+        $this->disk = $disk ?: config('filesystems.default');
         $this->modelClass = $modelClass;
         $this->modelId = $modelId;
         $this->modelField = $modelField;
@@ -133,7 +133,7 @@ class CompressVideoJob implements ShouldQueue
                 $this->maxHeight,
                 $this->preset,
                 $this->crf,
-                $this->disk
+                $this->disk ?: config('filesystems.default')
             );
 
             if (! $result['success']) {
@@ -152,10 +152,10 @@ class CompressVideoJob implements ShouldQueue
             // Handle replace original logic
             if ($this->replaceOriginal) {
                 // Move the compressed file to final location (always different name now)
-                Storage::disk($this->disk)->move($actualOutputPath, $this->outputPath);
+                Storage::disk($this->disk ?: config('filesystems.default'))->move($actualOutputPath, $this->outputPath);
 
                 // Verify the file was saved successfully
-                if (!Storage::disk($this->disk)->exists($this->outputPath)) {
+                if (!Storage::disk($this->disk ?: config('filesystems.default'))->exists($this->outputPath)) {
                     Log::error('Failed to save compressed video', [
                         'temp_path' => $actualOutputPath,
                         'final_path' => $this->outputPath,
@@ -164,7 +164,7 @@ class CompressVideoJob implements ShouldQueue
                 }
 
                 // Delete the original video since we have a new compressed one
-                Storage::disk($this->disk)->delete($this->videoPath);
+                Storage::disk($this->disk ?: config('filesystems.default'))->delete($this->videoPath);
 
                 // Update model if provided
                 $modelUpdated = false;
@@ -183,7 +183,7 @@ class CompressVideoJob implements ShouldQueue
             } else {
                 // For non-replace mode, keep both files and try to update the model
                 // Move compressed file to its final location
-                Storage::disk($this->disk)->move($actualOutputPath, $this->outputPath);
+                Storage::disk($this->disk ?: config('filesystems.default'))->move($actualOutputPath, $this->outputPath);
 
                 // Try to update the model with the compressed path
                 $modelUpdated = false;
@@ -194,7 +194,7 @@ class CompressVideoJob implements ShouldQueue
 
                 // Only delete original if model was successfully updated and deletion was requested
                 if ($modelUpdated && $this->deleteOriginal) {
-                    Storage::disk($this->disk)->delete($this->videoPath);
+                    Storage::disk($this->disk ?: config('filesystems.default'))->delete($this->videoPath);
                     Log::info("Original video deleted after successful model update: {$this->videoPath}");
                 }
 

@@ -315,7 +315,7 @@ class MetadataRefreshService
     {
         // Default to S3, but you can add logic here to determine
         // the correct disk based on file path or other criteria
-        return 's3';
+        return config('filesystems.default');
     }
     
     /**
