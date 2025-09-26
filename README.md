@@ -55,6 +55,173 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 -   AWS S3 configured (or S3-compatible storage)
 -   FFmpeg (optional, required for video compression)
 
+## Storage Configuration
+
+This package works with both AWS S3 and Cloudflare R2. Choose one of the following configurations:
+
+### Option 1: Using AWS S3
+
+#### 1. Configure `.env` file:
+
+```env
+# AWS S3 Configuration
+FILESYSTEM_DISK=s3
+
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_DEFAULT_REGION=us-east-1  # Your preferred region
+AWS_BUCKET=your-bucket-name
+AWS_URL=https://your-bucket.s3.amazonaws.com
+# Or if using CloudFront:
+# AWS_URL=https://your-cloudfront-distribution.cloudfront.net
+
+# Optional CDN URL (defaults to AWS_URL)
+CDN_URL=https://your-cdn-url.com
+```
+
+#### 2. Configure `config/filesystems.php`:
+
+```php
+'default' => env('FILESYSTEM_DISK', 's3'),
+
+'disks' => [
+    's3' => [
+        'driver' => 's3',
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'region' => env('AWS_DEFAULT_REGION'),
+        'bucket' => env('AWS_BUCKET'),
+        'url' => env('AWS_URL'),
+        'endpoint' => env('AWS_ENDPOINT'),
+        'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+        'throw' => false,
+    ],
+],
+```
+
+#### 3. Configure `config/livewire.php` (if using Livewire uploads):
+
+```php
+'temporary_file_upload' => [
+    'disk' => 's3',  // Use S3 for temporary uploads
+    'rules' => ['required', 'file', 'max:122880'],
+    'directory' => 'livewire-tmp',
+    'middleware' => null,
+    'preview_mimes' => [
+        'png', 'gif', 'bmp', 'svg', 'wav', 'mp4',
+        'mov', 'avi', 'wmv', 'mp3', 'm4a',
+        'jpg', 'jpeg', 'mpga', 'webp', 'wma',
+    ],
+    'max_upload_time' => 5,
+    'cleanup' => true,
+],
+```
+
+### Option 2: Using Cloudflare R2
+
+#### 1. Configure `.env` file:
+
+```env
+# Cloudflare R2 Configuration
+FILESYSTEM_DISK=r2
+
+CLOUDFLARE_R2_ACCESS_KEY_ID=your-r2-access-key
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your-r2-secret-key
+CLOUDFLARE_R2_BUCKET=your-bucket-name
+CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+CLOUDFLARE_R2_URL=https://your-custom-domain.com
+# Or use R2 public URL:
+# CLOUDFLARE_R2_URL=https://pub-xxxxx.r2.dev
+CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT=false
+
+# Optional CDN URL (defaults to CLOUDFLARE_R2_URL)
+CDN_URL=https://your-custom-domain.com
+```
+
+#### 2. Configure `config/filesystems.php`:
+
+```php
+'default' => env('FILESYSTEM_DISK', 'r2'),
+
+'disks' => [
+    's3' => [
+        'driver' => 's3',
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'region' => env('AWS_DEFAULT_REGION'),
+        'bucket' => env('AWS_BUCKET'),
+        'url' => env('AWS_URL'),
+        'endpoint' => env('AWS_ENDPOINT'),
+        'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+        'throw' => false,
+    ],
+
+    'r2' => [
+        'driver' => 's3',
+        'key' => env('CLOUDFLARE_R2_ACCESS_KEY_ID'),
+        'secret' => env('CLOUDFLARE_R2_SECRET_ACCESS_KEY'),
+        'region' => 'auto',  // Always use 'auto' for R2
+        'bucket' => env('CLOUDFLARE_R2_BUCKET'),
+        'url' => env('CLOUDFLARE_R2_URL'),
+        'visibility' => 'private',
+        'endpoint' => env('CLOUDFLARE_R2_ENDPOINT'),
+        'use_path_style_endpoint' => env('CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT', false),
+        'throw' => false,
+    ],
+],
+```
+
+#### 3. Configure `config/livewire.php` (if using Livewire uploads):
+
+```php
+'temporary_file_upload' => [
+    'disk' => 'r2',  // Use R2 for temporary uploads
+    'rules' => ['required', 'file', 'max:122880'],
+    'directory' => 'livewire-tmp',
+    'middleware' => null,
+    'preview_mimes' => [
+        'png', 'gif', 'bmp', 'svg', 'wav', 'mp4',
+        'mov', 'avi', 'wmv', 'mp3', 'm4a',
+        'jpg', 'jpeg', 'mpga', 'webp', 'wma',
+    ],
+    'max_upload_time' => 5,
+    'cleanup' => true,
+],
+```
+
+### Option 3: Using S3 Disk with R2 (Simplified)
+
+If you prefer to use the standard S3 configuration with R2, you can configure R2 using the AWS environment variables:
+
+#### Configure `.env` file:
+
+```env
+# Use S3 disk with R2 credentials
+FILESYSTEM_DISK=s3
+
+AWS_ACCESS_KEY_ID=your-r2-access-key
+AWS_SECRET_ACCESS_KEY=your-r2-secret-key
+AWS_DEFAULT_REGION=auto  # Always 'auto' for R2
+AWS_BUCKET=your-bucket-name
+AWS_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+AWS_URL=https://your-custom-domain.com
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+CDN_URL=https://your-custom-domain.com
+```
+
+This approach uses the existing `s3` disk configuration in `filesystems.php` without creating a separate `r2` disk.
+
+### Storage Driver Comparison
+
+| Feature | AWS S3 | Cloudflare R2 |
+|---------|--------|---------------|
+| **Storage Cost** | ~$0.023/GB | $0.015/GB |
+| **Egress Fees** | $0.09/GB after 1GB | $0 (free egress) |
+| **API Compatibility** | Native S3 API | S3-compatible API |
+| **Region Config** | Specific region (e.g., us-east-1) | Always use 'auto' |
+| **Best For** | AWS ecosystem integration | Cost-effective, high bandwidth usage |
+
 ## Installation
 
 1. **Install via Composer:**
@@ -79,19 +246,13 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
     php artisan migrate
     ```
 
-4. **Configure your `.env` file:**
+4. **Configure storage and environment variables:**
+
+    See the [Storage Configuration](#storage-configuration) section above for detailed setup instructions for AWS S3 or Cloudflare R2.
+
+    **Additional configuration options for `.env`:**
 
     ```env
-    # S3 Configuration (Required)
-    AWS_ACCESS_KEY_ID=your-key
-    AWS_SECRET_ACCESS_KEY=your-secret
-    AWS_DEFAULT_REGION=your-region
-    AWS_BUCKET=your-bucket
-    AWS_URL=https://your-cdn-url.com
-
-    # Optional CDN URL (defaults to AWS_URL)
-    CDN_URL=https://your-cdn-url.com
-
     # Cache Control Settings (Optional)
     FILE_MANAGER_CACHE_ENABLED=true
     FILE_MANAGER_CACHE_MAX_AGE=31536000  # 1 year in seconds
@@ -1693,6 +1854,48 @@ $checkout->items = [
 
 -   Ensure GD or ImageMagick PHP extensions are installed
 -   Check PHP memory limit for large images
+
+### Cloudflare R2 Specific Issues
+
+#### Connection Errors
+-   Ensure `AWS_ENDPOINT` is set correctly (format: `https://[account-id].r2.cloudflarestorage.com`)
+-   Always use `AWS_DEFAULT_REGION=auto` for R2
+-   Verify your API credentials have the correct permissions
+
+#### Public Access Not Working
+-   Enable R2.dev subdomain in bucket settings
+-   Or configure custom domain with Transform Rules
+-   Check CORS settings if accessing from browser
+
+#### Upload Failures
+-   R2 has a 5GB single upload limit (use multipart for larger files)
+-   Ensure your API token has write permissions
+-   Check if you've reached storage limits in your Cloudflare plan
+
+### AWS S3 Specific Issues
+
+#### Access Denied Errors
+-   Verify IAM user has correct policies attached
+-   Check bucket policy allows your operations
+-   Ensure bucket region matches your configuration
+
+#### CORS Issues
+-   Configure CORS in bucket settings:
+```json
+[
+    {
+        "AllowedHeaders": ["*"],
+        "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+        "AllowedOrigins": ["*"],
+        "ExposeHeaders": []
+    }
+]
+```
+
+#### Slow Upload/Download
+-   Consider using Transfer Acceleration for S3
+-   Use CloudFront CDN for better performance
+-   Choose bucket region closer to your users
 
 ## Performance Tips
 
