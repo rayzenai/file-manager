@@ -488,6 +488,10 @@ class MediaMetadataResource extends Resource
                             })
                             ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
                             ->helperText('Choose which compression method to use'),
+                        FormToggle::make('replace_original')
+                            ->label('Replace original files')
+                            ->helperText('Replace the original files with compressed versions')
+                            ->default(true),
                         FormToggle::make('resize_after')
                             ->label('Resize all versions after compression')
                             ->default(true),
@@ -990,6 +994,10 @@ class MediaMetadataResource extends Resource
                                 })
                                 ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
                                 ->helperText('Choose which compression method to use'),
+                            FormToggle::make('replace_original')
+                                ->label('Replace original file')
+                                ->helperText('Replace the original file with the compressed version')
+                                ->default(true),
                             FormToggle::make('resize_after')
                                 ->label('Resize all versions after compression')
                                 ->default(true),
@@ -1831,7 +1839,7 @@ class MediaMetadataResource extends Resource
 
         if ($result['success']) {
             // If replacing and format changed, delete old file
-            if ($data['replace_original'] && $newFileName !== $fileName) {
+            if (($data['replace_original'] ?? true) && $newFileName !== $fileName) {
                 Storage::disk(config('filesystems.default'))->delete($fileName);
 
                 // Delete resized versions
@@ -1869,7 +1877,7 @@ class MediaMetadataResource extends Resource
                 $updateData['file_name'] = $newFileName;
 
                 // Update model field if replacing
-                if ($data['replace_original']) {
+                if ($data['replace_original'] ?? true) {
                     $model = $record->mediable_type::find($record->mediable_id);
                     if ($model) {
                         $field = $record->mediable_field;
