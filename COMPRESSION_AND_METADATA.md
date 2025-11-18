@@ -2,7 +2,7 @@
 
 ## Overview
 
-This package now includes built-in image compression and media metadata tracking capabilities.
+This package now includes built-in image compression and media metadata tracking capabilities using GD Library or Imagick.
 
 ## Configuration
 
@@ -13,21 +13,14 @@ The package configuration has been extended with compression and metadata settin
 
 'compression' => [
     'enabled' => true,
-    'method' => 'gd',  // 'gd' or 'api'
+    'driver' => 'gd',  // 'gd' or 'imagick'
     'auto_compress' => true,
     'quality' => 85,
     'format' => 'webp',
     'mode' => 'contain',
-    'height' => 1080,
-    'width' => null,
+    'max_height' => 2160,
+    'max_width' => 3840,
     'threshold' => 500 * 1024, // 500KB
-
-    // If using API method
-    'api' => [
-        'url' => 'https://your-api.com/compress',
-        'token' => 'your-api-token',
-        'timeout' => 30,
-    ],
 ],
 
 'media_metadata' => [
@@ -45,18 +38,14 @@ You can configure the package using environment variables:
 ```env
 # Compression Settings
 FILE_MANAGER_COMPRESSION_ENABLED=true
-FILE_MANAGER_COMPRESSION_METHOD=gd  # or 'api'
+FILE_MANAGER_COMPRESSION_DRIVER=gd  # 'gd' or 'imagick'
 FILE_MANAGER_AUTO_COMPRESS=true
 FILE_MANAGER_COMPRESSION_QUALITY=85
 FILE_MANAGER_COMPRESSION_FORMAT=webp
 FILE_MANAGER_COMPRESSION_MODE=contain
-FILE_MANAGER_COMPRESSION_HEIGHT=2160
+FILE_MANAGER_MAX_HEIGHT=2160
+FILE_MANAGER_MAX_WIDTH=3840
 FILE_MANAGER_COMPRESSION_THRESHOLD=512000  # in bytes
-
-# API Compression (if using API method)
-FILE_MANAGER_COMPRESSION_API_URL=https://your-api.com/compress
-FILE_MANAGER_COMPRESSION_API_TOKEN=your-api-token
-FILE_MANAGER_COMPRESSION_API_TIMEOUT=30
 
 # Media Metadata
 FILE_MANAGER_METADATA_ENABLED=true
@@ -65,15 +54,21 @@ FILE_MANAGER_TRACK_DIMENSIONS=true
 FILE_MANAGER_TRACK_MIME_TYPE=true
 ```
 
-## Compression Methods
+## Compression Drivers
 
-### 1. GD Method (Default)
+### 1. GD Library (Default)
 
-Uses PHP's built-in GD library with Intervention Image for compression. This is suitable for most use cases and doesn't require external services.
+Uses PHP's built-in GD library with Intervention Image for compression. This is suitable for most use cases, fast, and requires lower memory.
 
-### 2. API Method
+- **Pros**: Fast processing, lower memory usage, built-in to PHP
+- **Cons**: Limited feature set compared to Imagick
 
-Uses an external API service for compression. This is useful if you have a dedicated image processing service. The package will automatically fall back to GD if the API fails.
+### 2. Imagick
+
+Uses ImageMagick extension for compression. This provides better quality and more features than GD.
+
+- **Pros**: Better quality, more image format support, advanced features
+- **Cons**: Requires ImageMagick to be installed on the server, higher memory usage
 
 ## Usage
 
@@ -200,15 +195,16 @@ php artisan migrate
 1. **File Upload**: When a file is uploaded through `MediaUpload`:
 
     - Files over the threshold (default 500KB) are automatically compressed
-    - Compression uses either GD or external API based on configuration
+    - Compression uses either GD or Imagick driver based on configuration
     - Images are converted to WebP format by default
     - Metadata is tracked in the `media_metadata` table
 
 2. **Compression Process**:
 
-    - GD Method: Uses Intervention Image to resize and convert
-    - API Method: Sends to external API, falls back to GD on failure
+    - **GD Driver**: Uses Intervention Image with GD library to resize and convert
+    - **Imagick Driver**: Uses Intervention Image with ImageMagick to resize and convert
     - Maintains aspect ratio with 'contain' mode by default
+    - Automatically scales down images exceeding max dimensions
 
 3. **Metadata Tracking**:
     - Automatically creates/updates metadata records
@@ -217,10 +213,10 @@ php artisan migrate
 
 ## Performance Considerations
 
--   **GD Method**: Fast, no external dependencies, limited by PHP memory
--   **API Method**: Can handle larger files, adds network latency
--   **Automatic Fallback**: API method falls back to GD on failure
+-   **GD Driver**: Fast, no external dependencies, limited by PHP memory, suitable for most use cases
+-   **Imagick Driver**: Better quality, more features, higher memory usage, requires ImageMagick extension
 -   **Caching**: Metadata queries are optimized with indexes
+-   **Queue Processing**: Large images are processed asynchronously to avoid blocking requests
 
 ## Troubleshooting
 
@@ -228,8 +224,8 @@ php artisan migrate
 
 -   Check if compression is enabled in config
 -   Verify file size is above threshold
--   Check PHP memory limit for GD method
--   Verify API credentials for API method
+-   Check PHP memory limit for large images
+-   Ensure GD or Imagick extension is installed (`php -m | grep -i gd` or `php -m | grep -i imagick`)
 
 ### Metadata not being tracked
 
@@ -237,9 +233,15 @@ php artisan migrate
 -   Check if metadata tracking is enabled
 -   Verify model is passed to MediaUpload
 
-### API compression failing
+### Imagick driver not working
 
--   Check API URL and token
--   Verify API timeout setting
--   Check network connectivity
--   Package will fall back to GD automatically
+-   Verify ImageMagick is installed on the server
+-   Check if Imagick PHP extension is installed and enabled
+-   Ensure PHP has sufficient memory allocated
+-   Fall back to GD driver if Imagick is unavailable
+
+### Compression quality issues
+
+-   Adjust the `quality` setting (1-100, default: 85)
+-   Try switching between GD and Imagick drivers to compare results
+-   Consider using different output formats (WebP, AVIF, JPEG, PNG)

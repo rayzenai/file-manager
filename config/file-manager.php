@@ -102,7 +102,7 @@ return [
     'video_compression' => [
         'enabled' => env('FILE_MANAGER_VIDEO_COMPRESSION_ENABLED', true),
 
-        // Compression method: 'ffmpeg' or 'api'
+        // Compression method: 'ffmpeg' (requires FFmpeg to be installed)
         'method' => env('FILE_MANAGER_VIDEO_COMPRESSION_METHOD', 'ffmpeg'),
 
         // Output format: 'webm' (recommended) or 'mp4'

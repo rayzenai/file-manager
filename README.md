@@ -14,7 +14,6 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 -   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
 -   🗜️ **Smart Compression** - WebP/AVIF conversion with configurable quality settings
 -   🎬 **Video Compression** - FFmpeg-based video optimization with WebM/MP4 output, H.264/H.265/VP9 codecs
--   🎭 **AI Background Removal** - Remove backgrounds from images using Cloud Run API
 -   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
 -   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
 -   ⚡ **Cache Control Headers** - Configurable browser/CDN caching for optimal performance
@@ -25,11 +24,10 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 ### Advanced Processing
 
--   ⚡ **Dual API System** - Fast Lambda API for compression, Cloud Run for AI features
--   🎨 **Flexible Driver System** - Choose between GD library or external APIs
+-   🎨 **Flexible Driver System** - Choose between GD Library or Imagick
 -   🖼️ **Interactive Processor** - Test and process images directly in admin panel
 -   📈 **Bulk Operations** - Process multiple files with detailed progress tracking
--   🔄 **Smart Fallbacks** - Automatic fallback to GD when API unavailable
+-   ⚙️ **Queue Processing** - Asynchronous processing for large files
 
 ### Developer Experience
 
@@ -268,18 +266,8 @@ This approach uses the existing `s3` disk configuration in `filesystems.php` wit
     FILE_MANAGER_MAX_HEIGHT=2160  # Maximum height in pixels
     FILE_MANAGER_MAX_WIDTH=3840   # Maximum width in pixels
 
-    # Compression Method Settings
-    FILE_MANAGER_COMPRESSION_METHOD=gd  # 'gd' for built-in PHP processing or 'api' for external service
-
-    # Primary API Settings (Fast compression, no background removal)
-    FILE_MANAGER_COMPRESSION_API_URL=https://your-aws-lambda-url.com/process-image
-    FILE_MANAGER_COMPRESSION_API_TOKEN=your-api-token
-    FILE_MANAGER_COMPRESSION_API_TIMEOUT=30
-
-    # Background Removal API Settings (Slower, supports background removal)
-    FILE_MANAGER_BG_REMOVAL_API_URL=https://your-gcp-run-url.com/process-image
-    FILE_MANAGER_BG_REMOVAL_API_TOKEN=your-bg-removal-token
-    FILE_MANAGER_BG_REMOVAL_API_TIMEOUT=60
+    # Compression Driver Settings
+    FILE_MANAGER_COMPRESSION_DRIVER=gd  # 'gd' for built-in GD Library or 'imagick' for ImageMagick
     ```
 
 5. **Register the plugin in your Filament panel provider:**
@@ -365,7 +353,7 @@ return [
     // Compression settings
     'compression' => [
         'enabled' => env('FILE_MANAGER_COMPRESSION_ENABLED', true),
-        'method' => env('FILE_MANAGER_COMPRESSION_METHOD', 'gd'), // 'gd' or 'api'
+        'driver' => env('FILE_MANAGER_COMPRESSION_DRIVER', 'gd'), // 'gd' or 'imagick'
         'auto_compress' => env('FILE_MANAGER_AUTO_COMPRESS', true),
         'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85), // 1-95
         'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'), // webp, jpeg, jpg, png, avif
@@ -375,21 +363,6 @@ return [
         // Maximum allowed dimensions (hard limits - images will never exceed these)
         'max_height' => env('FILE_MANAGER_MAX_HEIGHT', 2160),
         'max_width' => env('FILE_MANAGER_MAX_WIDTH', 3840),
-
-        // API settings for external compression
-        'api' => [
-            // Primary API (AWS Lambda - fast, no background removal)
-            'url' => env('FILE_MANAGER_COMPRESSION_API_URL', ''),
-            'token' => env('FILE_MANAGER_COMPRESSION_API_TOKEN', ''),
-            'timeout' => env('FILE_MANAGER_COMPRESSION_API_TIMEOUT', 30),
-
-            // Background removal API (Google Cloud Run - slower, supports bg removal)
-            'bg_removal' => [
-                'url' => env('FILE_MANAGER_BG_REMOVAL_API_URL', ''),
-                'token' => env('FILE_MANAGER_BG_REMOVAL_API_TOKEN', ''),
-                'timeout' => env('FILE_MANAGER_BG_REMOVAL_API_TIMEOUT', 60),
-            ],
-        ],
     ],
 
     // Media metadata tracking
@@ -528,12 +501,10 @@ MediaUpload::make('photo')
 MediaUpload::make('document')
     ->uploadOriginal()          // Skip all processing - no compression, no conversion
 
-// Example 4: Full featured upload with background removal
+// Example 4: Full featured upload
 MediaUpload::make('product_image')
-    ->toAvif()                  // Convert to AVIF format
+    ->toAvif()                  // Convert to AVIF format (requires Imagick)
     ->quality(90)               // High quality
-    ->removeBg()                // Remove background (API required)
-    ->driver('api')             // Use API compression
     ->trackMetadata()           // Track file metadata
     ->multiple()                // Allow multiple files
 ```
@@ -544,12 +515,10 @@ MediaUpload::make('product_image')
 -   `quality(int $quality)`: Set compression quality (1-95, default: from config)
 -   `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif', 'original')
 -   `toWebp()`: Convert images to WebP format
--   `toAvif()`: Convert images to AVIF format (might not be available with GD)
+-   `toAvif()`: Convert images to AVIF format (requires Imagick, not available with GD)
 -   `keepOriginalFormat()`: Compress but keep the original file format
 -   `uploadOriginal()`: Skip ALL processing - no compression, no resizing, no format conversion
 -   `trackMetadata()`: Enable/disable metadata tracking
--   `removeBg()`: Enable background removal (API only)
--   `driver('gd'|'api')`: Choose compression driver
 -   `resize()`: Enable Filament's built-in resizing (opposite of uploadOriginal)
 
 **Video Methods:**
@@ -572,70 +541,10 @@ MediaUpload::make('product_image')
 **Features:**
 
 -   Smart compression with configurable output format (WebP/JPEG/PNG/AVIF)
--   AI-powered background removal (API only)
 -   Metadata tracking with compression stats
 -   Supports both images and videos
 -   SEO-friendly file naming
-
-#### Background Removal
-
-The `removeBg()` method enables AI-powered background removal for images. This feature **requires external API configuration** (specifically the background removal API endpoint) and is not available with the GD library method.
-
-#### Compression Drivers
-
-You can specify which compression driver to use:
-
-```php
-// Use GD library (built-in PHP processing)
-MediaUpload::make('image')
-    ->driver('gd')
-
-// Use external API service
-MediaUpload::make('image')
-    ->driver('api')
-```
-
-The package supports two external APIs:
-
--   **Primary API** (AWS Lambda): Fast compression without background removal
--   **Background Removal API** (Google Cloud Run): Slower but supports AI background removal
-
-```php
-// Enable background removal with boolean
-MediaUpload::make('image')
-    ->removeBg(true)
-
-// Or use the convenience method
-MediaUpload::make('image')
-    ->withoutBackground()
-
-// Dynamic background removal with closure
-use Filament\Forms\Components\Toggle;
-
-Toggle::make('remove_bg')
-    ->label('Remove Background')
-    ->dehydrated(false)  // Don't save to database
-
-MediaUpload::make('image')
-    ->removeBg(fn (Get $get) => $get('remove_bg'))
-```
-
-**Important:** When using Toggle fields for background removal control, use `dehydrated(false)` or handle the field in `mutateFormDataBeforeCreate()` and `mutateFormDataBeforeSave()` to prevent database errors:
-
-```php
-// In your Filament Resource
-protected function mutateFormDataBeforeCreate(array $data): array
-{
-    unset($data['remove_bg']);
-    return $data;
-}
-
-protected function mutateFormDataBeforeSave(array $data): array
-{
-    unset($data['remove_bg']);
-    return $data;
-}
-```
+-   Choice between GD Library and Imagick drivers
 
 ### MediaModalColumn and MediaUrlColumn
 
@@ -888,14 +797,11 @@ The MediaMetadata resource includes a dedicated **Image Processor** page - a pow
 -   **Format Selection**: Convert between WebP, JPEG, PNG, and AVIF
 -   **Quality Control**: Adjust compression from 50% to 100%
 -   **Resizing**: Set custom dimensions with multiple resize modes
--   **Background Removal**: AI-powered background removal (when API configured)
 
-**Compression Methods**
+**Compression Drivers**
 
--   **Auto**: Intelligently selects the best available method
--   **Lambda API**: Fast compression via AWS Lambda
--   **Cloud Run API**: Advanced features including background removal
--   **GD Library**: Local processing fallback
+-   **GD Library**: Fast, built-in PHP processing with lower memory usage
+-   **Imagick**: Better quality and more features using ImageMagick
 
 **Results & Analytics**
 
@@ -913,8 +819,8 @@ The MediaMetadata resource includes a dedicated **Image Processor** page - a pow
 
 1. **Test compression settings** before applying to production
 2. **Optimize images** for specific use cases
-3. **Validate API configuration** and performance
-4. **Compare processing methods** (GD vs API)
+3. **Compare processing drivers** (GD vs Imagick)
+4. **Evaluate different output formats** (WebP, AVIF, JPEG, PNG)
 5. **Generate samples** for documentation
 
 ## Service Methods
@@ -1011,21 +917,7 @@ $result = $service->compressAndSave(
     width: null,  // Auto-calculate
     format: 'webp',
     mode: 'contain',
-    disk: 's3',
-    removeBg: false  // Set to true for background removal (API only)
-);
-
-// Compress with background removal (requires API configuration)
-$result = $service->compressAndSave(
-    sourcePath: '/tmp/product.jpg',
-    destinationPath: 'products/product-no-bg.webp',
-    quality: 90,
-    height: 720,
-    width: null,
-    format: 'webp',
-    mode: 'contain',
-    disk: 's3',
-    removeBg: true  // Requires FILE_MANAGER_COMPRESSION_METHOD=api
+    disk: 's3'
 );
 
 // Compress existing S3 file
@@ -1035,13 +927,10 @@ $result = $service->compressExisting(
 );
 ```
 
-**Compression Methods:**
+**Compression Drivers:**
 
--   **GD Library (`method: 'gd'`)**: Built-in PHP image processing. Supports resizing, format conversion, and basic compression. Does not support background removal.
--   **External API (`method: 'api'`)**: Uses external image processing service. Supports all GD features plus AI-powered background removal. The package intelligently routes requests:
-    -   Standard compression requests go to the primary API (faster)
-    -   Background removal requests go to the specialized background removal API (slower but more features)
-    -   Falls back to GD if API is unavailable
+-   **GD Library (`driver: 'gd'`)**: Built-in PHP image processing using GD extension. Fast, lower memory usage, suitable for most use cases. Supports WebP, JPEG, and PNG formats.
+-   **Imagick (`driver: 'imagick'`)**: Uses ImageMagick extension for image processing. Better quality, more features, supports additional formats like AVIF. Requires ImageMagick to be installed on the server.
 
 ### Video Compression Service
 
