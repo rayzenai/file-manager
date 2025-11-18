@@ -42,14 +42,16 @@ class PopulateSeoTitlesCommand extends Command
             $modelClass = class_exists($specificModel) ? $specificModel : "App\\Models\\{$specificModel}";
             if (class_exists($modelClass)) {
                 // Check if this model has seoTitleField method
-                if (!method_exists($modelClass, 'seoTitleField')) {
+                if (! method_exists($modelClass, 'seoTitleField')) {
                     $this->error("Model {$modelClass} does not have seoTitleField() method, skipping.");
+
                     return;
                 }
                 $query->where('mediable_type', $modelClass);
                 $this->info("Processing model: {$modelClass}");
             } else {
                 $this->error("Model class {$specificModel} does not exist.");
+
                 return;
             }
         }
@@ -90,13 +92,14 @@ class PopulateSeoTitlesCommand extends Command
             ->pluck('mediable_type')
             ->toArray();
 
-        if (empty($modelsWithSeoField) && !$specificModel) {
+        if (empty($modelsWithSeoField) && ! $specificModel) {
             $this->warn('No models found with seoTitleField() method.');
+
             return;
         }
 
         // Update query to only include models with seoTitleField
-        if (!$specificModel) {
+        if (! $specificModel) {
             $query->whereIn('mediable_type', $modelsWithSeoField);
             $totalRecords = $query->count();
         }
@@ -111,15 +114,16 @@ class PopulateSeoTitlesCommand extends Command
             foreach ($mediaRecords as $media) {
                 // Skip if model doesn't have seoTitleField method
                 $modelClass = $media->mediable_type;
-                if (!method_exists($modelClass, 'seoTitleField')) {
+                if (! method_exists($modelClass, 'seoTitleField')) {
                     $processed++;
                     $bar->advance();
+
                     continue;
                 }
-                
+
                 $seoTitle = $this->generateSeoTitle($media);
 
-                if ($seoTitle && !$isDryRun) {
+                if ($seoTitle && ! $isDryRun) {
                     $media->update(['seo_title' => $seoTitle]);
                     $updated++;
                 } elseif ($seoTitle && $isDryRun) {
@@ -148,21 +152,21 @@ class PopulateSeoTitlesCommand extends Command
         }
 
         // Check if model has seoTitleField method
-        if (!method_exists($model, 'seoTitleField')) {
+        if (! method_exists($model, 'seoTitleField')) {
             return null;
         }
 
         // Get the field to use for SEO title
         $seoField = $model->seoTitleField();
-        
+
         // Get the value from that field
-        if (isset($model->$seoField) && !empty($model->$seoField)) {
+        if (isset($model->$seoField) && ! empty($model->$seoField)) {
             $value = $model->$seoField;
-            
+
             // Clean up the value
             $value = strip_tags($value);
             $value = trim($value);
-            
+
             // Skip if it's just numbers or too short
             if (strlen($value) < 3 || is_numeric($value)) {
                 return null;
@@ -171,10 +175,10 @@ class PopulateSeoTitlesCommand extends Command
             // Add field context if needed
             $field = $media->mediable_field;
             $contextualFields = ['thumbnail', 'gallery_images', 'sec_images', 'cover_image', 'banner_image'];
-            
+
             if (in_array($field, $contextualFields)) {
                 $fieldContext = $this->getFieldContext($field);
-                if ($fieldContext && !str_contains(strtolower($value), strtolower($fieldContext))) {
+                if ($fieldContext && ! str_contains(strtolower($value), strtolower($fieldContext))) {
                     $value = mb_substr($value . ' - ' . $fieldContext, 0, 160);
                 }
             }
@@ -182,7 +186,7 @@ class PopulateSeoTitlesCommand extends Command
             // Clean and limit the SEO title
             return $this->cleanSeoTitle(mb_substr($value, 0, 160));
         }
-        
+
         return null;
     }
 
@@ -210,18 +214,18 @@ class PopulateSeoTitlesCommand extends Command
     {
         // Trim whitespace
         $title = trim($title);
-        
+
         // Remove all control characters (0x00-0x1F, 0x7F) except tab, newline, and carriage return
         // These characters are invalid in XML
         $title = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $title);
-        
+
         // Remove special characters from the beginning and end
         // This includes quotes, apostrophes, brackets, and other punctuation
         $title = preg_replace('/^[^\w\s]+|[^\w\s]+$/u', '', $title);
-        
+
         // Clean up multiple spaces
         $title = preg_replace('/\s+/', ' ', $title);
-        
+
         // Final trim
         return trim($title);
     }

@@ -36,12 +36,12 @@ class RemoveDuplicateMediaMetadataCommand extends Command
         $duplicates = DB::table('media_metadata')
             ->select([
                 'mediable_type',
-                'mediable_id', 
+                'mediable_id',
                 'mediable_field',
                 'file_name',
                 DB::raw('COUNT(*) as duplicate_count'),
                 DB::raw('MIN(created_at) as oldest_record'),
-                DB::raw('MIN(id) as keep_id')
+                DB::raw('MIN(id) as keep_id'),
             ])
             ->groupBy(['mediable_type', 'mediable_id', 'mediable_field', 'file_name'])
             ->havingRaw('COUNT(*) > 1')
@@ -52,13 +52,14 @@ class RemoveDuplicateMediaMetadataCommand extends Command
 
         if ($duplicates->isEmpty()) {
             $this->info('✅ No duplicates found! Your media metadata is clean.');
+
             return self::SUCCESS;
         }
 
         $totalDuplicates = $duplicates->sum('duplicate_count');
         $totalToRemove = $totalDuplicates - $duplicates->count(); // Keep one of each group
 
-        $this->warn("Found " . $duplicates->count() . " groups of duplicates containing {$totalDuplicates} total records.");
+        $this->warn('Found ' . $duplicates->count() . " groups of duplicates containing {$totalDuplicates} total records.");
         $this->warn("Will remove {$totalToRemove} duplicate records (keeping the oldest in each group).");
 
         // Show sample of duplicates
@@ -79,16 +80,18 @@ class RemoveDuplicateMediaMetadataCommand extends Command
         $this->table($headers, $sampleData);
 
         if ($duplicates->count() > 10) {
-            $this->line("... and " . ($duplicates->count() - 10) . " more groups");
+            $this->line('... and ' . ($duplicates->count() - 10) . ' more groups');
         }
 
         if ($dryRun) {
             $this->info('🔍 Dry run complete. Use without --dry-run to actually remove duplicates.');
+
             return self::SUCCESS;
         }
 
-        if (!$force && !$this->confirm("Are you sure you want to remove {$totalToRemove} duplicate records?")) {
+        if (! $force && ! $this->confirm("Are you sure you want to remove {$totalToRemove} duplicate records?")) {
             $this->info('Operation cancelled.');
+
             return self::SUCCESS;
         }
 
@@ -107,7 +110,7 @@ class RemoveDuplicateMediaMetadataCommand extends Command
                 ->where('file_name', $duplicate->file_name)
                 ->where('id', '!=', $duplicate->keep_id)
                 ->delete();
-            
+
             $removedCount += $deletedInThisGroup;
             $progressBar->advance();
         }
@@ -116,21 +119,21 @@ class RemoveDuplicateMediaMetadataCommand extends Command
         $this->newLine(2);
 
         $this->info("✅ Successfully removed {$removedCount} duplicate media metadata records.");
-        $this->info("Kept " . $duplicates->count() . " unique records (the oldest in each group).");
+        $this->info('Kept ' . $duplicates->count() . ' unique records (the oldest in each group).');
 
         // Verify cleanup
         $remainingDuplicates = DB::table('media_metadata')
             ->select([
                 'mediable_type',
-                'mediable_id', 
+                'mediable_id',
                 'mediable_field',
                 'file_name',
-                DB::raw('COUNT(*) as duplicate_count')
+                DB::raw('COUNT(*) as duplicate_count'),
             ])
             ->groupBy(['mediable_type', 'mediable_id', 'mediable_field', 'file_name'])
             ->havingRaw('COUNT(*) > 1')
             ->get();
-            
+
         if ($remainingDuplicates->isEmpty()) {
             $this->info('✅ Verification: No duplicates remaining.');
         } else {

@@ -188,10 +188,10 @@ class ImageProcessor extends Page implements HasForms
         try {
             // Get the temporary uploaded file
             // FileUpload returns a string for single files, array for multiple
-            $tempFilePath = is_array($data['image']) 
+            $tempFilePath = is_array($data['image'])
                 ? (array_values($data['image'])[0] ?? null)
                 : $data['image'];
-                
+
             if (! $tempFilePath) {
                 throw new \Exception('No file path found');
             }
@@ -199,14 +199,14 @@ class ImageProcessor extends Page implements HasForms
             // Handle Livewire temporary upload
             // First check if this is a Livewire temp upload ID
             $tempDisk = config('livewire.temporary_file_upload.disk', 'local');
-            
+
             // Livewire temp files are stored with a specific path pattern
             $possiblePaths = [
                 'livewire-tmp/' . $tempFilePath,
                 $tempFilePath,
                 'livewire-tmp/' . basename($tempFilePath),
             ];
-            
+
             $actualPath = null;
             foreach ($possiblePaths as $path) {
                 if (Storage::disk($tempDisk)->exists($path)) {
@@ -214,8 +214,8 @@ class ImageProcessor extends Page implements HasForms
                     break;
                 }
             }
-            
-            if (!$actualPath) {
+
+            if (! $actualPath) {
                 // Try to find the file by listing the livewire-tmp directory
                 $files = Storage::disk($tempDisk)->files('livewire-tmp');
                 foreach ($files as $file) {
@@ -225,14 +225,14 @@ class ImageProcessor extends Page implements HasForms
                     }
                 }
             }
-            
-            if (!$actualPath) {
+
+            if (! $actualPath) {
                 throw new \Exception('Uploaded file not found. Path checked: ' . $tempFilePath);
             }
-            
+
             // Get the actual file content
             $fileContent = Storage::disk($tempDisk)->get($actualPath);
-            
+
             // Create a temporary file for processing
             $inputPath = sys_get_temp_dir() . '/' . uniqid('process_input_') . '.tmp';
             file_put_contents($inputPath, $fileContent);
@@ -258,7 +258,7 @@ class ImageProcessor extends Page implements HasForms
                     : 'gd';
                 config(['file-manager.compression.driver' => $driver]);
             }
-            
+
             // Create compression service AFTER config override
             $compressionService = new ImageCompressionService;
 
@@ -365,20 +365,20 @@ class ImageProcessor extends Page implements HasForms
 
         $filePath = Storage::disk('local')->path($this->processedImagePath);
         $fileName = 'processed_image_' . date('Y-m-d_H-i-s') . '.' . pathinfo($this->processedImagePath, PATHINFO_EXTENSION);
-        
+
         // Build cache headers from config
         $headers = [];
-        
+
         if (config('file-manager.cache.enabled', true)) {
             $maxAge = config('file-manager.cache.max_age', 31536000);
             $visibility = config('file-manager.cache.visibility', 'public');
             $immutable = config('file-manager.cache.immutable', true);
-            
+
             $cacheControl = "{$visibility}, max-age={$maxAge}";
             if ($immutable) {
                 $cacheControl .= ', immutable';
             }
-            
+
             $headers['Cache-Control'] = $cacheControl;
             $headers['Expires'] = gmdate('D, d M Y H:i:s', time() + $maxAge) . ' GMT';
         }
@@ -430,7 +430,7 @@ class ImageProcessor extends Page implements HasForms
                 ->url(fn () => MediaMetadataResource::getUrl('index')),
         ];
     }
-    
+
     public static function canAccess(array $parameters = []): bool
     {
         // You can add permission checks here

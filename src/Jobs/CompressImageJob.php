@@ -10,7 +10,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
 use Throwable;
@@ -20,7 +19,9 @@ class CompressImageJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300; // 5 minutes timeout per job
+
     public int $tries = 3; // Retry failed jobs 3 times
+
     public int $backoff = 30; // Wait 30 seconds between retries
 
     public function __construct(
@@ -34,15 +35,17 @@ class CompressImageJob implements ShouldQueue
     public function handle(): void
     {
         $record = MediaMetadata::find($this->mediaMetadataId);
-        
-        if (!$record) {
+
+        if (! $record) {
             Log::warning("CompressImageJob: MediaMetadata record {$this->mediaMetadataId} not found");
+
             return;
         }
 
         // Only process image files
-        if (!str_starts_with($record->mime_type ?? '', 'image/')) {
+        if (! str_starts_with($record->mime_type ?? '', 'image/')) {
             Log::info("CompressImageJob: Skipping non-image file {$record->file_name}");
+
             return;
         }
 
@@ -67,7 +70,7 @@ class CompressImageJob implements ShouldQueue
                 Log::info("CompressImageJob: Successfully compressed {$record->file_name}", [
                     'original_size' => $result['original_size'],
                     'compressed_size' => $result['compressed_size'],
-                    'compression_ratio' => $result['compression_ratio']
+                    'compression_ratio' => $result['compression_ratio'],
                 ]);
 
                 // Update batch progress if part of a batch
@@ -81,28 +84,28 @@ class CompressImageJob implements ShouldQueue
                 }
             } else {
                 Log::error("CompressImageJob: Failed to compress {$record->file_name}", [
-                    'error' => $result['message'] ?? 'Unknown error'
+                    'error' => $result['message'] ?? 'Unknown error',
                 ]);
-                
+
                 // Update batch progress if part of a batch
                 if ($this->batchId) {
                     $this->updateBatchProgress($record, $result, 'failed');
                 }
-                
+
                 throw new \Exception($result['message'] ?? 'Compression failed');
             }
 
         } catch (Throwable $e) {
             Log::error("CompressImageJob: Exception processing {$record->file_name}", [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Update batch progress if part of a batch
             if ($this->batchId) {
                 $this->updateBatchProgress($record, ['message' => $e->getMessage()], 'failed');
             }
-            
+
             throw $e;
         }
     }
@@ -111,12 +114,12 @@ class CompressImageJob implements ShouldQueue
     {
         $record = MediaMetadata::find($this->mediaMetadataId);
         $fileName = $record?->file_name ?? "ID:{$this->mediaMetadataId}";
-        
+
         Log::error("CompressImageJob: Final failure for {$fileName}", [
             'error' => $exception->getMessage(),
-            'attempts' => $this->attempts()
+            'attempts' => $this->attempts(),
         ]);
-        
+
         // Update batch progress if part of a batch
         if ($this->batchId && $record) {
             $this->updateBatchProgress($record, ['message' => $exception->getMessage()], 'failed');
@@ -129,10 +132,10 @@ class CompressImageJob implements ShouldQueue
         $replaceOriginal = $data['replace_original'] ?? true;
         $fileName = $record->file_name;
 
-        if (!$fileName) {
+        if (! $fileName) {
             return [
                 'success' => false,
-                'message' => 'No file path found in record'
+                'message' => 'No file path found in record',
             ];
         }
 
@@ -155,7 +158,7 @@ class CompressImageJob implements ShouldQueue
         $filenameWithoutExt = $pathInfo['filename'];
         $newExtension = match ($outputFormat) {
             'jpg' => 'jpg',
-            'png' => 'png', 
+            'png' => 'png',
             'webp' => 'webp',
             'avif' => 'avif',
             default => 'webp'
@@ -168,7 +171,7 @@ class CompressImageJob implements ShouldQueue
             $newFileName,
             $quality,
             null, // height - let service handle max constraints
-            null, // width - let service handle max constraints  
+            null, // width - let service handle max constraints
             $outputFormat,
             config('file-manager.compression.mode', 'contain'),
             config('filesystems.default')
@@ -205,7 +208,7 @@ class CompressImageJob implements ShouldQueue
             ];
 
             // Update dimensions if available from compression result
-            if (isset($result['data']['width']) && isset($result['data']['height'])) {
+            if (isset($result['data']['width'], $result['data']['height'])) {
                 $updateData['width'] = $result['data']['width'];
                 $updateData['height'] = $result['data']['height'];
             }
@@ -241,7 +244,7 @@ class CompressImageJob implements ShouldQueue
                 'original_size' => $result['data']['original_size'],
                 'compressed_size' => $result['data']['compressed_size'],
                 'compression_ratio' => $result['data']['compression_ratio'],
-                'compression_method' => $result['data']['compression_method'] ?? 'unknown'
+                'compression_method' => $result['data']['compression_method'] ?? 'unknown',
             ];
         }
 
@@ -250,14 +253,14 @@ class CompressImageJob implements ShouldQueue
 
     private function generateCompressedPath(string $originalPath, ?string $format): string
     {
-        if (!$format) {
+        if (! $format) {
             return $originalPath;
         }
 
         $pathInfo = pathinfo($originalPath);
         $directory = $pathInfo['dirname'];
         $filename = $pathInfo['filename'];
-        
+
         return "{$directory}/{$filename}_compressed.{$format}";
     }
 
@@ -269,14 +272,14 @@ class CompressImageJob implements ShouldQueue
             Log::info("CompressImageJob: Dispatched resize job for {$record->file_name}");
         } catch (Throwable $e) {
             Log::warning("CompressImageJob: Failed to dispatch resize job for {$record->file_name}", [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
 
     private function updateBatchProgress(MediaMetadata $record, array $result, string $status): void
     {
-        if (!$this->batchId) {
+        if (! $this->batchId) {
             return;
         }
 
@@ -285,13 +288,13 @@ class CompressImageJob implements ShouldQueue
             'total' => 0,
             'completed' => 0,
             'failed' => 0,
-            'stats' => []
+            'stats' => [],
         ]);
 
         // Update counters
         if ($status === 'completed') {
             $batchData['completed']++;
-            
+
             // Store compression stats
             if (isset($result['original_size'], $result['compressed_size'])) {
                 $batchData['stats'][] = [
@@ -299,7 +302,7 @@ class CompressImageJob implements ShouldQueue
                     'original_size' => $result['original_size'],
                     'compressed_size' => $result['compressed_size'],
                     'compression_ratio' => $result['compression_ratio'],
-                    'method' => $result['compression_method'] ?? 'unknown'
+                    'method' => $result['compression_method'] ?? 'unknown',
                 ];
             }
         } elseif ($status === 'failed') {
@@ -313,7 +316,7 @@ class CompressImageJob implements ShouldQueue
         $totalProcessed = $batchData['completed'] + $batchData['failed'];
         if ($totalProcessed >= $batchData['total']) {
             // Dispatch final status notification
-            \Kirantimsina\FileManager\Jobs\BulkCompressionStatusJob::dispatch(
+            BulkCompressionStatusJob::dispatch(
                 $this->batchId,
                 $batchData['total'],
                 $batchData['completed'],
@@ -322,7 +325,7 @@ class CompressImageJob implements ShouldQueue
             );
         } elseif ($totalProcessed % 5 === 0) {
             // Send progress update every 5 completed jobs
-            \Kirantimsina\FileManager\Jobs\BulkCompressionStatusJob::dispatch(
+            BulkCompressionStatusJob::dispatch(
                 $this->batchId,
                 $batchData['total'],
                 $batchData['completed'],

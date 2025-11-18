@@ -52,7 +52,7 @@ class MediaPage extends Component
         // Fetch the record based on the slug or ID.
         // First try to find by slug (if it's not numeric)
         $record = null;
-        
+
         // If the slug is numeric, it's likely an ID
         if (is_numeric($slug)) {
             $record = $modelClass::find($slug);
@@ -64,14 +64,14 @@ class MediaPage extends Component
                 // If slug column doesn't exist, this will throw an exception
                 // We'll ignore it and try by ID
             }
-            
+
             // If not found by slug, try by ID anyway
-            if (!$record) {
+            if (! $record) {
                 $record = $modelClass::find($slug);
             }
         }
-        
-        if (!$record) {
+
+        if (! $record) {
             abort(404, 'Record not found.');
         }
 

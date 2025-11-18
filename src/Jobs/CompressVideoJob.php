@@ -155,12 +155,12 @@ class CompressVideoJob implements ShouldQueue
                 Storage::disk($this->disk ?: config('filesystems.default'))->move($actualOutputPath, $this->outputPath);
 
                 // Verify the file was saved successfully
-                if (!Storage::disk($this->disk ?: config('filesystems.default'))->exists($this->outputPath)) {
+                if (! Storage::disk($this->disk ?: config('filesystems.default'))->exists($this->outputPath)) {
                     Log::error('Failed to save compressed video', [
                         'temp_path' => $actualOutputPath,
                         'final_path' => $this->outputPath,
                     ]);
-                    throw new \Exception("Failed to save compressed video");
+                    throw new \Exception('Failed to save compressed video');
                 }
 
                 // Delete the original video since we have a new compressed one

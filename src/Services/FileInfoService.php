@@ -12,8 +12,8 @@ class FileInfoService
     /**
      * Get comprehensive file information from storage
      *
-     * @param string $filePath Path to the file in storage
-     * @param string|null $disk Storage disk (defaults to configured default)
+     * @param  string  $filePath  Path to the file in storage
+     * @param  string|null  $disk  Storage disk (defaults to configured default)
      * @return array|null File info array or null if file doesn't exist
      */
     public function getFileInfo(string $filePath, ?string $disk = null): ?array
@@ -21,7 +21,7 @@ class FileInfoService
         $disk = Storage::disk($disk ?? config('filesystems.default'));
 
         // Check if file exists
-        if (!$disk->exists($filePath)) {
+        if (! $disk->exists($filePath)) {
             return null;
         }
 

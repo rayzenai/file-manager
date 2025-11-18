@@ -194,6 +194,7 @@ class PopulateMediaMetadataCommand extends Command
         // Get fields from HasMultimedia trait
         if (method_exists($model, 'mediaFieldsToWatch')) {
             $fields = $model->mediaFieldsToWatch();
+
             return array_merge(
                 $fields['images'] ?? [],
                 $fields['videos'] ?? [],

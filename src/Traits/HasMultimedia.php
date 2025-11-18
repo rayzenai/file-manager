@@ -10,8 +10,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteMedia;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
@@ -37,12 +35,11 @@ trait HasMultimedia
 
     /**
      * Get all media fields regardless of type
-     *
-     * @return array
      */
     public function getAllMediaFields(): array
     {
         $fields = $this->mediaFieldsToWatch();
+
         return array_merge(
             $fields['images'] ?? [],
             $fields['videos'] ?? [],
@@ -52,40 +49,33 @@ trait HasMultimedia
 
     /**
      * Check if a field is an image field
-     *
-     * @param string $field
-     * @return bool
      */
     public function isImageField(string $field): bool
     {
         $fields = $this->mediaFieldsToWatch();
+
         return in_array($field, $fields['images'] ?? []);
     }
 
     /**
      * Check if a field is a video field
-     *
-     * @param string $field
-     * @return bool
      */
     public function isVideoField(string $field): bool
     {
         $fields = $this->mediaFieldsToWatch();
+
         return in_array($field, $fields['videos'] ?? []);
     }
 
     /**
      * Check if a field is a document field
-     *
-     * @param string $field
-     * @return bool
      */
     public function isDocumentField(string $field): bool
     {
         $fields = $this->mediaFieldsToWatch();
+
         return in_array($field, $fields['documents'] ?? []);
     }
-
 
     protected static function bootHasMultimedia()
     {
@@ -139,10 +129,10 @@ trait HasMultimedia
                     }
 
                     // Get actual file information from storage using FileInfoService
-                    $fileInfoService = new FileInfoService();
+                    $fileInfoService = new FileInfoService;
                     $fileInfo = $fileInfoService->getFileInfo($image, config('filesystems.default'));
 
-                    if (!$fileInfo) {
+                    if (! $fileInfo) {
                         // File doesn't exist or error reading
                         continue;
                     }

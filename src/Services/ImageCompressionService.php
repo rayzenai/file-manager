@@ -79,7 +79,7 @@ class ImageCompressionService
             // Get original dimensions
             $originalWidth = $img->width();
             $originalHeight = $img->height();
-            
+
             // Calculate enforced dimensions based on max constraints
             $enforcedDimensions = $this->calculateEnforcedDimensions(
                 $originalWidth,
@@ -87,7 +87,7 @@ class ImageCompressionService
                 $width,
                 $height
             );
-            
+
             $finalWidth = $enforcedDimensions['width'];
             $finalHeight = $enforcedDimensions['height'];
 
@@ -123,7 +123,7 @@ class ImageCompressionService
 
             $compressedSize = strlen($compressedContent);
             $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
-            
+
             // Get final dimensions after processing
             try {
                 $finalImg = $manager->read($compressedContent);
@@ -172,7 +172,6 @@ class ImageCompressionService
         }
     }
 
-
     /**
      * Compress and save image to storage
      */
@@ -197,19 +196,19 @@ class ImageCompressionService
                 // Prepare storage options with cache headers for S3
                 if (($disk ?: config('filesystems.default')) === 's3') {
                     // Determine content type based on format
-                    $contentType = match($format) {
+                    $contentType = match ($format) {
                         'jpeg', 'jpg' => 'image/jpeg',
                         'png' => 'image/png',
                         'webp' => 'image/webp',
                         'avif' => 'image/avif',
                         default => 'image/webp',
                     };
-                    
+
                     $storageOptions = [
                         'visibility' => 'public',
                         'ContentType' => $contentType,
                     ];
-                    
+
                     // Add cache headers if enabled
                     if (config('file-manager.cache.enabled', true)) {
                         $cacheControl = $this->buildCacheControlHeader();
@@ -217,7 +216,7 @@ class ImageCompressionService
                             $storageOptions['CacheControl'] = $cacheControl;
                         }
                     }
-                    
+
                     $saved = Storage::disk($disk ?: config('filesystems.default'))->put(
                         $outputPath,
                         $result['data']['compressed_image'],
@@ -340,47 +339,48 @@ class ImageCompressionService
             ];
         }
     }
-    
+
     /**
      * Build the Cache-Control header value from config
      */
     protected function buildCacheControlHeader(): ?string
     {
-        if (!config('file-manager.cache.enabled', true)) {
+        if (! config('file-manager.cache.enabled', true)) {
             return null;
         }
-        
+
         $visibility = config('file-manager.cache.visibility', 'public');
         $maxAge = config('file-manager.cache.max_age', 31536000);
         $immutable = config('file-manager.cache.immutable', true);
-        
+
         $header = "{$visibility}, max-age={$maxAge}";
-        
+
         if ($immutable) {
             $header .= ', immutable';
         }
-        
+
         return $header;
     }
-    
+
     /**
      * Calculate dimensions ensuring they don't exceed max constraints
-     * @param int $originalWidth Original image width
-     * @param int $originalHeight Original image height  
-     * @param int|null $requestedWidth Explicitly requested width (can be null)
-     * @param int|null $requestedHeight Explicitly requested height (can be null)
+     *
+     * @param  int  $originalWidth  Original image width
+     * @param  int  $originalHeight  Original image height
+     * @param  int|null  $requestedWidth  Explicitly requested width (can be null)
+     * @param  int|null  $requestedHeight  Explicitly requested height (can be null)
      * @return array ['width' => int, 'height' => int]
      */
     private function calculateEnforcedDimensions(
-        int $originalWidth, 
-        int $originalHeight, 
-        ?int $requestedWidth = null, 
+        int $originalWidth,
+        int $originalHeight,
+        ?int $requestedWidth = null,
         ?int $requestedHeight = null
     ): array {
         // Start with original dimensions
         $width = $originalWidth;
         $height = $originalHeight;
-        
+
         // Apply requested dimensions if provided
         if ($requestedWidth !== null) {
             $width = $requestedWidth;
@@ -388,24 +388,24 @@ class ImageCompressionService
         if ($requestedHeight !== null) {
             $height = $requestedHeight;
         }
-        
+
         // Check if dimensions exceed maximum constraints
         $exceedsMaxWidth = $width > $this->maxWidth;
         $exceedsMaxHeight = $height > $this->maxHeight;
-        
+
         if ($exceedsMaxWidth || $exceedsMaxHeight) {
             // Calculate scaling factors for both dimensions
             $widthScale = $this->maxWidth / $width;
             $heightScale = $this->maxHeight / $height;
-            
+
             // Use the more restrictive scale factor to maintain aspect ratio
             $scale = min($widthScale, $heightScale);
-            
+
             // Apply the scale factor
             $width = (int) round($width * $scale);
             $height = (int) round($height * $scale);
         }
-        
+
         return [
             'width' => $width,
             'height' => $height,

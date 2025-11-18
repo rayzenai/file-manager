@@ -28,6 +28,7 @@ class RefreshAllMediaCommand extends Command
 
         if ($totalRecords === 0) {
             $this->info('No media metadata records found');
+
             return 0;
         }
 
@@ -35,23 +36,24 @@ class RefreshAllMediaCommand extends Command
 
         if ($dryRun) {
             $this->info("DRY RUN: Would queue {$totalRecords} refresh jobs");
-            $this->info("Each job will check file metadata, dimensions, and update records as needed");
+            $this->info('Each job will check file metadata, dimensions, and update records as needed');
+
             return 0;
         }
 
-        if (!$force && !$this->confirm("Queue refresh jobs for {$totalRecords} media records?")) {
+        if (! $force && ! $this->confirm("Queue refresh jobs for {$totalRecords} media records?")) {
             return 0;
         }
 
         // Generate a unique batch ID
         $batchId = Str::uuid()->toString();
-        
+
         // Initialize batch cache
         Cache::put("refresh_batch_{$batchId}", [
             'total' => $totalRecords,
             'completed' => 0,
             'failed' => 0,
-            'stats' => []
+            'stats' => [],
         ], 3600); // Cache for 1 hour
 
         // Dispatch jobs in chunks
@@ -75,12 +77,12 @@ class RefreshAllMediaCommand extends Command
         $this->info("Successfully queued {$jobsDispatched} refresh jobs");
         $this->info("Batch ID: {$batchId}");
         $this->info("You'll receive notifications about progress and completion");
-        
-        $this->comment("Jobs will check each file for:");
-        $this->line("- File size changes");
-        $this->line("- MIME type changes");
-        $this->line("- Image dimension changes");
-        $this->line("- Parent model reference consistency");
+
+        $this->comment('Jobs will check each file for:');
+        $this->line('- File size changes');
+        $this->line('- MIME type changes');
+        $this->line('- Image dimension changes');
+        $this->line('- Parent model reference consistency');
 
         return 0;
     }

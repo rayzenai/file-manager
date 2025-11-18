@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 
@@ -11,26 +12,23 @@ class MetadataRefreshService
 {
     /**
      * Check if there's a discrepancy between model field and metadata
-     * 
-     * @param MediaMetadata $record
-     * @return array
      */
     public function checkDiscrepancy(MediaMetadata $record): array
     {
         try {
             // Get the parent model
             $model = $record->mediable_type::find($record->mediable_id);
-            
-            if (!$model) {
+
+            if (! $model) {
                 return [
                     'has_discrepancy' => false,
                     'reason' => 'Parent model not found',
                 ];
             }
-            
+
             $field = $record->mediable_field;
             $modelFileName = null;
-            
+
             if (is_array($model->{$field})) {
                 // Array field - check if our file is in the array
                 $values = $model->{$field};
@@ -40,11 +38,11 @@ class MetadataRefreshService
                 } else {
                     // File not in array or has different name
                     // Return the array files for user to see
-                    $filesList = !empty($values) ? implode(', ', array_slice($values, 0, 3)) : '(empty array)';
+                    $filesList = ! empty($values) ? implode(', ', array_slice($values, 0, 3)) : '(empty array)';
                     if (count($values) > 3) {
                         $filesList .= ' and ' . (count($values) - 3) . ' more';
                     }
-                    
+
                     return [
                         'has_discrepancy' => true,
                         'is_array' => true,
@@ -56,7 +54,7 @@ class MetadataRefreshService
             } else {
                 // Single value field
                 $modelFileName = $model->{$field};
-                
+
                 if ($modelFileName !== $record->file_name) {
                     return [
                         'has_discrepancy' => true,
@@ -66,9 +64,9 @@ class MetadataRefreshService
                     ];
                 }
             }
-            
+
             return ['has_discrepancy' => false];
-            
+
         } catch (\Exception $e) {
             return [
                 'has_discrepancy' => false,
@@ -76,41 +74,39 @@ class MetadataRefreshService
             ];
         }
     }
-    
+
     /**
      * Refresh metadata for a single media record
-     * 
-     * @param MediaMetadata $record
-     * @param string $source 'model' to use parent model's field value, 'metadata' to use current metadata value
-     * @return array
+     *
+     * @param  string  $source  'model' to use parent model's field value, 'metadata' to use current metadata value
      */
     public function refreshSingle(MediaMetadata $record, string $source = 'model'): array
     {
         try {
             // Get the parent model
             $model = $record->mediable_type::find($record->mediable_id);
-            
-            if (!$model) {
+
+            if (! $model) {
                 return [
                     'success' => false,
                     'message' => 'Parent model not found',
                 ];
             }
-            
+
             $updates = [];
             $changes = [];
-            
+
             // Refetch SEO title if the model has seoTitleField method
             if (method_exists($model, 'seoTitleField')) {
                 $seoField = $model->seoTitleField();
                 $seoTitle = $model->$seoField ?? null;
-                
+
                 if ($seoTitle) {
                     // Clean control characters
                     $seoTitle = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $seoTitle);
                     // Limit to 160 characters
                     $seoTitle = substr($seoTitle, 0, 160);
-                    
+
                     // Only update if different
                     if ($seoTitle !== $record->seo_title) {
                         $updates['seo_title'] = $seoTitle;
@@ -120,14 +116,14 @@ class MetadataRefreshService
                     }
                 }
             }
-            
+
             // Determine the file name based on source
             $actualFileName = null;
-            
+
             if ($source === 'model') {
                 // Get the actual file name from the parent model's field
                 $field = $record->mediable_field;
-                
+
                 if (is_array($model->{$field})) {
                     // If it's an array field, find the file in the array
                     $values = $model->{$field};
@@ -144,15 +140,15 @@ class MetadataRefreshService
                     // Single value field - get the current value from model
                     $actualFileName = $model->{$field};
                 }
-                
+
                 // Check if the file name has changed
                 if ($actualFileName && $actualFileName !== $record->file_name) {
                     $updates['file_name'] = $actualFileName;
                     $changes[] = "File name: {$record->file_name} → {$actualFileName}";
                 }
-                
+
                 // If no file name found in model
-                if (!$actualFileName) {
+                if (! $actualFileName) {
                     return [
                         'success' => false,
                         'message' => 'File reference removed from model',
@@ -162,10 +158,10 @@ class MetadataRefreshService
                 // Use the file name from metadata record
                 $actualFileName = $record->file_name;
             }
-            
+
             // Check if file exists and update file info using the actual file name
             $disk = $this->getDiskForFile($actualFileName);
-            
+
             if (Storage::disk($disk)->exists($actualFileName)) {
                 // Update file size
                 $fileSize = Storage::disk($disk)->size($actualFileName);
@@ -175,14 +171,14 @@ class MetadataRefreshService
                     $updates['file_size'] = $fileSize;
                     $changes[] = "File size: {$oldSizeKb}KB → {$newSizeKb}KB";
                 }
-                
+
                 // Get MIME type if possible
                 $mimeType = Storage::disk($disk)->mimeType($actualFileName);
                 if ($mimeType && $mimeType !== $record->mime_type) {
                     $updates['mime_type'] = $mimeType;
                     $changes[] = "MIME type: {$record->mime_type} → {$mimeType}";
                 }
-                
+
                 // For images, try to get dimensions
                 if (str_starts_with($mimeType ?? $record->mime_type ?? '', 'image/')) {
                     $dimensions = $this->getImageDimensions($actualFileName, $disk);
@@ -203,11 +199,11 @@ class MetadataRefreshService
                     'message' => "File not found on storage: {$actualFileName}",
                 ];
             }
-            
+
             // Update the record if there are changes
-            if (!empty($updates)) {
+            if (! empty($updates)) {
                 $record->update($updates);
-                
+
                 return [
                     'success' => true,
                     'updated' => true,
@@ -215,13 +211,13 @@ class MetadataRefreshService
                     'message' => implode("\n", $changes),
                 ];
             }
-            
+
             return [
                 'success' => true,
                 'updated' => false,
                 'message' => 'Metadata is already up to date',
             ];
-            
+
         } catch (\Exception $e) {
             return [
                 'success' => false,
@@ -229,25 +225,24 @@ class MetadataRefreshService
             ];
         }
     }
-    
+
     /**
      * Check if any records in a collection have discrepancies
-     * 
-     * @param \Illuminate\Support\Collection $records
-     * @return array
+     *
+     * @param  Collection  $records
      */
     public function checkBulkDiscrepancies($records): array
     {
         $hasAnyDiscrepancy = false;
         $discrepancyCount = 0;
         $examples = [];
-        
+
         foreach ($records as $record) {
             $check = $this->checkDiscrepancy($record);
             if ($check['has_discrepancy']) {
                 $hasAnyDiscrepancy = true;
                 $discrepancyCount++;
-                
+
                 // Collect first few examples
                 if (count($examples) < 3) {
                     $modelName = class_basename($record->mediable_type);
@@ -255,7 +250,7 @@ class MetadataRefreshService
                 }
             }
         }
-        
+
         return [
             'has_any_discrepancy' => $hasAnyDiscrepancy,
             'discrepancy_count' => $discrepancyCount,
@@ -263,13 +258,12 @@ class MetadataRefreshService
             'examples' => $examples,
         ];
     }
-    
+
     /**
      * Refresh metadata for multiple records
-     * 
-     * @param \Illuminate\Support\Collection $records
-     * @param string $source 'model' to use parent model's field value, 'metadata' to use current metadata value
-     * @return array
+     *
+     * @param  Collection  $records
+     * @param  string  $source  'model' to use parent model's field value, 'metadata' to use current metadata value
      */
     public function refreshBulk($records, string $source = 'model'): array
     {
@@ -278,10 +272,10 @@ class MetadataRefreshService
         $updatedCount = 0;
         $details = [];
         $failedRecords = [];
-        
+
         foreach ($records as $record) {
             $result = $this->refreshSingle($record, $source);
-            
+
             if ($result['success']) {
                 $successCount++;
                 if ($result['updated'] ?? false) {
@@ -295,7 +289,7 @@ class MetadataRefreshService
                 $failedRecords[] = "{$modelName} #{$record->mediable_id}: " . ($result['message'] ?? 'Failed');
             }
         }
-        
+
         return [
             'success_count' => $successCount,
             'failed_count' => $failedCount,
@@ -304,12 +298,9 @@ class MetadataRefreshService
             'failed_records' => $failedRecords,
         ];
     }
-    
+
     /**
      * Determine the disk for a file
-     * 
-     * @param string $fileName
-     * @return string
      */
     protected function getDiskForFile(string $fileName): string
     {
@@ -317,13 +308,9 @@ class MetadataRefreshService
         // the correct disk based on file path or other criteria
         return config('filesystems.default');
     }
-    
+
     /**
      * Get image dimensions from storage
-     * 
-     * @param string $fileName
-     * @param string $disk
-     * @return array|null
      */
     protected function getImageDimensions(string $fileName, string $disk): ?array
     {
@@ -332,10 +319,10 @@ class MetadataRefreshService
             $content = Storage::disk($disk)->get($fileName);
             $tempPath = sys_get_temp_dir() . '/' . uniqid('img_') . '.tmp';
             file_put_contents($tempPath, $content);
-            
+
             $imageInfo = @getimagesize($tempPath);
             @unlink($tempPath);
-            
+
             if ($imageInfo) {
                 return [
                     'width' => $imageInfo[0],
@@ -345,7 +332,7 @@ class MetadataRefreshService
         } catch (\Exception $e) {
             // Silently fail - dimensions are optional
         }
-        
+
         return null;
     }
 }

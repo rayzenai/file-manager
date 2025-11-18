@@ -19,7 +19,9 @@ class RefreshAllMediaJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300; // 5 minutes timeout per job
+
     public int $tries = 3; // Retry failed jobs 3 times
+
     public int $backoff = 30; // Wait 30 seconds between retries
 
     public function __construct(
@@ -32,19 +34,20 @@ class RefreshAllMediaJob implements ShouldQueue
     public function handle(): void
     {
         $record = MediaMetadata::find($this->mediaMetadataId);
-        
-        if (!$record) {
+
+        if (! $record) {
             Log::warning("RefreshAllMediaJob: MediaMetadata record {$this->mediaMetadataId} not found");
+
             return;
         }
 
         try {
-            $fileInfoService = new FileInfoService();
+            $fileInfoService = new FileInfoService;
             $result = $this->refreshMediaRecord($record, $fileInfoService);
-            
+
             if ($result['success']) {
                 Log::info("RefreshAllMediaJob: Successfully refreshed {$record->file_name}", [
-                    'changes' => $result['changes'] ?? []
+                    'changes' => $result['changes'] ?? [],
                 ]);
 
                 // Update batch progress if part of a batch
@@ -53,7 +56,7 @@ class RefreshAllMediaJob implements ShouldQueue
                 }
             } else {
                 Log::warning("RefreshAllMediaJob: No changes needed for {$record->file_name}");
-                
+
                 // Update batch progress if part of a batch
                 if ($this->batchId) {
                     $this->updateBatchProgress($record, $result, 'completed');
@@ -63,14 +66,14 @@ class RefreshAllMediaJob implements ShouldQueue
         } catch (Throwable $e) {
             Log::error("RefreshAllMediaJob: Exception processing {$record->file_name}", [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Update batch progress if part of a batch
             if ($this->batchId) {
                 $this->updateBatchProgress($record, ['message' => $e->getMessage()], 'failed');
             }
-            
+
             throw $e;
         }
     }
@@ -79,12 +82,12 @@ class RefreshAllMediaJob implements ShouldQueue
     {
         $record = MediaMetadata::find($this->mediaMetadataId);
         $fileName = $record?->file_name ?? "ID:{$this->mediaMetadataId}";
-        
+
         Log::error("RefreshAllMediaJob: Final failure for {$fileName}", [
             'error' => $exception->getMessage(),
-            'attempts' => $this->attempts()
+            'attempts' => $this->attempts(),
         ]);
-        
+
         // Update batch progress if part of a batch
         if ($this->batchId && $record) {
             $this->updateBatchProgress($record, ['message' => $exception->getMessage()], 'failed');
@@ -94,12 +97,12 @@ class RefreshAllMediaJob implements ShouldQueue
     private function refreshMediaRecord(MediaMetadata $record, FileInfoService $fileInfoService): array
     {
         $fileName = $record->file_name;
-        
+
         // Check if file exists in S3
-        if (!Storage::disk(config('filesystems.default'))->exists($fileName)) {
+        if (! Storage::disk(config('filesystems.default'))->exists($fileName)) {
             return [
                 'success' => false,
-                'message' => "File not found in S3: {$fileName}"
+                'message' => "File not found in S3: {$fileName}",
             ];
         }
 
@@ -107,10 +110,10 @@ class RefreshAllMediaJob implements ShouldQueue
         try {
             $fileInfo = $fileInfoService->getFileInfo($fileName, config('filesystems.default'));
 
-            if (!$fileInfo) {
+            if (! $fileInfo) {
                 return [
                     'success' => false,
-                    'message' => "Could not read file metadata: {$fileName}"
+                    'message' => "Could not read file metadata: {$fileName}",
                 ];
             }
 
@@ -141,57 +144,57 @@ class RefreshAllMediaJob implements ShouldQueue
                     $updateData['height'] = $fileInfo['height'];
                 }
             }
-            
+
             // Check if the parent model still references this file
             $model = $record->mediable_type::find($record->mediable_id);
             if ($model) {
                 $field = $record->mediable_field;
                 $modelValue = $model->{$field};
-                
+
                 $fileStillReferenced = false;
                 if (is_array($modelValue)) {
                     $fileStillReferenced = in_array($fileName, $modelValue);
                 } else {
                     $fileStillReferenced = ($modelValue === $fileName);
                 }
-                
-                if (!$fileStillReferenced) {
-                    $changes[] = "File no longer referenced by parent model";
+
+                if (! $fileStillReferenced) {
+                    $changes[] = 'File no longer referenced by parent model';
                     // Note: We don't delete the record, just log this discrepancy
                 }
             } else {
-                $changes[] = "Parent model no longer exists";
+                $changes[] = 'Parent model no longer exists';
                 // Note: We don't delete the record, just log this discrepancy
             }
-            
+
             // Update record if there are changes
-            if (!empty($updateData)) {
+            if (! empty($updateData)) {
                 $record->update($updateData);
-                
+
                 return [
                     'success' => true,
                     'changes' => $changes,
-                    'updated_fields' => array_keys($updateData)
+                    'updated_fields' => array_keys($updateData),
                 ];
             }
-            
+
             return [
                 'success' => false,
                 'message' => 'No changes detected',
-                'changes' => $changes
+                'changes' => $changes,
             ];
-            
+
         } catch (Throwable $e) {
             return [
                 'success' => false,
-                'message' => 'Error reading file metadata: ' . $e->getMessage()
+                'message' => 'Error reading file metadata: ' . $e->getMessage(),
             ];
         }
     }
 
     private function updateBatchProgress(MediaMetadata $record, array $result, string $status): void
     {
-        if (!$this->batchId) {
+        if (! $this->batchId) {
             return;
         }
 
@@ -200,19 +203,19 @@ class RefreshAllMediaJob implements ShouldQueue
             'total' => 0,
             'completed' => 0,
             'failed' => 0,
-            'stats' => []
+            'stats' => [],
         ]);
 
         // Update counters
         if ($status === 'completed') {
             $batchData['completed']++;
-            
+
             // Store refresh stats
-            if (isset($result['changes']) && !empty($result['changes'])) {
+            if (isset($result['changes']) && ! empty($result['changes'])) {
                 $batchData['stats'][] = [
                     'file_name' => $record->file_name,
                     'changes' => $result['changes'],
-                    'updated_fields' => $result['updated_fields'] ?? []
+                    'updated_fields' => $result['updated_fields'] ?? [],
                 ];
             }
         } elseif ($status === 'failed') {
@@ -226,7 +229,7 @@ class RefreshAllMediaJob implements ShouldQueue
         $totalProcessed = $batchData['completed'] + $batchData['failed'];
         if ($totalProcessed >= $batchData['total']) {
             // Dispatch final status notification
-            \Kirantimsina\FileManager\Jobs\BulkRefreshStatusJob::dispatch(
+            BulkRefreshStatusJob::dispatch(
                 $this->batchId,
                 $batchData['total'],
                 $batchData['completed'],
@@ -235,7 +238,7 @@ class RefreshAllMediaJob implements ShouldQueue
             );
         } elseif ($totalProcessed % 10 === 0) {
             // Send progress update every 10 completed jobs
-            \Kirantimsina\FileManager\Jobs\BulkRefreshStatusJob::dispatch(
+            BulkRefreshStatusJob::dispatch(
                 $this->batchId,
                 $batchData['total'],
                 $batchData['completed'],

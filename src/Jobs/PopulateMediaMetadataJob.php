@@ -43,7 +43,7 @@ class PopulateMediaMetadataJob implements ShouldQueue
             throw $e;
         }
 
-        $fileInfoService = new FileInfoService();
+        $fileInfoService = new FileInfoService;
 
         foreach ($records as $record) {
             foreach ($this->fields as $field) {
@@ -150,5 +150,4 @@ class PopulateMediaMetadataJob implements ShouldQueue
             }
         }
     }
-
 }

@@ -219,7 +219,7 @@ class FileManagerService
                     // Scale down by width, not height
                     $resizedImg->scaleDown(width: $val);
                 }
-                
+
                 // Convert to configured format with quality
                 // Keep the original filename to maintain consistency
                 switch ($format) {

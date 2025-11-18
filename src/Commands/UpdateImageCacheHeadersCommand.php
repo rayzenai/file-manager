@@ -20,9 +20,11 @@ class UpdateImageCacheHeadersCommand extends Command
     protected $description = 'Update cache control headers for existing images in S3';
 
     protected array $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'];
-    
+
     protected int $processedCount = 0;
+
     protected int $skippedCount = 0;
+
     protected int $errorCount = 0;
 
     public function handle(): int
@@ -31,14 +33,16 @@ class UpdateImageCacheHeadersCommand extends Command
         $dryRun = $this->option('dry-run');
         $limit = (int) $this->option('limit');
 
-        if (!config('file-manager.cache.enabled', true)) {
+        if (! config('file-manager.cache.enabled', true)) {
             $this->warn('Cache headers are disabled in config. Enable them first.');
+
             return 1;
         }
 
         $cacheControl = FileManagerService::buildCacheControlHeader();
-        if (!$cacheControl) {
+        if (! $cacheControl) {
             $this->error('Could not build cache control header from config.');
+
             return 1;
         }
 
@@ -51,7 +55,7 @@ class UpdateImageCacheHeadersCommand extends Command
 
         foreach ($directories as $dir) {
             $this->processDirectory($dir, $cacheControl, $dryRun, $limit);
-            
+
             if ($limit > 0 && $this->processedCount >= $limit) {
                 break;
             }
@@ -69,24 +73,24 @@ class UpdateImageCacheHeadersCommand extends Command
     protected function processDirectory(string $directory, string $cacheControl, bool $dryRun, int $limit): void
     {
         $this->info("Processing directory: {$directory}");
-        
+
         try {
             $files = Storage::disk(config('filesystems.default'))->files($directory, true);
             $imageFiles = $this->filterImageFiles($files);
-            
-            $this->info("Found " . count($imageFiles) . " image files");
-            
+
+            $this->info('Found ' . count($imageFiles) . ' image files');
+
             if (empty($imageFiles)) {
                 return;
             }
 
             // Only show progress bar if not in detailed mode
             $bar = null;
-            if (!$this->option('detailed')) {
+            if (! $this->option('detailed')) {
                 $bar = $this->output->createProgressBar(count($imageFiles));
                 $bar->start();
             } else {
-                $this->info("Processing " . count($imageFiles) . " files...");
+                $this->info('Processing ' . count($imageFiles) . ' files...');
                 $this->newLine();
             }
 
@@ -96,7 +100,7 @@ class UpdateImageCacheHeadersCommand extends Command
                 }
 
                 $this->processFile($file, $cacheControl, $dryRun);
-                
+
                 if ($bar) {
                     $bar->advance();
                 }
@@ -126,6 +130,7 @@ class UpdateImageCacheHeadersCommand extends Command
                     $this->line("  [DRY RUN] Would update: {$file}");
                 }
                 $this->processedCount++;
+
                 return;
             }
 
@@ -139,9 +144,9 @@ class UpdateImageCacheHeadersCommand extends Command
                     'secret' => $config['secret'],
                 ],
             ]);
-            
+
             $bucket = $config['bucket'];
-            
+
             // Copy object to itself with new metadata
             $client->copyObject([
                 'Bucket' => $bucket,
@@ -154,7 +159,7 @@ class UpdateImageCacheHeadersCommand extends Command
             ]);
 
             $this->processedCount++;
-            
+
             if ($this->option('detailed')) {
                 $this->info("  ✅ Updated: {$file}");
                 $this->line("     Cache-Control: {$cacheControl}");
@@ -165,7 +170,7 @@ class UpdateImageCacheHeadersCommand extends Command
             $this->errorCount++;
             if ($this->option('detailed')) {
                 $this->error("  ❌ Error: {$file}");
-                $this->line("     " . $e->getMessage());
+                $this->line('     ' . $e->getMessage());
             }
         }
     }
@@ -174,6 +179,7 @@ class UpdateImageCacheHeadersCommand extends Command
     {
         return array_filter($files, function ($file) {
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+
             return in_array($extension, $this->imageExtensions);
         });
     }
@@ -183,10 +189,10 @@ class UpdateImageCacheHeadersCommand extends Command
         // Get directories from config model mappings
         $modelMappings = config('file-manager.model', []);
         $directories = array_values($modelMappings);
-        
+
         // Also check for common resize directories
         $resizeDirs = array_keys(FileManagerService::getImageSizes());
-        
+
         // Combine base directories with their resize subdirectories
         $allDirectories = [];
         foreach ($directories as $dir) {
@@ -195,13 +201,13 @@ class UpdateImageCacheHeadersCommand extends Command
                 $allDirectories[] = "{$dir}/{$sizeKey}";
             }
         }
-        
+
         return array_unique($allDirectories);
     }
 
     protected function getContentType(string $extension): string
     {
-        return match($extension) {
+        return match ($extension) {
             'jpg', 'jpeg' => 'image/jpeg',
             'png' => 'image/png',
             'webp' => 'image/webp',

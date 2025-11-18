@@ -40,20 +40,21 @@ class UpdateSeoTitlesCommand extends Command
             $modelClass = class_exists($specificModel) ? $specificModel : "App\\Models\\{$specificModel}";
             if (class_exists($modelClass)) {
                 $query->where('mediable_type', $modelClass);
-                
+
                 // Filter by specific ID if provided
                 if ($specificId) {
                     $query->where('mediable_id', $specificId);
                 }
             } else {
                 $this->error("Model class {$specificModel} does not exist.");
+
                 return;
             }
         } else {
             // Only process enabled models by default
-            if (!empty($enabledModels)) {
+            if (! empty($enabledModels)) {
                 $query->whereIn('mediable_type', $enabledModels);
-            } elseif (!empty($excludedModels)) {
+            } elseif (! empty($excludedModels)) {
                 $query->whereNotIn('mediable_type', $excludedModels);
             }
         }
@@ -62,11 +63,12 @@ class UpdateSeoTitlesCommand extends Command
 
         if ($totalRecords === 0) {
             $this->info('No media metadata records found that need updating.');
+
             return;
         }
 
         $this->info("Found {$totalRecords} media metadata records to check for updates.");
-        
+
         $bar = $this->output->createProgressBar($totalRecords);
         $bar->start();
 
@@ -76,10 +78,11 @@ class UpdateSeoTitlesCommand extends Command
         $query->chunkById($chunkSize, function (Collection $mediaRecords) use (&$processed, &$updated, $bar) {
             foreach ($mediaRecords as $media) {
                 $model = $media->mediable;
-                
-                if (!$model) {
+
+                if (! $model) {
                     $processed++;
                     $bar->advance();
+
                     continue;
                 }
 
@@ -108,25 +111,27 @@ class UpdateSeoTitlesCommand extends Command
     private function generateSeoTitle($model, MediaMetadata $media): ?string
     {
         $modelTitle = $this->extractModelTitle($model);
-        
-        if (!$modelTitle) {
+
+        if (! $modelTitle) {
             return null;
         }
 
         $field = $media->mediable_field;
-        
+
         // For specific field types, we might want to add context
         $contextualFields = ['thumbnail', 'gallery_images', 'sec_images', 'cover_image', 'banner_image'];
-        
+
         if (in_array($field, $contextualFields)) {
             $fieldContext = $this->getFieldContext($field);
-            if ($fieldContext && !str_contains(strtolower($modelTitle), strtolower($fieldContext))) {
+            if ($fieldContext && ! str_contains(strtolower($modelTitle), strtolower($fieldContext))) {
                 $title = mb_substr($modelTitle . ' - ' . $fieldContext, 0, 160);
+
                 return $this->cleanSeoTitle($title);
             }
         }
 
         $title = mb_substr($modelTitle, 0, 160);
+
         return $this->cleanSeoTitle($title);
     }
 
@@ -144,7 +149,7 @@ class UpdateSeoTitlesCommand extends Command
         ];
 
         foreach ($titleFields as $field) {
-            if (isset($model->$field) && !empty($model->$field)) {
+            if (isset($model->$field) && ! empty($model->$field)) {
                 $value = $model->$field;
                 $value = strip_tags($value);
                 $value = trim($value);
@@ -185,6 +190,7 @@ class UpdateSeoTitlesCommand extends Command
         $title = trim($title);
         $title = preg_replace('/^[^\w\s]+|[^\w\s]+$/u', '', $title);
         $title = preg_replace('/\s+/', ' ', $title);
+
         return trim($title);
     }
 }
