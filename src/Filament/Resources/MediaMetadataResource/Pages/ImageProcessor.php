@@ -8,7 +8,6 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ViewField;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -48,7 +47,7 @@ class ImageProcessor extends Page implements HasForms
         $this->form->fill([
             'format' => 'webp',
             'quality' => '85',
-            'compression_method' => 'auto',
+            'compression_method' => config('file-manager.compression.driver', 'gd'),
             'resize_mode' => 'contain',
         ]);
     }
@@ -143,47 +142,14 @@ class ImageProcessor extends Page implements HasForms
                                 ->visible(fn ($get) => $get('width') || $get('height'))
                                 ->helperText('How to handle resizing when dimensions are specified'),
 
-                            Toggle::make('remove_background')
-                                ->label('Remove Background')
-                                ->helperText('Uses AI to remove the background (requires Cloud Run API)')
-                                ->visible(function () {
-                                    // Show if bg_removal API is configured OR if primary API is the Cloud Run endpoint
-                                    $bgRemovalUrl = config('file-manager.compression.api.bg_removal.url');
-                                    $primaryUrl = config('file-manager.compression.api.url');
-                                    
-                                    // Check if either bg_removal is configured or primary API is Cloud Run
-                                    return !empty($bgRemovalUrl) || 
-                                           (str_contains($primaryUrl ?? '', 'image-processor-ao25z3a2tq-el.a.run.app'));
-                                }),
-
                             Select::make('compression_method')
-                                ->label('Processing Method')
-                                ->options(function () {
-                                    $options = [];
-                                    
-                                    $hasLambda = !empty(config('file-manager.compression.api.url'));
-                                    $hasCloudRun = !empty(config('file-manager.compression.api.bg_removal.url'));
-                                    
-                                    if ($hasLambda || $hasCloudRun) {
-                                        $options['auto'] = 'Auto (Use best available API, fallback to GD)';
-                                    }
-                                    
-                                    if ($hasLambda) {
-                                        $options['api'] = 'Lambda API (Fast compression)';
-                                    }
-                                    
-                                    if ($hasCloudRun) {
-                                        $options['api_bg_removal'] = 'Cloud Run API (Background removal support)';
-                                    }
-                                    
-                                    $options['gd'] = 'GD Library Only (Local processing)';
-                                    
-                                    return $options;
-                                })
-                                ->default('auto')
-                                ->visible(fn () => !empty(config('file-manager.compression.api.url')) || 
-                                                  !empty(config('file-manager.compression.api.bg_removal.url')))
-                                ->helperText('Choose which compression method to use'),
+                                ->label('Processing Driver')
+                                ->options([
+                                    'gd' => 'GD Library (Fast, lower memory)',
+                                    'imagick' => 'Imagick (Better quality, more features)',
+                                ])
+                                ->default(fn () => config('file-manager.compression.driver', 'gd'))
+                                ->helperText('Choose which image processing driver to use'),
                         ])
                         ->columnSpan(1),
                 ]),
@@ -284,18 +250,13 @@ class ImageProcessor extends Page implements HasForms
                 };
             }
 
-            // Override compression method if specified
-            $originalMethod = config('file-manager.compression.method');
-            if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
-                // Map the UI options to actual compression methods
-                $methodMap = [
-                    'api' => 'api',  // Lambda API
-                    'api_bg_removal' => 'api',  // Cloud Run API (will be handled by removeBg flag)
-                    'gd' => 'gd',
-                ];
-                
-                $method = $methodMap[$data['compression_method']] ?? 'api';
-                config(['file-manager.compression.method' => $method]);
+            // Override compression driver if specified
+            $originalDriver = config('file-manager.compression.driver');
+            if (isset($data['compression_method'])) {
+                $driver = in_array($data['compression_method'], ['gd', 'imagick'])
+                    ? $data['compression_method']
+                    : 'gd';
+                config(['file-manager.compression.driver' => $driver]);
             }
             
             // Create compression service AFTER config override
@@ -306,7 +267,6 @@ class ImageProcessor extends Page implements HasForms
             $width = ! empty($data['width']) ? (int) $data['width'] : null;
             $height = ! empty($data['height']) ? (int) $data['height'] : null;
             $mode = $data['resize_mode'] ?? 'contain';
-            $removeBg = $data['remove_background'] ?? false;
 
             $result = $compressionService->compress(
                 $inputPath,
@@ -314,12 +274,11 @@ class ImageProcessor extends Page implements HasForms
                 $height,
                 $width,
                 $format,
-                $mode,
-                $removeBg
+                $mode
             );
 
-            // Restore original compression method
-            config(['file-manager.compression.method' => $originalMethod]);
+            // Restore original compression driver
+            config(['file-manager.compression.driver' => $originalDriver]);
 
             if (! $result['success']) {
                 throw new \Exception($result['message'] ?? 'Compression failed');
@@ -464,10 +423,9 @@ class ImageProcessor extends Page implements HasForms
     protected function getMethodLabel(string $method): string
     {
         return match ($method) {
-            'api' => 'API Compression',
             'gd' => 'GD Library',
-            'gd_fallback' => 'GD (API Fallback)',
-            default => 'Unknown',
+            'imagick' => 'Imagick',
+            default => strtoupper($method),
         };
     }
 

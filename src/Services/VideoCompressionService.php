@@ -93,10 +93,6 @@ class VideoCompressionService
         $preset = $preset ?? $this->preset;
         $crf = $crf ?? $this->crf;
 
-        if ($this->compressionMethod === 'api') {
-            return $this->compressViaApi($video, $outputFormat, $videoBitrate, $maxWidth, $maxHeight);
-        }
-
         return $this->compressViaFFmpeg($video, $outputFormat, $videoBitrate, $maxWidth, $maxHeight, $preset, $crf);
     }
 
@@ -308,24 +304,6 @@ class VideoCompressionService
                 'message' => 'Video compression failed: ' . $t->getMessage(),
             ];
         }
-    }
-
-    /**
-     * Compress via external API (placeholder for future implementation)
-     */
-    protected function compressViaApi(
-        $video,
-        string $outputFormat,
-        int $videoBitrate,
-        ?int $maxWidth,
-        ?int $maxHeight
-    ): array {
-        // This could be implemented to use cloud-based video encoding services
-        // like AWS MediaConvert, Coconut, Zencoder, etc.
-        return [
-            'success' => false,
-            'message' => 'API-based video compression not yet implemented. Please use FFmpeg method.',
-        ];
     }
 
     /**
