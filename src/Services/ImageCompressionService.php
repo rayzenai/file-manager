@@ -3,7 +3,6 @@
 namespace Kirantimsina\FileManager\Services;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -11,15 +10,7 @@ use Throwable;
 
 class ImageCompressionService
 {
-    private string $compressionMethod;
-
-    private string $apiUrl;
-
-    private string $apiToken;
-    
-    private string $bgRemovalApiUrl;
-    
-    private string $bgRemovalApiToken;
+    private string $driver;
 
     private int $defaultQuality;
 
@@ -27,32 +18,22 @@ class ImageCompressionService
 
     private string $defaultMode;
 
-    private int $timeout;
-    
-    private int $bgRemovalTimeout;
-    
     private int $maxHeight;
-    
+
     private int $maxWidth;
 
     public function __construct()
     {
-        $this->compressionMethod = config('file-manager.compression.method', 'gd');
-        $this->apiUrl = config('file-manager.compression.api.url', '');
-        $this->apiToken = config('file-manager.compression.api.token', '');
-        $this->bgRemovalApiUrl = config('file-manager.compression.api.bg_removal.url', '');
-        $this->bgRemovalApiToken = config('file-manager.compression.api.bg_removal.token', '');
+        $this->driver = config('file-manager.compression.driver', 'gd');
         $this->defaultQuality = config('file-manager.compression.quality', 85);
         $this->defaultFormat = config('file-manager.compression.format', 'webp');
         $this->defaultMode = config('file-manager.compression.mode', 'contain');
-        $this->timeout = config('file-manager.compression.api.timeout', 30);
-        $this->bgRemovalTimeout = config('file-manager.compression.api.bg_removal.timeout', 60);
         $this->maxHeight = config('file-manager.compression.max_height', 2160);
         $this->maxWidth = config('file-manager.compression.max_width', 3840);
     }
 
     /**
-     * Compress an image using the configured method
+     * Compress an image using the configured driver (GD or Imagick)
      */
     public function compress(
         $image,
@@ -60,32 +41,19 @@ class ImageCompressionService
         ?int $height = null,
         ?int $width = null,
         ?string $format = null,
-        ?string $mode = null,
-        bool $removeBg = false
+        ?string $mode = null
     ): array {
         $quality = $quality ?? $this->defaultQuality;
         $format = $format ?? $this->defaultFormat;
         $mode = $mode ?? $this->defaultMode;
 
-        if ($this->compressionMethod === 'api' && ! empty($this->apiUrl)) {
-            return $this->compressViaApi($image, $quality, $height, $width, $format, $mode, $removeBg);
-        }
-
-        // Note: GD library doesn't support background removal, only API does
-        if ($removeBg && $this->compressionMethod !== 'api') {
-            // Try to use API if background removal is requested but GD is configured
-            if (! empty($this->apiUrl)) {
-                return $this->compressViaApi($image, $quality, $height, $width, $format, $mode, $removeBg);
-            }
-        }
-
-        return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
+        return $this->compressViaDriver($image, $quality, $height, $width, $format, $mode);
     }
 
     /**
-     * Compress using built-in GD library
+     * Compress using configured driver (GD or Imagick)
      */
-    protected function compressViaGd(
+    protected function compressViaDriver(
         $image,
         int $quality,
         ?int $height,
@@ -101,8 +69,12 @@ class ImageCompressionService
 
             $originalSize = strlen($fileContent['data']['content']);
 
-            // Use Intervention Image with GD
-            $img = ImageManager::gd()->read($fileContent['data']['content']);
+            // Use Intervention Image with configured driver
+            $manager = $this->driver === 'imagick'
+                ? ImageManager::imagick()
+                : ImageManager::gd();
+
+            $img = $manager->read($fileContent['data']['content']);
 
             // Get original dimensions
             $originalWidth = $img->width();
@@ -154,7 +126,7 @@ class ImageCompressionService
             
             // Get final dimensions after processing
             try {
-                $finalImg = ImageManager::gd()->read($compressedContent);
+                $finalImg = $manager->read($compressedContent);
                 $finalWidth = $finalImg->width();
                 $finalHeight = $finalImg->height();
             } catch (\Exception $e) {
@@ -174,14 +146,14 @@ class ImageCompressionService
                     'format' => $format,
                     'width' => $finalWidth,
                     'height' => $finalHeight,
-                    'compression_method' => 'gd',
+                    'compression_method' => $this->driver,
                 ],
-                'message' => 'Image compressed successfully using GD',
+                'message' => 'Image compressed successfully using ' . strtoupper($this->driver),
             ];
 
         } catch (Throwable $t) {
             // Provide more context about the error
-            $errorMessage = 'GD compression failed: ' . $t->getMessage();
+            $errorMessage = ucfirst($this->driver) . ' compression failed: ' . $t->getMessage();
 
             // Add helpful debugging info
             if (str_contains($t->getMessage(), 'Unable to decode')) {
@@ -200,202 +172,6 @@ class ImageCompressionService
         }
     }
 
-    /**
-     * Compress using external API
-     */
-    protected function compressViaApi(
-        $image,
-        int $quality,
-        ?int $height,
-        ?int $width,
-        string $format,
-        string $mode,
-        bool $removeBg = false
-    ): array {
-        try {
-            $fileContent = $this->getFileContent($image);
-            if (! $fileContent['success']) {
-                return $fileContent;
-            }
-            
-            // Get original image dimensions to calculate enforced dimensions
-            $originalImg = ImageManager::gd()->read($fileContent['data']['content']);
-            $originalWidth = $originalImg->width();
-            $originalHeight = $originalImg->height();
-            
-            // Calculate enforced dimensions based on max constraints
-            $enforcedDimensions = $this->calculateEnforcedDimensions(
-                $originalWidth,
-                $originalHeight,
-                $width,
-                $height
-            );
-            
-            // Use enforced dimensions for API call
-            $finalWidth = $enforcedDimensions['width'];
-            $finalHeight = $enforcedDimensions['height'];
-            
-            // Determine which API to use
-            $useBackgroundRemovalApi = $removeBg && !empty($this->bgRemovalApiUrl);
-            $apiUrl = $useBackgroundRemovalApi ? $this->bgRemovalApiUrl : $this->apiUrl;
-            $apiToken = $useBackgroundRemovalApi ? $this->bgRemovalApiToken : $this->apiToken;
-            $apiTimeout = $useBackgroundRemovalApi ? $this->bgRemovalTimeout : $this->timeout;
-            
-            // If no appropriate API is configured, fall back to GD
-            if (empty($apiUrl)) {
-                if ($removeBg) {
-                    return [
-                        'success' => false,
-                        'message' => 'Background removal requested but no API configured',
-                    ];
-                }
-                return $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
-            }
-            
-            // Check file size - skip API for files over 5MB to avoid timeouts (except for bg removal)
-            $fileSizeInMb = strlen($fileContent['data']['content']) / (1024 * 1024);
-            if ($fileSizeInMb > 5 && !$removeBg) {
-                // For large files, fall back to GD unless background removal is required
-                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
-                if ($gdResult['success']) {
-                    $gdResult['data']['compression_method'] = 'gd_fallback';
-                    $gdResult['data']['api_fallback_reason'] = 'File too large for API (' . round($fileSizeInMb, 2) . ' MB)';
-                }
-                return $gdResult;
-            }
-
-            // Build API request parameters
-            $params = [
-                'format' => $format,
-                'mode' => $mode,
-                'quality' => $quality,
-            ];
-
-            // Always send dimensions to API (API requires these parameters)
-            $params['width'] = $finalWidth;
-            $params['height'] = $finalHeight;
-
-            // Add background removal parameter if requested
-            if ($removeBg) {
-                $params['removebg'] = 'true';
-            }
-
-            $queryParams = http_build_query($params);
-            $url = $apiUrl . '?' . $queryParams;
-
-            // Make API request
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiToken,
-            ])
-                ->timeout($apiTimeout)
-                ->attach(
-                    'file',
-                    $fileContent['data']['content'],
-                    $fileContent['data']['filename']
-                )
-                ->post($url);
-
-            if (! $response->successful()) {
-                // Fallback to GD if API fails (but can't do background removal with GD)
-                if ($removeBg) {
-                    $statusCode = $response->status();
-                    $errorMessage = match($statusCode) {
-                        401 => 'Authentication failed - check API token',
-                        403 => 'Access forbidden',
-                        404 => 'API endpoint not found',
-                        413 => 'Image too large',
-                        429 => 'Too many requests - please try again later',
-                        500 => 'Server error - please try again',
-                        503 => 'Service temporarily unavailable - Cloud Run is scaling up, please try again',
-                        default => "API returned status {$statusCode}"
-                    };
-                    
-                    return [
-                        'success' => false,
-                        'message' => "Background removal failed: {$errorMessage}",
-                    ];
-                }
-
-                // Fallback to GD and mark it as a fallback
-                $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
-                if ($gdResult['success']) {
-                    $gdResult['data']['compression_method'] = 'gd_fallback';
-                    $responseBody = $response->body();
-                    $statusCode = $response->status();
-                    $gdResult['data']['api_fallback_reason'] = "API returned status {$statusCode}" . 
-                        ($responseBody ? ". Response: " . substr($responseBody, 0, 100) : '');
-                }
-
-                return $gdResult;
-            }
-
-            $compressedImage = $response->body();
-            $originalSize = strlen($fileContent['data']['content']);
-            $compressedSize = strlen($compressedImage);
-            $compressionRatio = round((1 - ($compressedSize / $originalSize)) * 100, 2);
-            
-            // Get dimensions of the compressed image (actual dimensions from the API result)
-            try {
-                $compressedImg = ImageManager::gd()->read($compressedImage);
-                $actualWidth = $compressedImg->width();
-                $actualHeight = $compressedImg->height();
-                
-                // Use the actual dimensions from the compressed image
-                $finalWidth = $actualWidth;
-                $finalHeight = $actualHeight;
-            } catch (\Exception $e) {
-                // If we can't read dimensions, keep the enforced dimensions we calculated earlier
-                // $finalWidth and $finalHeight already contain the enforced dimensions
-            }
-
-            $apiType = $useBackgroundRemovalApi ? 'api_bg_removal' : 'api';
-            $apiName = $useBackgroundRemovalApi ? 'Cloud Run (BG Removal)' : 'Lambda';
-            
-            return [
-                'success' => true,
-                'data' => [
-                    'compressed_image' => $compressedImage,
-                    'original_size' => $originalSize,
-                    'compressed_size' => $compressedSize,
-                    'compression_ratio' => $compressionRatio . '%',
-                    'filename' => $fileContent['data']['filename'],
-                    'format' => $format,
-                    'width' => $finalWidth,
-                    'height' => $finalHeight,
-                    'compression_method' => $apiType,
-                    'api_used' => $apiName,
-                ],
-                'message' => 'Image compressed successfully using ' . $apiName . ' API',
-            ];
-
-        } catch (Throwable $t) {
-            // Fallback to GD if API fails (but can't do background removal with GD)
-            if ($removeBg) {
-                $errorMessage = $t->getMessage();
-                
-                // Provide more user-friendly error messages
-                if (str_contains($errorMessage, 'cURL error 28') || str_contains($errorMessage, 'Operation timed out')) {
-                    $errorMessage = 'Request timed out - Cloud Run may be starting up. Please try again in a few seconds.';
-                } elseif (str_contains($errorMessage, 'Could not resolve host')) {
-                    $errorMessage = 'Cannot connect to API server - check your internet connection';
-                }
-                
-                return [
-                    'success' => false,
-                    'message' => 'Background removal failed: ' . $errorMessage,
-                ];
-            }
-
-            // Fallback to GD and mark it as a fallback
-            $gdResult = $this->compressViaGd($image, $quality, $height, $width, $format, $mode);
-            if ($gdResult['success']) {
-                $gdResult['data']['compression_method'] = 'gd_fallback';
-                $gdResult['data']['api_fallback_reason'] = 'API exception: ' . $t->getMessage();
-            }
-
-            return $gdResult;
-        }
-    }
 
     /**
      * Compress and save image to storage
@@ -408,11 +184,10 @@ class ImageCompressionService
         ?int $width = null,
         ?string $format = null,
         ?string $mode = null,
-        ?string $disk = null,
-        bool $removeBg = false
+        ?string $disk = null
     ): array {
         try {
-            $result = $this->compress($image, $quality, $height, $width, $format, $mode, $removeBg);
+            $result = $this->compress($image, $quality, $height, $width, $format, $mode);
             if (! $result['success']) {
                 return $result;
             }

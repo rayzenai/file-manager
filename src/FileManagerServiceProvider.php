@@ -10,7 +10,6 @@ use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
 use Kirantimsina\FileManager\Commands\PopulateSeoTitlesCommand;
 use Kirantimsina\FileManager\Commands\RefreshAllMediaCommand;
 use Kirantimsina\FileManager\Commands\RemoveDuplicateMediaMetadataCommand;
-use Kirantimsina\FileManager\Commands\TestCompressionApiCommand;
 use Kirantimsina\FileManager\Commands\UpdateImageCacheHeadersCommand;
 use Kirantimsina\FileManager\Commands\UpdateSeoTitlesCommand;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages\ImageProcessor;
@@ -43,7 +42,6 @@ class FileManagerServiceProvider extends PackageServiceProvider
                 PopulateSeoTitlesCommand::class,
                 RefreshAllMediaCommand::class,
                 RemoveDuplicateMediaMetadataCommand::class,
-                TestCompressionApiCommand::class,
                 UpdateImageCacheHeadersCommand::class,
                 UpdateSeoTitlesCommand::class,
             ]);

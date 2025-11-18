@@ -47,19 +47,21 @@ class CompressImageJob implements ShouldQueue
         }
 
         try {
-            // Override compression method if specified
-            $originalMethod = config('file-manager.compression.method');
+            // Override compression driver if specified
+            $originalDriver = config('file-manager.compression.driver');
             if (isset($this->compressionSettings['compression_method']) && $this->compressionSettings['compression_method'] !== 'auto') {
-                $method = $this->compressionSettings['compression_method'] === 'api' ? 'api' : 'gd';
-                config(['file-manager.compression.method' => $method]);
+                $driver = in_array($this->compressionSettings['compression_method'], ['gd', 'imagick'])
+                    ? $this->compressionSettings['compression_method']
+                    : 'gd';
+                config(['file-manager.compression.driver' => $driver]);
             }
 
             $compressionService = new ImageCompressionService;
-            
+
             $result = $this->compressMediaRecord($record, $this->compressionSettings, $compressionService);
-            
-            // Restore original method
-            config(['file-manager.compression.method' => $originalMethod]);
+
+            // Restore original driver
+            config(['file-manager.compression.driver' => $originalDriver]);
 
             if ($result['success']) {
                 Log::info("CompressImageJob: Successfully compressed {$record->file_name}", [

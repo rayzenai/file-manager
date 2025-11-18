@@ -7,7 +7,6 @@ namespace Kirantimsina\FileManager\Forms\Components;
 use Closure;
 use Exception;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -45,11 +44,6 @@ class MediaUpload extends FileUpload
      * Whether compression was used for the upload
      */
     protected bool $compressionUsed = false;
-
-    /**
-     * Whether to remove background from images
-     */
-    protected bool|Closure $removeBackground = false;
 
     /**
      * Compression driver to use (overrides config)
@@ -168,30 +162,12 @@ class MediaUpload extends FileUpload
     }
 
     /**
-     * Set whether to remove background from images
-     */
-    public function removeBg(bool|Closure $removeBackground = true): static
-    {
-        $this->removeBackground = $removeBackground;
-
-        return $this;
-    }
-
-    /**
-     * Convenience method to enable background removal
-     */
-    public function withoutBackground(): static
-    {
-        return $this->removeBg(true);
-    }
-
-    /**
-     * Set the compression driver (gd or api)
+     * Set the compression driver (gd or imagick)
      */
     public function driver(string $driver): static
     {
-        if (! in_array($driver, ['gd', 'api'])) {
-            throw new \InvalidArgumentException("Invalid compression driver: {$driver}. Must be 'gd' or 'api'.");
+        if (! in_array($driver, ['gd', 'imagick'])) {
+            throw new \InvalidArgumentException("Invalid compression driver: {$driver}. Must be 'gd' or 'imagick'.");
         }
 
         $this->compressionDriver = $driver;
@@ -852,11 +828,11 @@ class MediaUpload extends FileUpload
                 }
             }
 
-            // Override compression method if driver is specified
-            $originalMethod = null;
+            // Override compression driver if specified
+            $originalDriver = null;
             if ($this->compressionDriver !== null) {
-                $originalMethod = config('file-manager.compression.method');
-                config(['file-manager.compression.method' => $this->compressionDriver]);
+                $originalDriver = config('file-manager.compression.driver');
+                config(['file-manager.compression.driver' => $this->compressionDriver]);
             }
 
             // Create compression service AFTER config override
@@ -884,10 +860,7 @@ class MediaUpload extends FileUpload
             $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
             $fullPath = "{$directory}/{$filename}";
 
-            // Evaluate the removeBackground value if it's a closure
-            $shouldRemoveBackground = $this->evaluate($this->removeBackground);
-
-            // Compress the image (with optional background removal)
+            // Compress the image
             // Pass the file path instead of the TemporaryUploadedFile object
             $result = $compressionService->compressAndSave(
                 $tempPath,
@@ -897,13 +870,12 @@ class MediaUpload extends FileUpload
                 config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
                 $outputFormat,
                 config('file-manager.compression.mode'),
-                config('filesystems.default'),
-                $shouldRemoveBackground  // Pass the evaluated removeBg flag
+                config('filesystems.default')
             );
 
-            // Restore original compression method if we changed it
-            if ($originalMethod !== null) {
-                config(['file-manager.compression.method' => $originalMethod]);
+            // Restore original compression driver if we changed it
+            if ($originalDriver !== null) {
+                config(['file-manager.compression.driver' => $originalDriver]);
             }
 
             // Clean up temporary file if we created one
@@ -915,10 +887,10 @@ class MediaUpload extends FileUpload
             // If compression fails, try with the original file object
 
             // Apply driver override in fallback too
-            $originalMethod = null;
+            $originalDriver = null;
             if ($this->compressionDriver !== null) {
-                $originalMethod = config('file-manager.compression.method');
-                config(['file-manager.compression.method' => $this->compressionDriver]);
+                $originalDriver = config('file-manager.compression.driver');
+                config(['file-manager.compression.driver' => $this->compressionDriver]);
             }
 
             // Create compression service AFTER config override
@@ -944,7 +916,6 @@ class MediaUpload extends FileUpload
 
             $filename = (string) FileManagerService::filename($file, static::tag($get), $extension);
             $fullPath = "{$directory}/{$filename}";
-            $shouldRemoveBackground = $this->evaluate($this->removeBackground);
 
             $result = $compressionService->compressAndSave(
                 $file,
@@ -954,13 +925,12 @@ class MediaUpload extends FileUpload
                 config('file-manager.compression.width') ? (int) config('file-manager.compression.width') : null,
                 $outputFormat,
                 config('file-manager.compression.mode'),
-                config('filesystems.default'),
-                $shouldRemoveBackground
+                config('filesystems.default')
             );
 
-            // Restore original method after fallback
-            if ($originalMethod !== null) {
-                config(['file-manager.compression.method' => $originalMethod]);
+            // Restore original driver after fallback
+            if ($originalDriver !== null) {
+                config(['file-manager.compression.driver' => $originalDriver]);
             }
         }
 
@@ -975,47 +945,25 @@ class MediaUpload extends FileUpload
 
             // Check compression method and send appropriate notification
             if (isset($result['data']['compression_method'])) {
-                if ($result['data']['compression_method'] === 'gd_fallback') {
-                    // API failed, used GD as fallback
-                    $reason = $result['data']['api_fallback_reason'] ?? 'Unknown reason';
-                    Notification::make()
-                        ->warning()
-                        ->title('API Compression Failed - Used GD Fallback')
-                        ->body("API Error: {$reason}<br>
-                               Compressed with GD: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
-                               Saved: {$compressionRatio}")
-                        ->duration(8000)
-                        ->send();
-                } elseif ($result['data']['compression_method'] === 'gd') {
-                    // Direct GD compression
-                    Notification::make()
-                        ->success()
-                        ->title('Image Compressed with GD')
-                        ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
-                               Saved: {$compressionRatio}")
-                        ->duration(5000)
-                        ->send();
-                } elseif ($result['data']['compression_method'] === 'api') {
-                    // Successful Lambda API compression
-                    Notification::make()
-                        ->success()
-                        ->title('Image Compressed via Lambda API')
-                        ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
-                               Saved: {$compressionRatio}<br>
-                               <small>Fast compression via AWS Lambda</small>")
-                        ->duration(5000)
-                        ->send();
-                } elseif ($result['data']['compression_method'] === 'api_bg_removal') {
-                    // Successful Cloud Run API compression with bg removal
-                    Notification::make()
-                        ->success()
-                        ->title('Image Processed with Background Removal')
-                        ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
-                               Saved: {$compressionRatio}<br>
-                               <small>Background removed via Cloud Run</small>")
-                        ->duration(5000)
-                        ->send();
-                }
+                $method = $result['data']['compression_method'];
+                $methodLabel = strtoupper($method);
+
+                Notification::make()
+                    ->success()
+                    ->title("Image Compressed with {$methodLabel}")
+                    ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                           Saved: {$compressionRatio}")
+                    ->duration(5000)
+                    ->send();
+            } else {
+                // Fallback notification if method is not set
+                Notification::make()
+                    ->success()
+                    ->title('Image Compressed')
+                    ->body("Size: {$originalSizeFormatted} → {$compressedSizeFormatted}<br>
+                           Saved: {$compressionRatio}")
+                    ->duration(5000)
+                    ->send();
             }
 
             // Create metadata with compression info
@@ -1030,9 +978,8 @@ class MediaUpload extends FileUpload
                                 'original_size' => $result['data']['original_size'] ?? null,
                                 'compressed_size' => $result['data']['compressed_size'] ?? null,
                                 'compression_ratio' => $result['data']['compression_ratio'] ?? null,
-                                'method' => $result['data']['compression_method'] ?? config('file-manager.compression.method'),
+                                'driver' => $result['data']['compression_method'] ?? config('file-manager.compression.driver'),
                                 'compressed_at' => now()->toIso8601String(),
-                                'api_fallback_reason' => $result['data']['api_fallback_reason'] ?? null,
                             ],
                         ]),
                     ]);

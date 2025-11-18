@@ -197,7 +197,13 @@ class FileManagerService
             if ($disk === 'local') {
                 throw new Exception('Local disk is not supported for resizing images. Please use s3.');
             } else {
-                $img = ImageManager::gd()->read(\file_get_contents(FileManager::getMediaPath($file)));
+                // Use configured driver (GD or Imagick)
+                $driver = config('file-manager.compression.driver', 'gd');
+                $manager = $driver === 'imagick'
+                    ? ImageManager::imagick()
+                    : ImageManager::gd();
+
+                $img = $manager->read(\file_get_contents(FileManager::getMediaPath($file)));
 
             }
 

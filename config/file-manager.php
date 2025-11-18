@@ -24,43 +24,30 @@ return [
      */
     'compression' => [
         'enabled' => env('FILE_MANAGER_COMPRESSION_ENABLED', true),
-        
-        // Compression method: 'gd' or 'api'
-        'method' => env('FILE_MANAGER_COMPRESSION_METHOD', 'gd'),
-        
+
+        // Image driver: 'gd' or 'imagick'
+        // GD: Built-in PHP extension (faster, lower memory)
+        // Imagick: ImageMagick extension (better quality, more features)
+        'driver' => env('FILE_MANAGER_COMPRESSION_DRIVER', 'gd'),
+
         // Automatically compress on upload
         'auto_compress' => env('FILE_MANAGER_AUTO_COMPRESS', true),
-        
+
         // Compression quality (1-100)
         'quality' => env('FILE_MANAGER_COMPRESSION_QUALITY', 85),
-        
+
         // Output format: webp, jpeg, png, avif
         'format' => env('FILE_MANAGER_COMPRESSION_FORMAT', 'webp'),
-        
+
         // Resize mode: contain, crop, cover
         'mode' => env('FILE_MANAGER_COMPRESSION_MODE', 'contain'),
-        
+
         // Maximum allowed dimensions (hard limits - images will never exceed these)
         'max_height' => env('FILE_MANAGER_MAX_HEIGHT', 2160),
         'max_width' => env('FILE_MANAGER_MAX_WIDTH', 3840),
-        
+
         // Files larger than this will be compressed (in bytes)
         'threshold' => env('FILE_MANAGER_COMPRESSION_THRESHOLD', 100 * 1024), // 100KB
-        
-        // API settings (if using external compression API)
-        'api' => [
-            // Primary API (AWS Lambda - fast, no background removal)
-            'url' => env('FILE_MANAGER_COMPRESSION_API_URL', ''),
-            'token' => env('FILE_MANAGER_COMPRESSION_API_TOKEN', ''),
-            'timeout' => env('FILE_MANAGER_COMPRESSION_API_TIMEOUT', 30),
-            
-            // Background removal API (Google Cloud Run - slower, supports bg removal)
-            'bg_removal' => [
-                'url' => env('FILE_MANAGER_BG_REMOVAL_API_URL', ''),
-                'token' => env('FILE_MANAGER_BG_REMOVAL_API_TOKEN', ''),
-                'timeout' => env('FILE_MANAGER_BG_REMOVAL_API_TIMEOUT', 60),
-            ],
-        ],
     ],
 
     /**

@@ -36,9 +36,9 @@ use Kirantimsina\FileManager\Facades\FileManager;
 use Kirantimsina\FileManager\Filament\Resources\MediaMetadataResource\Pages;
 use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\CompressImageJob;
+use Kirantimsina\FileManager\Jobs\CompressVideoJob;
 use Kirantimsina\FileManager\Jobs\RefreshAllMediaJob;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
-use Kirantimsina\FileManager\Jobs\CompressVideoJob;
 use Kirantimsina\FileManager\Models\MediaMetadata;
 use Kirantimsina\FileManager\Services\ImageCompressionService;
 use Kirantimsina\FileManager\Services\MetadataRefreshService;
@@ -461,33 +461,13 @@ class MediaMetadataResource extends Resource
                             ->default('85')
                             ->required(),
                         FormSelect::make('compression_method')
-                            ->label('Processing Method')
-                            ->options(function () {
-                                $options = [];
-
-                                $hasApi = ! empty(config('file-manager.compression.api.url'));
-
-                                if ($hasApi) {
-                                    $options['auto'] = 'Auto (Use API, fallback to GD)';
-                                    $options['api'] = 'API Only (Fast compression)';
-                                }
-
-                                $options['gd'] = 'GD Library Only (Local processing)';
-
-                                return $options;
-                            })
-                            ->default(function () {
-                                $configMethod = config('file-manager.compression.method', 'api');
-
-                                // Map config values to form values
-                                return match ($configMethod) {
-                                    'gd' => 'gd',
-                                    'api' => 'auto',  // 'api' in config means auto (with fallback)
-                                    default => 'auto'
-                                };
-                            })
-                            ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
-                            ->helperText('Choose which compression method to use'),
+                            ->label('Processing Driver')
+                            ->options([
+                                'gd' => 'GD Library (Fast, lower memory)',
+                                'imagick' => 'Imagick (Better quality, more features)',
+                            ])
+                            ->default(fn () => config('file-manager.compression.driver', 'gd'))
+                            ->helperText('Choose which image processing driver to use'),
                         FormToggle::make('replace_original')
                             ->label('Replace original files')
                             ->helperText('Replace the original files with compressed versions')
@@ -710,7 +690,6 @@ class MediaMetadataResource extends Resource
                             ->success()
                             ->send();
                     }),
-
 
                 BulkAction::make('bulk_delete_resized')
                     ->label('Delete Resized Versions')
@@ -967,33 +946,13 @@ class MediaMetadataResource extends Resource
                                 ->default('85')
                                 ->required(),
                             FormSelect::make('compression_method')
-                                ->label('Processing Method')
-                                ->options(function () {
-                                    $options = [];
-
-                                    $hasApi = ! empty(config('file-manager.compression.api.url'));
-
-                                    if ($hasApi) {
-                                        $options['auto'] = 'Auto (Use API, fallback to GD)';
-                                        $options['api'] = 'API Only (Fast compression)';
-                                    }
-
-                                    $options['gd'] = 'GD Library Only (Local processing)';
-
-                                    return $options;
-                                })
-                                ->default(function () {
-                                    $configMethod = config('file-manager.compression.method', 'api');
-
-                                    // Map config values to form values
-                                    return match ($configMethod) {
-                                        'gd' => 'gd',
-                                        'api' => 'auto',  // 'api' in config means auto (with fallback)
-                                        default => 'auto'
-                                    };
-                                })
-                                ->visible(fn () => ! empty(config('file-manager.compression.api.url')))
-                                ->helperText('Choose which compression method to use'),
+                                ->label('Processing Driver')
+                                ->options([
+                                    'gd' => 'GD Library (Fast, lower memory)',
+                                    'imagick' => 'Imagick (Better quality, more features)',
+                                ])
+                                ->default(fn () => config('file-manager.compression.driver', 'gd'))
+                                ->helperText('Choose which image processing driver to use'),
                             FormToggle::make('replace_original')
                                 ->label('Replace original file')
                                 ->helperText('Replace the original file with the compressed version')
@@ -1004,59 +963,35 @@ class MediaMetadataResource extends Resource
                         ])
                         ->action(function (MediaMetadata $record, array $data): void {
                             try {
-                                // Override compression method if specified
-                                $originalMethod = config('file-manager.compression.method');
-                                if (isset($data['compression_method']) && $data['compression_method'] !== 'auto') {
-                                    $method = $data['compression_method'] === 'api' ? 'api' : 'gd';
-                                    config(['file-manager.compression.method' => $method]);
+                                // Override compression driver if specified
+                                $originalDriver = config('file-manager.compression.driver');
+                                if (isset($data['compression_method'])) {
+                                    $driver = in_array($data['compression_method'], ['gd', 'imagick'])
+                                        ? $data['compression_method']
+                                        : 'gd';
+                                    config(['file-manager.compression.driver' => $driver]);
                                 }
 
                                 // Create compression service after config override
                                 $compressionService = new ImageCompressionService;
                                 $result = static::compressMediaRecord($record, $data, $compressionService);
 
-                                // Restore original compression method
-                                config(['file-manager.compression.method' => $originalMethod]);
+                                // Restore original compression driver
+                                config(['file-manager.compression.driver' => $originalDriver]);
 
                                 if ($result['success']) {
                                     $savedKb = round($result['saved'] / 1024, 2);
                                     $compressionRatio = round(($result['saved'] / $result['original_size']) * 100, 1);
 
-                                    // Check compression method and show appropriate notification
+                                    // Show compression notification
                                     $compressionMethod = $result['compression_method'] ?? 'unknown';
+                                    $methodLabel = strtoupper($compressionMethod);
 
-                                    if ($compressionMethod === 'gd_fallback') {
-                                        // API failed, used GD as fallback
-                                        $reason = $result['api_fallback_reason'] ?? 'Unknown reason';
-                                        Notification::make()
-                                            ->warning()
-                                            ->title('API Compression Failed - Used GD Fallback')
-                                            ->body("API Error: {$reason}<br>
-                                                   Compressed with GD: Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                            ->duration(8000)
-                                            ->send();
-                                    } elseif ($compressionMethod === 'gd') {
-                                        // Direct GD compression
-                                        Notification::make()
-                                            ->success()
-                                            ->title('Image Compressed with GD')
-                                            ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                            ->send();
-                                    } elseif ($compressionMethod === 'api') {
-                                        // Successful API compression
-                                        Notification::make()
-                                            ->success()
-                                            ->title('Image Compressed via API')
-                                            ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                            ->send();
-                                    } else {
-                                        // Fallback for unknown method
-                                        Notification::make()
-                                            ->success()
-                                            ->title('Image compressed successfully')
-                                            ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
-                                            ->send();
-                                    }
+                                    Notification::make()
+                                        ->success()
+                                        ->title("Image Compressed with {$methodLabel}")
+                                        ->body("Saved {$savedKb} KB ({$compressionRatio}% reduction)")
+                                        ->send();
                                 } else {
                                     throw new \Exception($result['message'] ?? 'Compression failed');
                                 }
@@ -1233,8 +1168,8 @@ class MediaMetadataResource extends Resource
                                 $outputPath = $pathInfo['dirname'] . '/' . $filename . '-' . $timestamp . '-' . $randomString . '.' . $data['format'];
                                 $outputPath = ltrim($outputPath, '/');
 
-                                // Dispatch compression job
-                                CompressVideoJob::dispatch(
+                                // Run compression job instantly
+                                CompressVideoJob::dispatchSync(
                                     $videoPath,
                                     $outputPath,
                                     $data['format'],
@@ -1254,7 +1189,7 @@ class MediaMetadataResource extends Resource
                                 Notification::make()
                                     ->success()
                                     ->title('Video compression queued')
-                                    ->body("The video will be compressed in the background. This may take a few minutes.")
+                                    ->body('The video will be compressed in the background. This may take a few minutes.')
                                     ->send();
 
                             } catch (\Exception $e) {
@@ -1471,88 +1406,88 @@ class MediaMetadataResource extends Resource
 
                             // Build the description with proper line breaks
                             $lines = [];
-                            $lines[] = "📄 FILE ANALYSIS";
-                            $lines[] = "";
-                            $lines[] = "File Path: " . basename($record->file_name);
-                            $lines[] = "Full Path: " . $record->file_name;
-                            $lines[] = "";
-                            $lines[] = "═══════════════════════════════";
-                            $lines[] = "";
+                            $lines[] = '📄 FILE ANALYSIS';
+                            $lines[] = '';
+                            $lines[] = 'File Path: ' . basename($record->file_name);
+                            $lines[] = 'Full Path: ' . $record->file_name;
+                            $lines[] = '';
+                            $lines[] = '═══════════════════════════════';
+                            $lines[] = '';
 
                             // File existence check
                             if ($fileExists) {
-                                $lines[] = "✅ S3 File Status: File exists in storage";
+                                $lines[] = '✅ S3 File Status: File exists in storage';
                             } else {
-                                $lines[] = "❌ S3 File Status: File does NOT exist in storage";
+                                $lines[] = '❌ S3 File Status: File does NOT exist in storage';
                                 $issues[] = 'file_missing';
                             }
-                            $lines[] = "";
+                            $lines[] = '';
 
                             // Model reference check
-                            if (!$modelFound) {
-                                $lines[] = "❌ Parent Model: Model not found";
-                                $lines[] = "   Model Type: " . class_basename($record->mediable_type);
-                                $lines[] = "   Model ID: " . $record->mediable_id;
+                            if (! $modelFound) {
+                                $lines[] = '❌ Parent Model: Model not found';
+                                $lines[] = '   Model Type: ' . class_basename($record->mediable_type);
+                                $lines[] = '   Model ID: ' . $record->mediable_id;
                                 $issues[] = 'model_missing';
                             } elseif ($modelExists) {
-                                $lines[] = "✅ Parent Model: Model correctly references this file";
-                                $lines[] = "   Field: " . $record->mediable_field;
+                                $lines[] = '✅ Parent Model: Model correctly references this file';
+                                $lines[] = '   Field: ' . $record->mediable_field;
                             } else {
-                                $lines[] = "❌ Parent Model: Model does NOT reference this file";
-                                $lines[] = "   Field: " . $record->mediable_field;
+                                $lines[] = '❌ Parent Model: Model does NOT reference this file';
+                                $lines[] = '   Field: ' . $record->mediable_field;
                                 if (is_array($fieldValue)) {
                                     $fieldPreview = implode(', ', array_slice($fieldValue, 0, 2));
                                     if (count($fieldValue) > 2) {
                                         $fieldPreview .= ' ... +' . (count($fieldValue) - 2) . ' more';
                                     }
-                                    $lines[] = "   Current Value: [" . $fieldPreview . "]";
+                                    $lines[] = '   Current Value: [' . $fieldPreview . ']';
                                 } else {
                                     $currentValue = $fieldValue ?: '(null/empty)';
-                                    $lines[] = "   Current Value: " . $currentValue;
+                                    $lines[] = '   Current Value: ' . $currentValue;
                                 }
                                 $issues[] = 'model_not_referenced';
                             }
-                            $lines[] = "";
-                            $lines[] = "═══════════════════════════════";
-                            $lines[] = "";
+                            $lines[] = '';
+                            $lines[] = '═══════════════════════════════';
+                            $lines[] = '';
 
                             // Conclusion with clear recommendation
                             if (empty($issues)) {
-                                $lines[] = "⚠️  WARNING";
-                                $lines[] = "";
-                                $lines[] = "Both the file and model reference exist.";
-                                $lines[] = "This record does NOT appear to be orphaned.";
-                                $lines[] = "";
-                                $lines[] = "RECOMMENDATION: Investigate further before deletion.";
+                                $lines[] = '⚠️  WARNING';
+                                $lines[] = '';
+                                $lines[] = 'Both the file and model reference exist.';
+                                $lines[] = 'This record does NOT appear to be orphaned.';
+                                $lines[] = '';
+                                $lines[] = 'RECOMMENDATION: Investigate further before deletion.';
                             } elseif (count($issues) === 2) {
-                                $lines[] = "🗑️  SAFE TO DELETE";
-                                $lines[] = "";
-                                $lines[] = "This is a truly orphaned record:";
-                                $lines[] = "• File is missing from S3";
+                                $lines[] = '🗑️  SAFE TO DELETE';
+                                $lines[] = '';
+                                $lines[] = 'This is a truly orphaned record:';
+                                $lines[] = '• File is missing from S3';
                                 $lines[] = "• Parent model doesn't reference it";
-                                $lines[] = "";
-                                $lines[] = "RECOMMENDATION: Safe to delete this metadata record.";
+                                $lines[] = '';
+                                $lines[] = 'RECOMMENDATION: Safe to delete this metadata record.';
                             } else {
-                                $lines[] = "⚠️  PARTIALLY ORPHANED";
-                                $lines[] = "";
+                                $lines[] = '⚠️  PARTIALLY ORPHANED';
+                                $lines[] = '';
                                 if (in_array('file_missing', $issues)) {
-                                    $lines[] = "File is missing but model still references it.";
-                                    $lines[] = "";
-                                    $lines[] = "You may want to:";
-                                    $lines[] = "• Restore the missing file, or";
-                                    $lines[] = "• Update the model to remove the reference";
+                                    $lines[] = 'File is missing but model still references it.';
+                                    $lines[] = '';
+                                    $lines[] = 'You may want to:';
+                                    $lines[] = '• Restore the missing file, or';
+                                    $lines[] = '• Update the model to remove the reference';
                                 } else {
                                     $lines[] = "File exists but model doesn't reference it.";
-                                    $lines[] = "";
-                                    $lines[] = "This might be:";
-                                    $lines[] = "• A sync issue that needs investigation";
-                                    $lines[] = "• An intentionally unused file";
+                                    $lines[] = '';
+                                    $lines[] = 'This might be:';
+                                    $lines[] = '• A sync issue that needs investigation';
+                                    $lines[] = '• An intentionally unused file';
                                 }
-                                $lines[] = "";
-                                $lines[] = "RECOMMENDATION: Use caution before deleting.";
+                                $lines[] = '';
+                                $lines[] = 'RECOMMENDATION: Use caution before deleting.';
                             }
 
-                            $description = implode("<br>", $lines);
+                            $description = implode('<br>', $lines);
 
                             return new HtmlString($description);
                         })
@@ -1909,7 +1844,6 @@ class MediaMetadataResource extends Resource
                 'compressed_size' => $result['data']['compressed_size'],
                 'saved' => $result['data']['original_size'] - $result['data']['compressed_size'],
                 'compression_method' => $result['data']['compression_method'] ?? null,
-                'api_fallback_reason' => $result['data']['api_fallback_reason'] ?? null,
             ];
         }
 
