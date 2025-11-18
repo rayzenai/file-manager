@@ -1169,7 +1169,7 @@ class MediaMetadataResource extends Resource
                                 $outputPath = ltrim($outputPath, '/');
 
                                 // Run compression job instantly
-                                CompressVideoJob::dispatchSync(
+                                CompressVideoJob::dispatch(
                                     $videoPath,
                                     $outputPath,
                                     $data['format'],

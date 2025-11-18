@@ -30,6 +30,7 @@ class ResizeImages implements ShouldQueue
     public function __construct($filesArr)
     {
         $this->filesArr = $filesArr;
+        $this->onQueue('images');
     }
 
     /**

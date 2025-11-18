@@ -137,14 +137,55 @@ trait HasMultimedia
                         continue;
                     }
 
-                    // Determine media type
-                    $mimeType = null;
-                    if ($model->isVideoField($field)) {
-                        $mimeType = 'video';
-                    } elseif ($model->isDocumentField($field)) {
-                        $mimeType = 'document';
-                    } else {
-                        $mimeType = 'image';
+                    // Get actual file information from storage
+                    $disk = Storage::disk(config('filesystems.default'));
+
+                    try {
+                        // Get file size from storage
+                        $fileSize = $disk->exists($image) ? $disk->size($image) : 0;
+
+                        // Determine actual MIME type from file extension
+                        $extension = strtolower(pathinfo($image, PATHINFO_EXTENSION));
+                        $mimeType = match ($extension) {
+                            'jpg', 'jpeg' => 'image/jpeg',
+                            'png' => 'image/png',
+                            'gif' => 'image/gif',
+                            'webp' => 'image/webp',
+                            'avif' => 'image/avif',
+                            'svg' => 'image/svg+xml',
+                            'mp4' => 'video/mp4',
+                            'webm' => 'video/webm',
+                            'mov' => 'video/quicktime',
+                            'avi' => 'video/x-msvideo',
+                            'pdf' => 'application/pdf',
+                            'doc', 'docx' => 'application/msword',
+                            'xls', 'xlsx' => 'application/vnd.ms-excel',
+                            default => 'application/octet-stream',
+                        };
+
+                        // Get image dimensions if it's an image
+                        $width = null;
+                        $height = null;
+                        if (str_starts_with($mimeType, 'image/') && $disk->exists($image)) {
+                            try {
+                                $tempFile = tempnam(sys_get_temp_dir(), 'img_');
+                                file_put_contents($tempFile, $disk->get($image));
+                                $imageInfo = @getimagesize($tempFile);
+                                if ($imageInfo) {
+                                    $width = $imageInfo[0];
+                                    $height = $imageInfo[1];
+                                }
+                                @unlink($tempFile);
+                            } catch (\Exception $e) {
+                                // Failed to get dimensions, continue without them
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // File doesn't exist or error reading, use defaults
+                        $fileSize = 0;
+                        $mimeType = 'application/octet-stream';
+                        $width = null;
+                        $height = null;
                     }
 
                     // Get SEO title if model supports it
@@ -154,19 +195,27 @@ trait HasMultimedia
                         $seoTitle = $model->{$seoField} ?? null;
                     }
 
+                    $metadataToCreate = [
+                        'mime_type' => $mimeType,
+                        'file_size' => $fileSize,
+                        'metadata' => [
+                            'seo_title' => $seoTitle,
+                            'created_at' => now()->toIso8601String(),
+                        ],
+                    ];
+
+                    // Add dimensions for images
+                    if ($width !== null && $height !== null) {
+                        $metadataToCreate['width'] = $width;
+                        $metadataToCreate['height'] = $height;
+                    }
+
                     MediaMetadata::updateOrCreate([
                         'mediable_type' => get_class($model),
                         'mediable_id' => $model->id,
                         'mediable_field' => $field,
                         'file_name' => $image,
-                    ], [
-                        'mime_type' => $mimeType,
-                        'file_size' => 0, // Default value for now, should be updated when actual file info is available
-                        'metadata' => [
-                            'seo_title' => $seoTitle,
-                            'created_at' => now()->toIso8601String(),
-                        ],
-                    ]);
+                    ], $metadataToCreate);
                 }
             }
         });
