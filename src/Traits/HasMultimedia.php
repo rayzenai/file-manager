@@ -16,6 +16,7 @@ use Kirantimsina\FileManager\FileManagerService;
 use Kirantimsina\FileManager\Jobs\DeleteMedia;
 use Kirantimsina\FileManager\Jobs\ResizeImages;
 use Kirantimsina\FileManager\Models\MediaMetadata;
+use Kirantimsina\FileManager\Services\FileInfoService;
 
 trait HasMultimedia
 {
@@ -137,56 +138,19 @@ trait HasMultimedia
                         continue;
                     }
 
-                    // Get actual file information from storage
-                    $disk = Storage::disk(config('filesystems.default'));
+                    // Get actual file information from storage using FileInfoService
+                    $fileInfoService = new FileInfoService();
+                    $fileInfo = $fileInfoService->getFileInfo($image, config('filesystems.default'));
 
-                    try {
-                        // Get file size from storage
-                        $fileSize = $disk->exists($image) ? $disk->size($image) : 0;
-
-                        // Determine actual MIME type from file extension
-                        $extension = strtolower(pathinfo($image, PATHINFO_EXTENSION));
-                        $mimeType = match ($extension) {
-                            'jpg', 'jpeg' => 'image/jpeg',
-                            'png' => 'image/png',
-                            'gif' => 'image/gif',
-                            'webp' => 'image/webp',
-                            'avif' => 'image/avif',
-                            'svg' => 'image/svg+xml',
-                            'mp4' => 'video/mp4',
-                            'webm' => 'video/webm',
-                            'mov' => 'video/quicktime',
-                            'avi' => 'video/x-msvideo',
-                            'pdf' => 'application/pdf',
-                            'doc', 'docx' => 'application/msword',
-                            'xls', 'xlsx' => 'application/vnd.ms-excel',
-                            default => 'application/octet-stream',
-                        };
-
-                        // Get image dimensions if it's an image
-                        $width = null;
-                        $height = null;
-                        if (str_starts_with($mimeType, 'image/') && $disk->exists($image)) {
-                            try {
-                                $tempFile = tempnam(sys_get_temp_dir(), 'img_');
-                                file_put_contents($tempFile, $disk->get($image));
-                                $imageInfo = @getimagesize($tempFile);
-                                if ($imageInfo) {
-                                    $width = $imageInfo[0];
-                                    $height = $imageInfo[1];
-                                }
-                                @unlink($tempFile);
-                            } catch (\Exception $e) {
-                                // Failed to get dimensions, continue without them
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        // File doesn't exist or error reading, use defaults
-                        $fileSize = 0;
-                        $mimeType = 'application/octet-stream';
-                        $width = null;
-                        $height = null;
+                    if (!$fileInfo) {
+                        // File doesn't exist or error reading
+                        continue;
                     }
+
+                    $fileSize = $fileInfo['size'];
+                    $mimeType = $fileInfo['mime_type'];
+                    $width = $fileInfo['width'];
+                    $height = $fileInfo['height'];
 
                     // Get SEO title if model supports it
                     $seoTitle = null;

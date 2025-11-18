@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Kirantimsina\FileManager\Models\MediaMetadata;
-use Kirantimsina\FileManager\Services\MetadataRefreshService;
+use Kirantimsina\FileManager\Services\FileInfoService;
 use Throwable;
 
 class RefreshAllMediaJob implements ShouldQueue
@@ -39,8 +39,8 @@ class RefreshAllMediaJob implements ShouldQueue
         }
 
         try {
-            $refreshService = new MetadataRefreshService;
-            $result = $this->refreshMediaRecord($record, $refreshService);
+            $fileInfoService = new FileInfoService();
+            $result = $this->refreshMediaRecord($record, $fileInfoService);
             
             if ($result['success']) {
                 Log::info("RefreshAllMediaJob: Successfully refreshed {$record->file_name}", [
@@ -91,7 +91,7 @@ class RefreshAllMediaJob implements ShouldQueue
         }
     }
 
-    private function refreshMediaRecord(MediaMetadata $record, MetadataRefreshService $refreshService): array
+    private function refreshMediaRecord(MediaMetadata $record, FileInfoService $fileInfoService): array
     {
         $fileName = $record->file_name;
         
@@ -103,50 +103,42 @@ class RefreshAllMediaJob implements ShouldQueue
             ];
         }
 
-        // Get fresh file metadata from S3
+        // Get fresh file metadata from S3 using FileInfoService
         try {
-            $fileSize = Storage::disk(config('filesystems.default'))->size($fileName);
-            $mimeType = Storage::disk(config('filesystems.default'))->mimeType($fileName) ?? 'application/octet-stream';
-            
+            $fileInfo = $fileInfoService->getFileInfo($fileName, config('filesystems.default'));
+
+            if (!$fileInfo) {
+                return [
+                    'success' => false,
+                    'message' => "Could not read file metadata: {$fileName}"
+                ];
+            }
+
             $changes = [];
             $updateData = [];
-            
+
             // Check file size changes
-            if ($record->file_size !== $fileSize) {
-                $changes[] = "File size: {$record->file_size} → {$fileSize}";
-                $updateData['file_size'] = $fileSize;
+            if ($record->file_size !== $fileInfo['size']) {
+                $changes[] = "File size: {$record->file_size} → {$fileInfo['size']}";
+                $updateData['file_size'] = $fileInfo['size'];
             }
-            
+
             // Check mime type changes
-            if ($record->mime_type !== $mimeType) {
-                $changes[] = "MIME type: {$record->mime_type} → {$mimeType}";
-                $updateData['mime_type'] = $mimeType;
+            if ($record->mime_type !== $fileInfo['mime_type']) {
+                $changes[] = "MIME type: {$record->mime_type} → {$fileInfo['mime_type']}";
+                $updateData['mime_type'] = $fileInfo['mime_type'];
             }
-            
-            // For images, check dimensions
-            if (str_starts_with($mimeType, 'image/')) {
-                try {
-                    $fileContent = Storage::disk(config('filesystems.default'))->get($fileName);
-                    $imageData = getimagesizefromstring($fileContent);
-                    
-                    if ($imageData !== false) {
-                        $width = $imageData[0];
-                        $height = $imageData[1];
-                        
-                        if ($record->width !== $width) {
-                            $changes[] = "Width: {$record->width} → {$width}";
-                            $updateData['width'] = $width;
-                        }
-                        
-                        if ($record->height !== $height) {
-                            $changes[] = "Height: {$record->height} → {$height}";
-                            $updateData['height'] = $height;
-                        }
-                    }
-                } catch (Throwable $e) {
-                    Log::warning("RefreshAllMediaJob: Could not get image dimensions for {$fileName}", [
-                        'error' => $e->getMessage()
-                    ]);
+
+            // Check dimensions for images
+            if ($fileInfo['width'] !== null && $fileInfo['height'] !== null) {
+                if ($record->width !== $fileInfo['width']) {
+                    $changes[] = "Width: {$record->width} → {$fileInfo['width']}";
+                    $updateData['width'] = $fileInfo['width'];
+                }
+
+                if ($record->height !== $fileInfo['height']) {
+                    $changes[] = "Height: {$record->height} → {$fileInfo['height']}";
+                    $updateData['height'] = $fileInfo['height'];
                 }
             }
             
