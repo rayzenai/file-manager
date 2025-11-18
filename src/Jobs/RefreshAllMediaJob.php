@@ -98,22 +98,16 @@ class RefreshAllMediaJob implements ShouldQueue
     {
         $fileName = $record->file_name;
 
-        // Check if file exists in S3
-        if (! Storage::disk(config('filesystems.default'))->exists($fileName)) {
-            return [
-                'success' => false,
-                'message' => "File not found in S3: {$fileName}",
-            ];
-        }
-
         // Get fresh file metadata from S3 using FileInfoService
+        // Skip exists() check - if getFileInfo returns null, file doesn't exist
         try {
-            $fileInfo = $fileInfoService->getFileInfo($fileName, config('filesystems.default'));
+            // First get basic info WITHOUT dimensions (fast - no download needed)
+            $fileInfo = $fileInfoService->getFileInfo($fileName, config('filesystems.default'), skipDimensions: true);
 
             if (! $fileInfo) {
                 return [
                     'success' => false,
-                    'message' => "Could not read file metadata: {$fileName}",
+                    'message' => "File not found in S3: {$fileName}",
                 ];
             }
 
@@ -132,16 +126,24 @@ class RefreshAllMediaJob implements ShouldQueue
                 $updateData['mime_type'] = $fileInfo['mime_type'];
             }
 
-            // Check dimensions for images
-            if ($fileInfo['width'] !== null && $fileInfo['height'] !== null) {
-                if ($record->width !== $fileInfo['width']) {
-                    $changes[] = "Width: {$record->width} → {$fileInfo['width']}";
-                    $updateData['width'] = $fileInfo['width'];
-                }
+            // Only fetch dimensions if this is an image AND dimensions are missing
+            $isImage = str_starts_with($fileInfo['mime_type'], 'image/');
+            $dimensionsMissing = $record->width === null || $record->height === null;
 
-                if ($record->height !== $fileInfo['height']) {
-                    $changes[] = "Height: {$record->height} → {$fileInfo['height']}";
-                    $updateData['height'] = $fileInfo['height'];
+            if ($isImage && $dimensionsMissing) {
+                // Now fetch with dimensions (requires S3 download)
+                $fileInfoWithDimensions = $fileInfoService->getFileInfo($fileName, config('filesystems.default'), skipDimensions: false);
+
+                if ($fileInfoWithDimensions && $fileInfoWithDimensions['width'] !== null) {
+                    if ($record->width !== $fileInfoWithDimensions['width']) {
+                        $changes[] = "Width: {$record->width} → {$fileInfoWithDimensions['width']}";
+                        $updateData['width'] = $fileInfoWithDimensions['width'];
+                    }
+
+                    if ($record->height !== $fileInfoWithDimensions['height']) {
+                        $changes[] = "Height: {$record->height} → {$fileInfoWithDimensions['height']}";
+                        $updateData['height'] = $fileInfoWithDimensions['height'];
+                    }
                 }
             }
 

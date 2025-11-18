@@ -14,9 +14,10 @@ class FileInfoService
      *
      * @param  string  $filePath  Path to the file in storage
      * @param  string|null  $disk  Storage disk (defaults to configured default)
+     * @param  bool  $skipDimensions  Skip fetching image dimensions (saves S3 download)
      * @return array|null File info array or null if file doesn't exist
      */
-    public function getFileInfo(string $filePath, ?string $disk = null): ?array
+    public function getFileInfo(string $filePath, ?string $disk = null, bool $skipDimensions = false): ?array
     {
         $disk = Storage::disk($disk ?? config('filesystems.default'));
 
@@ -32,11 +33,11 @@ class FileInfoService
             // Detect MIME type from extension (more reliable than Storage::mimeType())
             $mimeType = $this->detectMimeTypeFromExtension($filePath);
 
-            // Get dimensions for images
+            // Get dimensions for images (only if not skipped)
             $width = null;
             $height = null;
 
-            if (str_starts_with($mimeType, 'image/')) {
+            if (! $skipDimensions && str_starts_with($mimeType, 'image/')) {
                 [$width, $height] = $this->getImageDimensions($disk, $filePath);
             }
 
