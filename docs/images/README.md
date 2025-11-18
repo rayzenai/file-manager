@@ -4,15 +4,16 @@ This directory contains images for the README documentation. Please add the foll
 
 ## Required Images
 
-### 1. dual-api-architecture.png
-- Diagram showing the dual API architecture
-- AWS Lambda for fast compression
-- Google Cloud Run for AI features
-- Show fallback to GD library
+### 1. driver-architecture.png
+- Diagram showing the compression driver architecture
+- GD Library for fast, built-in processing
+- Imagick for better quality and more features
+- Show comparison between drivers
 
 ### 2. driver-selection.png
-- Code example showing ->driver('api') and ->driver('gd')
-- Screenshot of MediaUpload component with driver selection
+- Code example showing GD and Imagick configuration
+- Screenshot of MediaUpload component with different format options
+- Show quality and format selection
 
 ### 3. image-processor.png
 - Screenshot of the Image Processor page

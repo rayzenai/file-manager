@@ -326,23 +326,14 @@ class ImageProcessor extends Page implements HasForms
             // Show success notification with details
             $notificationBody = "Size: {$this->processingStats['original_size']} → {$this->processingStats['compressed_size']}<br>";
             $notificationBody .= "Saved: {$this->processingStats['saved']} ({$this->processingStats['ratio']})<br>";
-            $notificationBody .= "Method: {$this->processingStats['method']}";
+            $notificationBody .= "Driver: {$this->processingStats['method']}";
 
-            if (isset($result['data']['api_fallback_reason'])) {
-                Notification::make()
-                    ->warning()
-                    ->title('Image Processed (API Fallback)')
-                    ->body($notificationBody . '<br>API Issue: ' . $result['data']['api_fallback_reason'])
-                    ->duration(8000)
-                    ->send();
-            } else {
-                Notification::make()
-                    ->success()
-                    ->title('Image Processed Successfully')
-                    ->body($notificationBody)
-                    ->duration(5000)
-                    ->send();
-            }
+            Notification::make()
+                ->success()
+                ->title('Image Processed Successfully')
+                ->body($notificationBody)
+                ->duration(5000)
+                ->send();
 
             // Clean up temp file
             @unlink($inputPath);
