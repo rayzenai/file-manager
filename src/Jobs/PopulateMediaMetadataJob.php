@@ -65,17 +65,51 @@ class PopulateMediaMetadataJob implements ShouldQueue
                         ->where('file_name', $image)
                         ->first();
 
-                    // If exists, check if mime type needs fixing
+                    // If exists, check if it needs fixing (wrong mime type, missing file size, or missing dimensions)
                     if ($existingMetadata) {
-                        $fileInfo = $this->getFileInfo($image);
-                        if ($fileInfo && $existingMetadata->mime_type !== $fileInfo['mime_type']) {
-                            Log::info("Fixing mime type for {$image}: {$existingMetadata->mime_type} -> {$fileInfo['mime_type']}");
-                            $existingMetadata->update([
-                                'mime_type' => $fileInfo['mime_type'],
-                                'width' => $fileInfo['width'] ?? $existingMetadata->width,
-                                'height' => $fileInfo['height'] ?? $existingMetadata->height,
-                            ]);
+                        $needsUpdate = false;
+                        $updates = [];
+
+                        // Check if any data is missing or incorrect
+                        if (in_array($existingMetadata->mime_type, ['image', 'video', 'document'])
+                            || $existingMetadata->file_size == 0
+                            || ($existingMetadata->mime_type && str_starts_with($existingMetadata->mime_type, 'image/') && $existingMetadata->width === null)) {
+
+                            $fileInfo = $this->getFileInfo($image);
+
+                            if ($fileInfo) {
+                                // Update MIME type if wrong
+                                if ($existingMetadata->mime_type !== $fileInfo['mime_type']) {
+                                    Log::info("Fixing mime type for {$image}: {$existingMetadata->mime_type} -> {$fileInfo['mime_type']}");
+                                    $updates['mime_type'] = $fileInfo['mime_type'];
+                                    $needsUpdate = true;
+                                }
+
+                                // Update file size if missing
+                                if ($existingMetadata->file_size == 0 && $fileInfo['size'] > 0) {
+                                    Log::info("Fixing file size for {$image}: 0 -> {$fileInfo['size']}");
+                                    $updates['file_size'] = $fileInfo['size'];
+                                    $needsUpdate = true;
+                                }
+
+                                // Update dimensions if missing (for images)
+                                if ($fileInfo['width'] && $fileInfo['height']) {
+                                    if ($existingMetadata->width === null) {
+                                        $updates['width'] = $fileInfo['width'];
+                                        $needsUpdate = true;
+                                    }
+                                    if ($existingMetadata->height === null) {
+                                        $updates['height'] = $fileInfo['height'];
+                                        $needsUpdate = true;
+                                    }
+                                }
+
+                                if ($needsUpdate) {
+                                    $existingMetadata->update($updates);
+                                }
+                            }
                         }
+
                         continue;
                     }
 
