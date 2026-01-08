@@ -1,5 +1,7 @@
 <?php
 
+use Kirantimsina\FileManager\Models\MediaMetadata;
+
 return [
     'cdn' => env('CDN_URL', env('AWS_URL', env('APP_URL'))),
 
@@ -55,18 +57,18 @@ return [
      */
     'media_metadata' => [
         'enabled' => env('FILE_MANAGER_METADATA_ENABLED', true),
-        
+
         // Track file size
         'track_file_size' => env('FILE_MANAGER_TRACK_FILE_SIZE', true),
-        
+
         // Track image dimensions
         'track_dimensions' => env('FILE_MANAGER_TRACK_DIMENSIONS', true),
-        
+
         // Track MIME type
         'track_mime_type' => env('FILE_MANAGER_TRACK_MIME_TYPE', true),
-        
+
         // Model to use for metadata
-        'model' => \Kirantimsina\FileManager\Models\MediaMetadata::class,
+        'model' => MediaMetadata::class,
     ],
 
     /**
@@ -74,7 +76,7 @@ return [
      * Define the sizes that should be created when an image is uploaded
      * Format: 'size_name' => height in pixels
      * The width will be calculated automatically to maintain aspect ratio
-     * 
+     *
      * Set to empty array [] to disable automatic resizing completely:
      * 'image_sizes' => [],
      */
@@ -96,6 +98,29 @@ return [
      */
     'default_thumbnail_size' => env('FILE_MANAGER_DEFAULT_THUMBNAIL_SIZE', 'icon'),
     'default_card_size' => env('FILE_MANAGER_DEFAULT_CARD_SIZE', 'card'),
+
+    /**
+     * Queue Settings
+     * Configure which queue to use for background jobs (image resizing, video compression, etc.)
+     *
+     * IMPORTANT: If not using Laravel Horizon, you must ensure your queue worker
+     * listens to this queue. For example:
+     *   php artisan queue:work --queue=default,images
+     *
+     * Or in your composer.json dev script:
+     *   "php artisan queue:listen --queue=default,images --tries=1"
+     */
+    'queue' => [
+        // Queue name for image processing jobs (resizing, compression)
+        'images' => env('FILE_MANAGER_QUEUE_IMAGES', 'default'),
+
+        // Queue name for video processing jobs
+        'videos' => env('FILE_MANAGER_QUEUE_VIDEOS', 'default'),
+
+        // Queue name for file deletion jobs
+        'delete' => env('FILE_MANAGER_QUEUE_DELETE', 'default'),
+    ],
+
     /**
      * Video Compression Settings
      */

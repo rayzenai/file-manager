@@ -23,6 +23,7 @@ class DeleteMedia implements ShouldQueue
     public function __construct($filesArr)
     {
         $this->filesArr = $filesArr;
+        $this->onQueue(config('file-manager.queue.delete', 'default'));
     }
 
     /**

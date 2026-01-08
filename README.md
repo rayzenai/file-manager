@@ -11,31 +11,31 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 ### Core Features
 
--   🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
--   🗜️ **Smart Compression** - WebP/AVIF conversion with configurable quality settings
--   🎬 **Video Compression** - FFmpeg-based video optimization with WebM/MP4 output, H.264/H.265/VP9 codecs
--   📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
--   ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
--   ⚡ **Cache Control Headers** - Configurable browser/CDN caching for optimal performance
--   📏 **Smart File Size Limits** - Automatic detection and different limits for images (8MB), videos (100MB), and documents (20MB)
--   🛠️ **Artisan Commands** - CLI tools for populating metadata with progress tracking
--   📁 **Media Metadata Resource** - Dedicated admin page for managing media with bulk operations
--   🖼️ **Image Processor Page** - Interactive tool for testing compression and processing settings
+- 🖼️ **Automatic Image Resizing** - Generate multiple sizes automatically on upload
+- 🗜️ **Smart Compression** - WebP/AVIF conversion with configurable quality settings
+- 🎬 **Video Compression** - FFmpeg-based video optimization with WebM/MP4 output, H.264/H.265/VP9 codecs
+- 📊 **Media Metadata Tracking** - Track file sizes, dimensions, and compression stats
+- ☁️ **S3 Integration** - Seamless AWS S3 storage with CDN support
+- ⚡ **Cache Control Headers** - Configurable browser/CDN caching for optimal performance
+- 📏 **Smart File Size Limits** - Automatic detection and different limits for images (8MB), videos (100MB), and documents (20MB)
+- 🛠️ **Artisan Commands** - CLI tools for populating metadata with progress tracking
+- 📁 **Media Metadata Resource** - Dedicated admin page for managing media with bulk operations
+- 🖼️ **Image Processor Page** - Interactive tool for testing compression and processing settings
 
 ### Advanced Processing
 
--   🎨 **Flexible Driver System** - Choose between GD Library or Imagick
--   🖼️ **Interactive Processor** - Test and process images directly in admin panel
--   📈 **Bulk Operations** - Process multiple files with detailed progress tracking
--   ⚙️ **Queue Processing** - Asynchronous processing for large files
+- 🎨 **Flexible Driver System** - Choose between GD Library or Imagick
+- 🖼️ **Interactive Processor** - Test and process images directly in admin panel
+- 📈 **Bulk Operations** - Process multiple files with detailed progress tracking
+- ⚙️ **Queue Processing** - Asynchronous processing for large files
 
 ### Developer Experience
 
--   🎨 **Custom Filament Components** - MediaUpload and S3Image components
--   🔍 **Advanced Resource Management** - Built-in media metadata interface with bulk actions
--   🚀 **Performance Optimized** - Queue-based processing with chunked operations
--   🔧 **Highly Configurable** - Extensive configuration with environment variables
--   📝 **Comprehensive CLI** - Powerful artisan commands with progress tracking
+- 🎨 **Custom Filament Components** - MediaUpload and S3Image components
+- 🔍 **Advanced Resource Management** - Built-in media metadata interface with bulk actions
+- 🚀 **Performance Optimized** - Queue-based processing with chunked operations
+- 🔧 **Highly Configurable** - Extensive configuration with environment variables
+- 📝 **Comprehensive CLI** - Powerful artisan commands with progress tracking
 
 ## About the Developers
 
@@ -47,11 +47,11 @@ This package is developed and maintained by **Kiran Timsina** and **RayzenTech**
 
 ## Requirements
 
--   PHP 8.1+
--   Laravel 10.0+
--   Filament 4.0+
--   AWS S3 configured (or S3-compatible storage)
--   FFmpeg (optional, required for video compression)
+- PHP 8.1+
+- Laravel 10.0+
+- Filament 4.0+
+- AWS S3 configured (or S3-compatible storage)
+- FFmpeg (optional, required for video compression)
 
 ## Storage Configuration
 
@@ -212,13 +212,13 @@ This approach uses the existing `s3` disk configuration in `filesystems.php` wit
 
 ### Storage Driver Comparison
 
-| Feature | AWS S3 | Cloudflare R2 |
-|---------|--------|---------------|
-| **Storage Cost** | ~$0.023/GB | $0.015/GB |
-| **Egress Fees** | $0.09/GB after 1GB | $0 (free egress) |
-| **API Compatibility** | Native S3 API | S3-compatible API |
-| **Region Config** | Specific region (e.g., us-east-1) | Always use 'auto' |
-| **Best For** | AWS ecosystem integration | Cost-effective, high bandwidth usage |
+| Feature               | AWS S3                            | Cloudflare R2                        |
+| --------------------- | --------------------------------- | ------------------------------------ |
+| **Storage Cost**      | ~$0.023/GB                        | $0.015/GB                            |
+| **Egress Fees**       | $0.09/GB after 1GB                | $0 (free egress)                     |
+| **API Compatibility** | Native S3 API                     | S3-compatible API                    |
+| **Region Config**     | Specific region (e.g., us-east-1) | Always use 'auto'                    |
+| **Best For**          | AWS ecosystem integration         | Cost-effective, high bandwidth usage |
 
 ## Installation
 
@@ -428,14 +428,14 @@ class Product extends Model
 
 **Key Features:**
 
--   Automatically generates multiple sizes when images are saved
--   Handles both single images and arrays of images
--   Smart diffing - only resizes truly new images
--   Automatic cleanup of old media files when replaced
--   Queue-based processing for better performance
--   Video compression with configurable codecs and quality
--   Document file support without unwanted processing
--   Automatic file type detection based on field configuration
+- Automatically generates multiple sizes when images are saved
+- Handles both single images and arrays of images
+- Smart diffing - only resizes truly new images
+- Automatic cleanup of old media files when replaced
+- Queue-based processing for better performance
+- Video compression with configurable codecs and quality
+- Document file support without unwanted processing
+- Automatic file type detection based on field configuration
 
 ## Usage in Filament Resources
 
@@ -512,39 +512,41 @@ MediaUpload::make('product_image')
 **Available Methods:**
 
 **Image Methods:**
--   `quality(int $quality)`: Set compression quality (1-95, default: from config)
--   `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif', 'original')
--   `toWebp()`: Convert images to WebP format
--   `toAvif()`: Convert images to AVIF format (requires Imagick, not available with GD)
--   `keepOriginalFormat()`: Compress but keep the original file format
--   `uploadOriginal()`: Skip ALL processing - no compression, no resizing, no format conversion
--   `trackMetadata()`: Enable/disable metadata tracking
--   `resize()`: Enable Filament's built-in resizing (opposite of uploadOriginal)
+
+- `quality(int $quality)`: Set compression quality (1-95, default: from config)
+- `format(string $format)`: Set output format ('webp', 'jpeg', 'jpg', 'png', 'avif', 'original')
+- `toWebp()`: Convert images to WebP format
+- `toAvif()`: Convert images to AVIF format (requires Imagick, not available with GD)
+- `keepOriginalFormat()`: Compress but keep the original file format
+- `uploadOriginal()`: Skip ALL processing - no compression, no resizing, no format conversion
+- `trackMetadata()`: Enable/disable metadata tracking
+- `resize()`: Enable Filament's built-in resizing (opposite of uploadOriginal)
 
 **Video Methods:**
--   `toWebm()`: Complete WebM setup with optimal settings (1000kbps, 1080p, CRF 30)
--   `toMp4()`: Complete MP4 setup with optimal settings (1500kbps, 1080p, CRF 23)
--   `compressVideo()`: Enable video compression
--   `videoFormat('webm'|'mp4')`: Set video output format
--   `videoBitrate(int)`: Set video bitrate in kbps
--   `videoMaxDimensions(width, height)`: Set maximum video dimensions
--   `videoPreset('ultrafast'|'fast'|'medium'|'slow'|'veryslow')`: Encoding speed/quality trade-off
--   `videoCrf(int)`: Set quality (0-63, lower = better)
--   `videoAsync(bool)`: Enable async processing (recommended)
+
+- `toWebm()`: Complete WebM setup with optimal settings (1000kbps, 1080p, CRF 30)
+- `toMp4()`: Complete MP4 setup with optimal settings (1500kbps, 1080p, CRF 23)
+- `compressVideo()`: Enable video compression
+- `videoFormat('webm'|'mp4')`: Set video output format
+- `videoBitrate(int)`: Set video bitrate in kbps
+- `videoMaxDimensions(width, height)`: Set maximum video dimensions
+- `videoPreset('ultrafast'|'fast'|'medium'|'slow'|'veryslow')`: Encoding speed/quality trade-off
+- `videoCrf(int)`: Set quality (0-63, lower = better)
+- `videoAsync(bool)`: Enable async processing (recommended)
 
 **Important Notes:**
 
--   **Compression:** Images are automatically compressed when enabled in config (unless `uploadOriginal()` is called)
--   **Format Control:** Use `toWebp()`, `toAvif()`, or `format()` to override config format
--   **Upload Original:** Call `uploadOriginal()` to skip ALL processing and upload file exactly as-is
+- **Compression:** Images are automatically compressed when enabled in config (unless `uploadOriginal()` is called)
+- **Format Control:** Use `toWebp()`, `toAvif()`, or `format()` to override config format
+- **Upload Original:** Call `uploadOriginal()` to skip ALL processing and upload file exactly as-is
 
 **Features:**
 
--   Smart compression with configurable output format (WebP/JPEG/PNG/AVIF)
--   Metadata tracking with compression stats
--   Supports both images and videos
--   SEO-friendly file naming
--   Choice between GD Library and Imagick drivers
+- Smart compression with configurable output format (WebP/JPEG/PNG/AVIF)
+- Metadata tracking with compression stats
+- Supports both images and videos
+- SEO-friendly file naming
+- Choice between GD Library and Imagick drivers
 
 ### MediaModalColumn and MediaUrlColumn
 
@@ -601,35 +603,35 @@ MediaUrlColumn::make('featured_image')
 
 **Common Methods (both components):**
 
--   `thumbnailSize()`: Set thumbnail size ('icon', 'small', 'medium', 'large', etc.)
--   `label()`: Column label
--   `relationship()`: Name of the Eloquent relationship (for HasMany, HasOne, BelongsTo)
--   `showMetadata()`: Show file metadata in tooltip
--   `viewCountField()`: Field to track view counts
+- `thumbnailSize()`: Set thumbnail size ('icon', 'small', 'medium', 'large', etc.)
+- `label()`: Column label
+- `relationship()`: Name of the Eloquent relationship (for HasMany, HasOne, BelongsTo)
+- `showMetadata()`: Show file metadata in tooltip
+- `viewCountField()`: Field to track view counts
 
 **MediaModalColumn specific methods:**
 
--   `modalSize()`: Size for modal preview images
--   `heading()`: Modal heading (closure or string)
--   `allowEdit()`: Enable editing images in modal
--   `multiple()`: Handle multiple images
--   `downloadable()`: Allow image downloads
--   `previewable()`: Enable image preview
--   `uploadOriginal()`: Upload file as-is without any processing (default: false)
+- `modalSize()`: Size for modal preview images
+- `heading()`: Modal heading (closure or string)
+- `allowEdit()`: Enable editing images in modal
+- `multiple()`: Handle multiple images
+- `downloadable()`: Allow image downloads
+- `previewable()`: Enable image preview
+- `uploadOriginal()`: Upload file as-is without any processing (default: false)
 
 **MediaUrlColumn specific methods:**
 
--   `openInNewTab()`: Open media page in new tab (default: true)
+- `openInNewTab()`: Open media page in new tab (default: true)
 
 **Features:**
 
--   **Direct field access**: Works with model attributes directly
--   **Relationship support**: Access images through Eloquent relationships
--   **Dot notation**: Legacy support for nested relationships
--   **Modal editing**: View and replace images through modal interface
--   **Multiple images**: Handles both single and multiple image fields
--   **Smart loading**: Automatically loads relationships to prevent N+1 queries
--   **Metadata display**: Optional file size and type information
+- **Direct field access**: Works with model attributes directly
+- **Relationship support**: Access images through Eloquent relationships
+- **Dot notation**: Legacy support for nested relationships
+- **Modal editing**: View and replace images through modal interface
+- **Multiple images**: Handles both single and multiple image fields
+- **Smart loading**: Automatically loads relationships to prevent N+1 queries
+- **Metadata display**: Optional file size and type information
 
 **Relationship Support (v4.3+):**
 
@@ -655,10 +657,10 @@ MediaColumn::make(
 
 This will:
 
--   Display all attachment images in the table column
--   Allow viewing all images in a modal
--   Enable uploading new images that will replace existing attachments
--   Handle HasMany, HasOne, and BelongsTo relationships automatically
+- Display all attachment images in the table column
+- Allow viewing all images in a modal
+- Enable uploading new images that will replace existing attachments
+- Handle HasMany, HasOne, and BelongsTo relationships automatically
 
 #### Default Sizes
 
@@ -679,8 +681,8 @@ FILE_MANAGER_DEFAULT_CARD_SIZE=large
 
 **Available size configurations:**
 
--   **`default_thumbnail_size`**: Used for thumbnail displays in table columns (default: `'icon'`)
--   **`default_card_size`**: Used for larger preview displays like modals (default: `'card'`)
+- **`default_thumbnail_size`**: Used for thumbnail displays in table columns (default: `'icon'`)
+- **`default_card_size`**: Used for larger preview displays like modals (default: `'card'`)
 
 Individual columns can still override these defaults (limited to thumbnail size only):
 
@@ -716,31 +718,31 @@ The package includes a powerful Filament resource for comprehensive media manage
 
 #### Navigation & Monitoring
 
--   **Smart Navigation Badge**: Real-time count of large files (>500KB)
-    -   🔵 Info: 1-50 large files
-    -   🟡 Warning: 51-100 large files
-    -   🔴 Danger: 100+ large files
--   **Automatic cache refresh** every 5 minutes
+- **Smart Navigation Badge**: Real-time count of large files (>500KB)
+    - 🔵 Info: 1-50 large files
+    - 🟡 Warning: 51-100 large files
+    - 🔴 Danger: 100+ large files
+- **Automatic cache refresh** every 5 minutes
 
 #### File Management
 
--   **Comprehensive file listing** with:
-    -   Model type and ID
-    -   Field name
-    -   File size with human-readable format
-    -   Image dimensions (width × height)
-    -   MIME type with color-coded badges
-    -   Creation and update timestamps
+- **Comprehensive file listing** with:
+    - Model type and ID
+    - Field name
+    - File size with human-readable format
+    - Image dimensions (width × height)
+    - MIME type with color-coded badges
+    - Creation and update timestamps
 
 #### Advanced Filtering
 
--   **Quick Filters**:
-    -   Inefficient Images (>0.35 bytes per pixel, >10KB) - Smart filter for images that would benefit from WebP compression
-    -   Large Files (>500KB)
-    -   Very Large Files (>2MB)
--   **Model Type Filter**: Filter by specific models
--   **File Type Filter**: Filter by MIME type
--   **Search**: Find files by name or path
+- **Quick Filters**:
+    - Inefficient Images (>0.35 bytes per pixel, >10KB) - Smart filter for images that would benefit from WebP compression
+    - Large Files (>500KB)
+    - Very Large Files (>2MB)
+- **Model Type Filter**: Filter by specific models
+- **File Type Filter**: Filter by MIME type
+- **Search**: Find files by name or path
 
 ![Filtering Options](docs/images/metadata-filters.webp)
 
@@ -760,23 +762,23 @@ The package includes a powerful Filament resource for comprehensive media manage
 
 #### Bulk Compress
 
--   Select multiple images for compression
--   Choose output format (WebP, AVIF, JPEG, PNG)
--   Set compression quality (50-100%)
--   Option to replace originals
--   Detailed progress reporting
+- Select multiple images for compression
+- Choose output format (WebP, AVIF, JPEG, PNG)
+- Set compression quality (50-100%)
+- Option to replace originals
+- Detailed progress reporting
 
 #### Bulk Resize
 
--   Generate all size variations for selected images
--   Queue-based processing for performance
--   Progress notifications
+- Generate all size variations for selected images
+- Queue-based processing for performance
+- Progress notifications
 
 #### Bulk Delete Resized
 
--   Remove all resized versions for selected images
--   Confirmation dialog with warnings
--   Batch processing with result summary
+- Remove all resized versions for selected images
+- Confirmation dialog with warnings
+- Batch processing with result summary
 
 ### Image Processor Page
 
@@ -788,30 +790,30 @@ The MediaMetadata resource includes a dedicated **Image Processor** page - a pow
 
 **Upload & Process**
 
--   Drag-and-drop or click to upload images up to 10MB
--   Support for JPEG, PNG, WebP, and AVIF formats
--   Real-time preview of uploaded images
+- Drag-and-drop or click to upload images up to 10MB
+- Support for JPEG, PNG, WebP, and AVIF formats
+- Real-time preview of uploaded images
 
 **Processing Options**
 
--   **Format Selection**: Convert between WebP, JPEG, PNG, and AVIF
--   **Quality Control**: Adjust compression from 50% to 100%
--   **Resizing**: Set custom dimensions with multiple resize modes
+- **Format Selection**: Convert between WebP, JPEG, PNG, and AVIF
+- **Quality Control**: Adjust compression from 50% to 100%
+- **Resizing**: Set custom dimensions with multiple resize modes
 
 **Compression Drivers**
 
--   **GD Library**: Fast, built-in PHP processing with lower memory usage
--   **Imagick**: Better quality and more features using ImageMagick
+- **GD Library**: Fast, built-in PHP processing with lower memory usage
+- **Imagick**: Better quality and more features using ImageMagick
 
 **Results & Analytics**
 
--   Side-by-side comparison of original vs processed
--   Detailed statistics:
-    -   Original and compressed file sizes
-    -   Space saved (KB and percentage)
-    -   Final dimensions
-    -   Processing method used
--   Download processed images directly
+- Side-by-side comparison of original vs processed
+- Detailed statistics:
+    - Original and compressed file sizes
+    - Space saved (KB and percentage)
+    - Final dimensions
+    - Processing method used
+- Download processed images directly
 
 ![Processing Results](docs/images/processor-results.webp)
 
@@ -929,14 +931,15 @@ $result = $service->compressExisting(
 
 **Compression Drivers:**
 
--   **GD Library (`driver: 'gd'`)**: Built-in PHP image processing using GD extension. Fast, lower memory usage, suitable for most use cases. Supports WebP, JPEG, and PNG formats.
--   **Imagick (`driver: 'imagick'`)**: Uses ImageMagick extension for image processing. Better quality, more features, supports additional formats like AVIF. Requires ImageMagick to be installed on the server.
+- **GD Library (`driver: 'gd'`)**: Built-in PHP image processing using GD extension. Fast, lower memory usage, suitable for most use cases. Supports WebP, JPEG, and PNG formats.
+- **Imagick (`driver: 'imagick'`)**: Uses ImageMagick extension for image processing. Better quality, more features, supports additional formats like AVIF. Requires ImageMagick to be installed on the server.
 
 ### Video Compression Service
 
 The package now includes comprehensive video compression capabilities using FFmpeg to convert and optimize video files.
 
 **Prerequisites:**
+
 ```bash
 # Install FFmpeg on your system
 # macOS:
@@ -954,6 +957,7 @@ sudo yum install ffmpeg
 ```
 
 **Configuration:**
+
 ```env
 # Video Compression Settings
 FILE_MANAGER_VIDEO_COMPRESSION_ENABLED=true
@@ -975,6 +979,7 @@ FILE_MANAGER_VIDEO_THUMBNAIL_TIME=1.0          # seconds into video
 ```
 
 **Using Video Compression in Forms:**
+
 ```php
 use Kirantimsina\FileManager\Forms\Components\MediaUpload;
 
@@ -1002,6 +1007,7 @@ MediaUpload::make('video')
 The package provides two convenient helper methods that configure all video settings with a single call:
 
 **`toWebm()`** - Optimized for web delivery with WebM format:
+
 - Accepts common video formats (MP4, WebM, QuickTime, M4V)
 - Outputs WebM format with VP9 codec
 - 1000 kbps bitrate for balanced quality/size
@@ -1011,6 +1017,7 @@ The package provides two convenient helper methods that configure all video sett
 - Async processing enabled
 
 **`toMp4()`** - Universal compatibility with MP4 format:
+
 - Accepts common video formats (MP4, WebM, QuickTime, M4V)
 - Outputs MP4 format with H.264 codec
 - 1500 kbps bitrate for better quality
@@ -1020,6 +1027,7 @@ The package provides two convenient helper methods that configure all video sett
 - Async processing enabled
 
 **Programmatic Video Compression:**
+
 ```php
 use Kirantimsina\FileManager\Services\VideoCompressionService;
 
@@ -1055,6 +1063,7 @@ $metadata = $service->getVideoMetadata('/path/to/video.mp4');
 ```
 
 **Async Video Processing with Queue:**
+
 ```php
 use Kirantimsina\FileManager\Jobs\CompressVideoJob;
 
@@ -1078,6 +1087,7 @@ CompressVideoJob::dispatch(
 ```
 
 **Bulk Video Compression Command:**
+
 ```bash
 # Compress all videos in media metadata
 php artisan file-manager:compress-videos
@@ -1110,12 +1120,12 @@ php artisan file-manager:compress-videos \
 
 **Video Format Recommendations:**
 
-| Format | Video Codec | Audio Codec | Use Case | Pros | Cons |
-|--------|------------|-------------|----------|------|------|
-| **WebM** | VP9 | Opus | Modern web | Better compression, open source | Limited browser support (no Safari) |
-| **WebM** | VP8 | Vorbis | Legacy web | Wider browser support | Larger files than VP9 |
-| **MP4** | H.264 | AAC | Universal | Maximum compatibility | Larger files, licensing |
-| **MP4** | H.265/HEVC | AAC | High quality | 50% smaller than H.264 | Limited browser support |
+| Format   | Video Codec | Audio Codec | Use Case     | Pros                            | Cons                                |
+| -------- | ----------- | ----------- | ------------ | ------------------------------- | ----------------------------------- |
+| **WebM** | VP9         | Opus        | Modern web   | Better compression, open source | Limited browser support (no Safari) |
+| **WebM** | VP8         | Vorbis      | Legacy web   | Wider browser support           | Larger files than VP9               |
+| **MP4**  | H.264       | AAC         | Universal    | Maximum compatibility           | Larger files, licensing             |
+| **MP4**  | H.265/HEVC  | AAC         | High quality | 50% smaller than H.264          | Limited browser support             |
 
 **Preset Performance Guide:**
 
@@ -1135,22 +1145,48 @@ php artisan file-manager:compress-videos \
 
 ## Queue Jobs
 
-The package uses queued jobs for better performance:
+The package uses queued jobs for better performance. Jobs are dispatched to configurable queues.
 
-```bash
-# Process resize jobs
-php artisan queue:work
+### Queue Configuration
 
-# Monitor queue
-php artisan queue:monitor
+Configure queue names in `config/file-manager.php`:
+
+```php
+'queue' => [
+    // Queue name for image processing jobs (resizing, compression)
+    'images' => env('FILE_MANAGER_QUEUE_IMAGES', 'default'),
+
+    // Queue name for video processing jobs
+    'videos' => env('FILE_MANAGER_QUEUE_VIDEOS', 'default'),
+
+    // Queue name for file deletion jobs
+    'delete' => env('FILE_MANAGER_QUEUE_DELETE', 'default'),
+],
 ```
 
-**Available Jobs:**
+### Running Queue Workers
 
--   `ResizeImages` - Generate multiple sizes for uploaded images
--   `DeleteMedia` - Clean up all media files (images, videos, documents) and their sizes
--   `PopulateMediaMetadataJob` - Populate media metadata for existing media files
--   `CompressVideoJob` - Asynchronously compress and optimize video files
+**If using Laravel Horizon** (recommended for production):
+You might have to configure horizon to use supervisors as your requirements. Check horizon's docs for more info on how to configure queues.
+
+**If NOT using Horizon**, you must explicitly specify the queues:
+
+```bash
+# Listen to both default and custom queues
+php artisan queue:work --queue=default,images,videos
+
+# Or in your composer.json dev script:
+"php artisan queue:listen --queue=default,images,videos --tries=1"
+```
+
+> ⚠️ **Important**: If you're using a database queue driver without Horizon and don't specify the queue names, jobs on non-default queues will not be processed!
+
+### Available Jobs
+
+- `ResizeImages` - Generate multiple sizes for uploaded images (uses `queue.images`)
+- `DeleteMedia` - Clean up all media files and their sizes (uses `queue.delete`)
+- `PopulateMediaMetadataJob` - Populate media metadata for existing media files
+- `CompressVideoJob` - Asynchronously compress and optimize video files (uses `queue.videos`)
 
 ## Artisan Commands
 
@@ -1158,8 +1194,8 @@ The package provides several powerful Artisan commands for managing your media f
 
 | Command                             | Purpose                                 | Key Features                                 |
 | ----------------------------------- | --------------------------------------- | -------------------------------------------- |
-| `file-manager:manage-sizes`         | Add/remove image sizes for all media   | Config checking, batch processing, dry run   |
-| `file-manager:refresh-all`          | Queue refresh jobs for all media       | Metadata sync, dimension updates, batch jobs |
+| `file-manager:manage-sizes`         | Add/remove image sizes for all media    | Config checking, batch processing, dry run   |
+| `file-manager:refresh-all`          | Queue refresh jobs for all media        | Metadata sync, dimension updates, batch jobs |
 | `file-manager:populate-seo-titles`  | Generate SEO titles for media files     | Dry run, model filtering, chunked processing |
 | `file-manager:update-seo-titles`    | Update SEO titles when models change    | Model-specific updates, automatic tracking   |
 | `file-manager:populate-metadata`    | Create metadata for existing images     | Auto-fixes MIME types, progress tracking     |
@@ -1204,7 +1240,7 @@ php artisan file-manager:manage-sizes remove xlarge --force
 #### Key Features
 
 - **Safe Operations**: Dry-run mode lets you preview changes before executing
-- **Progress Tracking**: Real-time progress bar shows current status  
+- **Progress Tracking**: Real-time progress bar shows current status
 - **Batch Processing**: Configurable chunk sizes for memory efficiency
 - **Error Handling**: Detailed error reporting for failed operations
 - **S3 Integration**: Automatically handles S3 file creation and deletion
@@ -1213,29 +1249,29 @@ php artisan file-manager:manage-sizes remove xlarge --force
 #### Important Notes
 
 - **Configuration First Approach**: The command enforces configuration updates before operations:
-  - **Adding**: Blocks execution if size not in config, requires you to add it first
-  - **Removing**: Blocks execution if size still in config, requires you to remove it first
-  - This prevents orphaned files and ensures configuration consistency
-  
-- **Two-Step Process**: 
-  1. **Update your configuration** in `config/file-manager.php`
-  2. **Run the command** to process the files
+    - **Adding**: Blocks execution if size not in config, requires you to add it first
+    - **Removing**: Blocks execution if size still in config, requires you to remove it first
+    - This prevents orphaned files and ensures configuration consistency
+- **Two-Step Process**:
+    1. **Update your configuration** in `config/file-manager.php`
+    2. **Run the command** to process the files
 
-  ```php
-  'image_sizes' => [
-      'icon' => 64,
-      'small' => 120,
-      'xlarge' => 1440,  // Add your new size here
-  ],
-  ```
+    ```php
+    'image_sizes' => [
+        'icon' => 64,
+        'small' => 120,
+        'xlarge' => 1440,  // Add your new size here
+    ],
+    ```
 
 - **Storage Requirements**: Adding sizes will increase storage usage as new files are created
-- **Processing Time**: Large datasets may take considerable time to process  
+- **Processing Time**: Large datasets may take considerable time to process
 - **File Cleanup**: Removing sizes permanently deletes the associated image files
 
 #### Example Output
 
 **Blocked when size not in config:**
+
 ```bash
 $ php artisan file-manager:manage-sizes add hero 1800
 
@@ -1251,6 +1287,7 @@ After updating your config, run this command again.
 ```
 
 **Success after adding to config:**
+
 ```bash
 $ php artisan file-manager:manage-sizes add hero 1800
 
@@ -1262,7 +1299,7 @@ Add size 'hero' (1800px height) to 1,250 images? (yes/no) [no]:
 
 Processing completed:
 - Total processed: 1250
-- Succeeded: 1248  
+- Succeeded: 1248
 - Failed: 2
 
 Successfully created 'hero' sized images for 1248 files
@@ -1322,7 +1359,7 @@ You'll receive notifications about progress and completion
 
 Jobs will check each file for:
 - File size changes
-- MIME type changes  
+- MIME type changes
 - Image dimension changes
 - Parent model reference consistency
 ```
@@ -1356,11 +1393,11 @@ php artisan file-manager:populate-seo-titles --overwrite
 
 **Features:**
 
--   Intelligently extracts titles from parent model fields (meta_title, seo_title, name, title, etc.)
--   Removes special characters from beginning/end of titles
--   Respects configuration for enabled/excluded models
--   Processes large datasets efficiently with chunked operations
--   Shows detailed breakdown by model type
+- Intelligently extracts titles from parent model fields (meta_title, seo_title, name, title, etc.)
+- Removes special characters from beginning/end of titles
+- Respects configuration for enabled/excluded models
+- Processes large datasets efficiently with chunked operations
+- Shows detailed breakdown by model type
 
 ### Update SEO Titles
 
@@ -1405,24 +1442,24 @@ class Product extends Model
 
 The HasMultimedia trait now provides:
 
--   Automatic image resizing for configured sizes
--   Video compression with queue processing
--   Media metadata tracking for all file types
--   **Automatic SEO title updates** when the field returned by `seoTitleField()` changes
--   Smart file type detection and processing based on field configuration
+- Automatic image resizing for configured sizes
+- Video compression with queue processing
+- Media metadata tracking for all file types
+- **Automatic SEO title updates** when the field returned by `seoTitleField()` changes
+- Smart file type detection and processing based on field configuration
 
 **How SEO Titles Work:**
 
--   **Opt-in system**: Only models with a `seoTitleField()` method will have SEO titles
--   **No configuration needed**: The presence of the method indicates the model wants SEO titles
--   **Null is fine**: If the specified field is null/empty, the SEO title will be null
--   **Clean and explicit**: Each model declares exactly which field to use
+- **Opt-in system**: Only models with a `seoTitleField()` method will have SEO titles
+- **No configuration needed**: The presence of the method indicates the model wants SEO titles
+- **Null is fine**: If the specified field is null/empty, the SEO title will be null
+- **Clean and explicit**: Each model declares exactly which field to use
 
 **Important Notes:**
 
--   Models without `seoTitleField()` method won't have SEO titles (intentional)
--   Return a single field name, not conditional logic
--   This is perfect for models where SEO is important (Product, Blog, Category) while internal models (Order, User, CartItem) simply don't define the method
+- Models without `seoTitleField()` method won't have SEO titles (intentional)
+- Return a single field name, not conditional logic
+- This is perfect for models where SEO is important (Product, Blog, Category) while internal models (Order, User, CartItem) simply don't define the method
 
 **Example for different models:**
 
@@ -1512,14 +1549,14 @@ php artisan file-manager:populate-metadata --dry-run
 
 **Improvements in the latest version:**
 
--   Better model class resolution (supports both short names and full namespaces)
--   Progress bar for tracking processing status
--   Improved error handling and reporting
--   Memory-efficient chunked processing
--   Dry-run mode for testing
--   Synchronous mode for immediate processing
--   **Automatic MIME type correction** for existing records
--   **Enhanced MIME type detection** for WebP/AVIF formats
+- Better model class resolution (supports both short names and full namespaces)
+- Progress bar for tracking processing status
+- Improved error handling and reporting
+- Memory-efficient chunked processing
+- Dry-run mode for testing
+- Synchronous mode for immediate processing
+- **Automatic MIME type correction** for existing records
+- **Enhanced MIME type detection** for WebP/AVIF formats
 
 This command will:
 
@@ -1537,11 +1574,11 @@ The package includes robust MIME type detection that:
 - **Trusts file extensions** for WebP and AVIF formats (PHP's built-in detection often confuses these)
 - **Automatically fixes mismatches** when running `populate-metadata` command
 - **Uses multiple detection methods** in priority order:
-  1. Extension-based for WebP/AVIF (most reliable for these formats)
-  2. PHP's `finfo` functions for other file types
-  3. `mime_content_type()` as fallback
-  4. `getimagesize()` for image validation
-  5. Extension mapping as last resort
+    1. Extension-based for WebP/AVIF (most reliable for these formats)
+    2. PHP's `finfo` functions for other file types
+    3. `mime_content_type()` as fallback
+    4. `getimagesize()` for image validation
+    5. Extension mapping as last resort
 
 This ensures that files like `.webp` are correctly identified as `image/webp` and not incorrectly labeled as `image/avif` or `binary/octet-stream`.
 
@@ -1568,21 +1605,21 @@ php artisan file-manager:remove-duplicates --force --chunk=1000
 
 **What it does:**
 
--   Identifies duplicate records based on: `mediable_type` + `mediable_id` + `mediable_field` + `file_name`
--   Shows you a preview of duplicates with counts and details
--   Keeps the **oldest record** in each duplicate group (by `created_at` and `id`)
--   Removes all other duplicates in each group
--   Provides verification that cleanup was successful
+- Identifies duplicate records based on: `mediable_type` + `mediable_id` + `mediable_field` + `file_name`
+- Shows you a preview of duplicates with counts and details
+- Keeps the **oldest record** in each duplicate group (by `created_at` and `id`)
+- Removes all other duplicates in each group
+- Provides verification that cleanup was successful
 
 **Features:**
 
--   🔍 **Dry run mode** to preview what will be removed
--   📊 **Detailed reporting** showing duplicate groups and counts
--   📋 **Sample preview** of duplicates before removal
--   ✅ **Verification** to confirm cleanup was successful
--   🚀 **Progress bar** for large datasets
--   💾 **Safe operation** - always keeps the oldest record
--   🤖 **Non-interactive mode** with `--force` flag for automation
+- 🔍 **Dry run mode** to preview what will be removed
+- 📊 **Detailed reporting** showing duplicate groups and counts
+- 📋 **Sample preview** of duplicates before removal
+- ✅ **Verification** to confirm cleanup was successful
+- 🚀 **Progress bar** for large datasets
+- 💾 **Safe operation** - always keeps the oldest record
+- 🤖 **Non-interactive mode** with `--force` flag for automation
 
 **Example output:**
 
@@ -1602,10 +1639,10 @@ Will remove 30 duplicate records (keeping the oldest in each group).
 
 This command is useful when:
 
--   You've imported data that created duplicate metadata entries
--   Migration issues caused duplicate records
--   Multiple processes created metadata for the same files
--   You want to clean up your database before important operations
+- You've imported data that created duplicate metadata entries
+- Migration issues caused duplicate records
+- Multiple processes created metadata for the same files
+- You want to clean up your database before important operations
 
 ### Update Cache Headers for Existing Images
 
@@ -1634,20 +1671,20 @@ php artisan file-manager:update-cache-headers products --dry-run --limit=10 --de
 
 **Features:**
 
--   ✅ Progress bar showing real-time progress
--   🔍 Dry run mode to preview changes
--   📁 Directory-specific updates
--   🎯 Limit option for batch processing
--   📝 Detailed output mode showing each file processed
--   📊 Summary report with success/error counts
--   🚀 Automatically detects all image directories from config
+- ✅ Progress bar showing real-time progress
+- 🔍 Dry run mode to preview changes
+- 📁 Directory-specific updates
+- 🎯 Limit option for batch processing
+- 📝 Detailed output mode showing each file processed
+- 📊 Summary report with success/error counts
+- 🚀 Automatically detects all image directories from config
 
 **How it works:**
 
--   Uses S3's `copyObject` API to update metadata without re-uploading files
--   Applies cache control settings from your config
--   Sets proper Content-Type based on file extension
--   Processes original images and all resized versions
+- Uses S3's `copyObject` API to update metadata without re-uploading files
+- Applies cache control settings from your config
+- Sets proper Content-Type based on file extension
+- Processes original images and all resized versions
 
 This command is essential if you have images uploaded before cache headers were implemented, ensuring all your images benefit from optimal browser and CDN caching.
 
@@ -1702,14 +1739,15 @@ To completely disable automatic image resizing, set the `image_sizes` config to 
 
 This is useful when:
 
--   You want to handle image resizing manually
--   You're working with vector graphics or images that shouldn't be resized
--   You want to optimize storage by keeping only original images
--   You're using an external service for image processing
+- You want to handle image resizing manually
+- You're working with vector graphics or images that shouldn't be resized
+- You want to optimize storage by keeping only original images
+- You're using an external service for image processing
 
 ### Exclude Certain Fields from Processing
 
 The HasMultimedia trait automatically determines the appropriate processing based on field type:
+
 - **Image fields**: Automatic resizing to configured sizes
 - **Video fields**: Optional compression with FFmpeg
 - **Document fields**: No processing, upload as-is
@@ -1730,46 +1768,52 @@ $checkout->items = [
 
 ### Images not resizing
 
--   Ensure queue workers are running: `php artisan queue:work`
--   Check that model directories are configured in `config/file-manager.php`
--   Verify S3 permissions allow reading and writing
+- Ensure queue workers are running: `php artisan queue:work`
+- Check that model directories are configured in `config/file-manager.php`
+- Verify S3 permissions allow reading and writing
 
 ### Duplicate resize jobs
 
--   Use `moveTempImageWithoutResize()` when the model has `HasMultimedia` trait
--   The trait automatically handles resizing on create/update
+- Use `moveTempImageWithoutResize()` when the model has `HasMultimedia` trait
+- The trait automatically handles resizing on create/update
 
 ### WebP conversion failing
 
--   Ensure GD or ImageMagick PHP extensions are installed
--   Check PHP memory limit for large images
+- Ensure GD or ImageMagick PHP extensions are installed
+- Check PHP memory limit for large images
 
 ### Cloudflare R2 Specific Issues
 
 #### Connection Errors
--   Ensure `AWS_ENDPOINT` is set correctly (format: `https://[account-id].r2.cloudflarestorage.com`)
--   Always use `AWS_DEFAULT_REGION=auto` for R2
--   Verify your API credentials have the correct permissions
+
+- Ensure `AWS_ENDPOINT` is set correctly (format: `https://[account-id].r2.cloudflarestorage.com`)
+- Always use `AWS_DEFAULT_REGION=auto` for R2
+- Verify your API credentials have the correct permissions
 
 #### Public Access Not Working
--   Enable R2.dev subdomain in bucket settings
--   Or configure custom domain with Transform Rules
--   Check CORS settings if accessing from browser
+
+- Enable R2.dev subdomain in bucket settings
+- Or configure custom domain with Transform Rules
+- Check CORS settings if accessing from browser
 
 #### Upload Failures
--   R2 has a 5GB single upload limit (use multipart for larger files)
--   Ensure your API token has write permissions
--   Check if you've reached storage limits in your Cloudflare plan
+
+- R2 has a 5GB single upload limit (use multipart for larger files)
+- Ensure your API token has write permissions
+- Check if you've reached storage limits in your Cloudflare plan
 
 ### AWS S3 Specific Issues
 
 #### Access Denied Errors
--   Verify IAM user has correct policies attached
--   Check bucket policy allows your operations
--   Ensure bucket region matches your configuration
+
+- Verify IAM user has correct policies attached
+- Check bucket policy allows your operations
+- Ensure bucket region matches your configuration
 
 #### CORS Issues
--   Configure CORS in bucket settings:
+
+- Configure CORS in bucket settings:
+
 ```json
 [
     {
@@ -1782,9 +1826,10 @@ $checkout->items = [
 ```
 
 #### Slow Upload/Download
--   Consider using Transfer Acceleration for S3
--   Use CloudFront CDN for better performance
--   Choose bucket region closer to your users
+
+- Consider using Transfer Acceleration for S3
+- Use CloudFront CDN for better performance
+- Choose bucket region closer to your users
 
 ## Performance Tips
 
@@ -1820,9 +1865,9 @@ FILE_MANAGER_CACHE_IMMUTABLE=false
 
 All media files uploaded to S3 will automatically include these cache headers:
 
--   `Cache-Control: public, max-age=31536000, immutable` (default)
--   Proper `Content-Type` based on actual file format
--   Optimized for CDN edge caching
+- `Cache-Control: public, max-age=31536000, immutable` (default)
+- Proper `Content-Type` based on actual file format
+- Optimized for CDN edge caching
 
 ## Changelog
 
@@ -1838,9 +1883,9 @@ If you discover any security issues, please email timsinakiran@gmail.com instead
 
 ## Credits
 
--   [Kiran Timsina](https://github.com/kirantimsina)
--   [RayzenTech](https://www.rayzentech.com)
--   [All Contributors](../../contributors)
+- [Kiran Timsina](https://github.com/kirantimsina)
+- [RayzenTech](https://www.rayzentech.com)
+- [All Contributors](../../contributors)
 
 ## License
 

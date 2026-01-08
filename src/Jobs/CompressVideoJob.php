@@ -90,6 +90,7 @@ class CompressVideoJob implements ShouldQueue
         $this->modelField = $modelField;
         $this->replaceOriginal = $replaceOriginal;
         $this->deleteOriginal = $deleteOriginal;
+        $this->onQueue(config('file-manager.queue.videos', 'default'));
     }
 
     /**
