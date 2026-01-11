@@ -311,6 +311,19 @@ class MediaUpload extends FileUpload
     }
 
     /**
+     * Configure for Open Graph image uploads (1200x630)
+     * Sets up proper aspect ratio and helper text for social media sharing images
+     */
+    public function og(): static
+    {
+        return $this
+            ->image()
+            ->imageEditor()
+            ->imageCropAspectRatio('1200:630')
+            ->helperText('Social media sharing image (1200×630 pixels recommended)');
+    }
+
+    /**
      * This is called automatically by Filament when the component is constructed.
      */
     protected function setUp(): void
