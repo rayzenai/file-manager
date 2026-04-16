@@ -21,7 +21,7 @@ return new class extends Migration
                 $table->string('mime_type')->nullable();
                 $table->unsignedInteger('width')->nullable();
                 $table->unsignedInteger('height')->nullable();
-                $table->jsonb('metadata')->nullable();
+                $table->json('metadata')->nullable();
                 $table->timestamps();
                 
                 $table->index(['mediable_type', 'mediable_id', 'mediable_field'], 'media_metadata_composite_index');

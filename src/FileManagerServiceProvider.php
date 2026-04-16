@@ -49,7 +49,8 @@ class FileManagerServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        // Register Livewire components
-        Livewire::component('kirantimsina.file-manager.filament.resources.media-metadata-resource.pages.image-processor', ImageProcessor::class);
+        if (class_exists(Livewire::class) && $this->app->bound('livewire')) {
+            Livewire::component('kirantimsina.file-manager.filament.resources.media-metadata-resource.pages.image-processor', ImageProcessor::class);
+        }
     }
 }
