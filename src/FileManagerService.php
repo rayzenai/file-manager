@@ -429,4 +429,76 @@ class FileManagerService
 
         return $header;
     }
+
+    /**
+     * Cleanup old media files from storage based on age threshold.
+     * Uses the mediable relationship to find records older than the specified age,
+     * then deletes files from storage and marks them as deleted.
+     *
+     * @param  int  $ageInDays  Age threshold in days (files older than this will be deleted)
+     * @param  array  $mediableTypes  Optional array of mediable types to filter (e.g., ['App\Models\Order'])
+     * @param  bool  $dryRun  If true, only reports what would be deleted without actually deleting
+     * @param  string|null  $diskName  Optional disk name, defaults to config('filesystems.default')
+     * @return array{found: int, deleted: int, skipped: int, errors: int, messages: array<string>}
+     */
+    public static function cleanupOldMedia(
+        int $ageInDays,
+        array $mediableTypes = [],
+        bool $dryRun = false,
+        ?string $diskName = null
+    ): array {
+        $diskName = $diskName ?? config('filesystems.default', 's3');
+        $threshold = now()->subDays($ageInDays)->startOfDay();
+
+        $results = [
+            'found' => 0,
+            'deleted' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'messages' => [],
+        ];
+
+        $query = MediaMetadata::query()
+            ->whereHas('mediable', function ($query) use ($threshold) {
+                // Filter by the created_at of the parent model
+                $query->where('created_at', '<', $threshold);
+            })
+            ->whereNull('storage_deleted_at')
+            ->whereNotNull('file_name');
+
+        if (! empty($mediableTypes)) {
+            $query->whereIn('mediable_type', $mediableTypes);
+        }
+
+        $total = $query->count();
+        $results['messages'][] = "Found {$total} media records older than {$ageInDays} days on disk '{$diskName}'" . ($dryRun ? ' (DRY RUN)' : '');
+
+        $query->chunk(100, function ($records) use (&$results, $dryRun) {
+            foreach ($records as $media) {
+                $results['found']++;
+
+                if ($dryRun) {
+                    $results['messages'][] = "  [DRY] Would delete: {$media->file_name} ({$media->mediable_type} #{$media->mediable_id}.{$media->mediable_field})";
+                    $results['deleted']++;
+
+                    continue;
+                }
+
+                try {
+                    static::deleteImage($media->file_name);
+                    $media->storage_deleted_at = now();
+                    $media->save();
+                    $results['deleted']++;
+                    $results['messages'][] = "  Deleted: {$media->file_name}";
+                } catch (Exception $e) {
+                    $results['errors']++;
+                    $results['messages'][] = "  ERROR {$media->file_name}: {$e->getMessage()}";
+                }
+            }
+        });
+
+        $results['messages'][] = "Summary: found={$results['found']}, deleted={$results['deleted']}, skipped={$results['skipped']}, errors={$results['errors']}";
+
+        return $results;
+    }
 }
