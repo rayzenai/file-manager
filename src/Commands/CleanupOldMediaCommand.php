@@ -113,7 +113,7 @@ class CleanupOldMediaCommand extends Command
         $namespace = app()->getNamespace();
         $relativePath = str_replace(app_path('Models') . DIRECTORY_SEPARATOR, '', $file);
         $className = str_replace(DIRECTORY_SEPARATOR, '\\', $relativePath);
-        $className = $namespace . '\\Models\\' . str_replace('.php', '', $className);
+        $className = $namespace . 'Models\\' . str_replace('.php', '', $className);
 
         if (! class_exists($className)) {
             return null;
