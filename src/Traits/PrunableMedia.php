@@ -132,19 +132,21 @@ trait PrunableMedia
      * Prune media for a single model instance.
      *
      * @param  string|null  $diskName  Disk to delete from
-     * @return array{files_deleted: int, errors: int}
+     * @return array{main: int, resized: int, errors: int}
      */
     public function pruneMedia(?string $diskName = null): array
     {
         $diskName = $diskName ?? config('filesystems.default', 's3');
         $filesToDelete = $this->getMediaToPrune();
-        $deleted = 0;
+        $mainDeleted = 0;
+        $resizedDeleted = 0;
         $errors = 0;
 
         foreach ($filesToDelete as $file) {
             try {
-                FileManagerService::deleteImage($file);
-                $deleted++;
+                $result = FileManagerService::deleteImageWithSizes($file);
+                $mainDeleted += $result['main'];
+                $resizedDeleted += $result['resized'];
             } catch (\Exception $e) {
                 $errors++;
                 Log::error("Failed to delete media file: {$file}", [
@@ -155,10 +157,20 @@ trait PrunableMedia
             }
         }
 
-        if ($deleted > 0) {
+        if (count($filesToDelete) > 0) {
             $this->markMediaAsPruned();
+            $this->clearPrunedMediaFiles();
         }
 
-        return ['files_deleted' => $deleted, 'errors' => $errors];
+        return ['main' => $mainDeleted, 'resized' => $resizedDeleted, 'errors' => $errors];
+    }
+
+    /**
+     * Clear file references after pruning so this record won't be re-selected.
+     * Override in model if it stores files differently (e.g. in a JSON column).
+     */
+    public function clearPrunedMediaFiles(): void
+    {
+        // Default: subclasses can override if needed
     }
 }
