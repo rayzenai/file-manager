@@ -21,6 +21,7 @@ class MediaMetadata extends Model
         'height',
         'metadata',
         'seo_title',
+        'storage_deleted_at',
     ];
 
     protected $casts = [

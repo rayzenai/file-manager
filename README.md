@@ -1198,9 +1198,10 @@ The package provides several powerful Artisan commands for managing your media f
 | `file-manager:refresh-all`          | Queue refresh jobs for all media        | Metadata sync, dimension updates, batch jobs |
 | `file-manager:populate-seo-titles`  | Generate SEO titles for media files     | Dry run, model filtering, chunked processing |
 | `file-manager:update-seo-titles`    | Update SEO titles when models change    | Model-specific updates, automatic tracking   |
-| `file-manager:populate-metadata`    | Create metadata for existing images     | Auto-fixes MIME types, progress tracking     |
-| `file-manager:remove-duplicates`    | Remove duplicate metadata records       | Safe cleanup, dry run preview                |
-| `file-manager:update-cache-headers` | Add cache headers to existing S3 images | Directory-specific, progress tracking        |
+| `file-manager:populate-metadata`     | Create metadata for existing images     | Auto-fixes MIME types, progress tracking    |
+| `file-manager:remove-duplicates`    | Remove duplicate metadata records       | Safe cleanup, dry run preview               |
+| `file-manager:update-cache-headers`| Add cache headers to existing S3 images | Directory-specific, progress tracking        |
+| `file-manager:cleanup-old-media`    | Delete old media files from storage      | Age threshold, PrunableMedia trait, dry run  |
 
 ---
 
@@ -1868,6 +1869,137 @@ All media files uploaded to S3 will automatically include these cache headers:
 - `Cache-Control: public, max-age=31536000, immutable` (default)
 - Proper `Content-Type` based on actual file format
 - Optimized for CDN edge caching
+
+---
+
+## Cleanup Old Media
+
+The package provides a cleanup command to delete old media files from storage based on age thresholds. This helps manage storage costs and keep your S3/R2 bucket clean.
+
+### How It Works
+
+1. Apply the `PrunableMedia` trait to models that have media files
+2. Define `prunableMediaPeriod()` to specify how old files should be before deletion
+3. The command discovers all models with the trait and deletes their old files from storage
+4. The `storage_deleted_at` timestamp is set on `media_metadata` records to track cleanup state
+
+### Prerequisites
+
+Add the `storage_deleted_at` column to your `media_metadata` table by publishing and running the migration:
+
+```bash
+php artisan vendor:publish --tag="file-manager-migrations"
+php artisan migrate
+```
+
+### Step 1: Apply the Trait
+
+Add `PrunableMedia` trait to any model that has media files you want to clean up. The model must also use `HasMultimedia`:
+
+```php
+use Kirantimsina\FileManager\Traits\HasMultimedia;
+use Kirantimsina\FileManager\Traits\PrunableMedia;
+
+class Product extends Model
+{
+    use HasMultimedia, PrunableMedia;
+
+    /**
+     * Period in days after which media files should be deleted.
+     * Files older than this will be removed from storage.
+     */
+    public static function prunableMediaPeriod(): int
+    {
+        return 365; // 1 year
+    }
+
+    /**
+     * Define which fields contain media files
+     */
+    public function mediaFieldsToWatch(): array
+    {
+        return [
+            'images' => ['thumbnail', 'gallery'],
+            'documents' => ['datasheet'],
+        ];
+    }
+}
+```
+
+### Step 2: Run the Cleanup Command
+
+```bash
+# Discover all models with PrunableMedia trait and clean their old media
+php artisan file-manager:cleanup-old-media
+
+# Preview what would be deleted without actually deleting
+php artisan file-manager:cleanup-old-media --dry-run
+
+# Target a specific disk (s3 or r2)
+php artisan file-manager:cleanup-old-media --disk=r2
+
+# Override age threshold for all models (ignores prunableMediaPeriod)
+php artisan file-manager:cleanup-old-media --age=180
+
+# Clean only a specific model
+php artisan file-manager:cleanup-old-media --model="App\Models\Product"
+```
+
+### What Gets Deleted
+
+The command:
+1. Finds all models where `created_at` is older than the `prunableMediaPeriod()` threshold
+2. Collects all file paths from the model's `mediaFieldsToWatch()` fields
+3. Uses `FileManagerService::deleteImage()` to delete each file — including all resized variants
+4. Sets `storage_deleted_at = now()` on the corresponding `media_metadata` records
+
+The command is **idempotent** — re-running it skips records that already have `storage_deleted_at` set.
+
+### Scheduling
+
+Add to your `app/Console/Kernel.php` to run weekly:
+
+```php
+$schedule->command('file-manager:cleanup-old-media')
+    ->weekly()
+    ->withoutOverlapping();
+```
+
+Or run manually via cron:
+
+```bash
+# Run every Sunday at 2 AM
+0 2 * * 0 cd /path-to-your-project && php artisan file-manager:cleanup-old-media >> /dev/null 2>&1
+```
+
+### API Method
+
+You can also call the cleanup logic directly from PHP:
+
+```php
+use Kirantimsina\FileManager\Facades\FileManager;
+
+// Clean media older than 365 days for CartItem models
+$result = FileManager::cleanupOldMedia(
+    ageInDays: 365,
+    mediableTypes: ['App\Models\CartItem'],
+    dryRun: false,
+    diskName: 's3'
+);
+
+// Result contains counts and messages
+// $result['found']   - total records found
+// $result['deleted'] - files actually deleted
+// $result['errors']  - failed deletions
+```
+
+### Key Features
+
+- **Idempotent**: Safely re-run — skips already-deleted files via `storage_deleted_at` flag
+- **Discovers models automatically**: No configuration needed beyond applying the trait
+- **Handles all resized variants**: Uses `FileManagerService::deleteImage()` which deletes original + all sizes
+- **Dry-run mode**: Preview what would be deleted before running for real
+- **Configurable per model**: Each model can define its own `prunableMediaPeriod()`
 
 ## Changelog
 

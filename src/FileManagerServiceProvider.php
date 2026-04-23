@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kirantimsina\FileManager;
 
+use Kirantimsina\FileManager\Commands\CleanupOldMediaCommand;
 use Kirantimsina\FileManager\Commands\CompressVideosCommand;
 use Kirantimsina\FileManager\Commands\ManageMediaSizesCommand;
 use Kirantimsina\FileManager\Commands\PopulateMediaMetadataCommand;
@@ -34,8 +35,10 @@ class FileManagerServiceProvider extends PackageServiceProvider
             ->hasMigrations([
                 '2025_01_09_000001_create_media_metadata_table',
                 '2025_01_09_000002_add_seo_title_to_media_metadata',
+                '2026_04_23_114200_add_storage_deleted_at_to_media_metadata',
             ])
             ->hasCommands([
+                CleanupOldMediaCommand::class,
                 CompressVideosCommand::class,
                 ManageMediaSizesCommand::class,
                 PopulateMediaMetadataCommand::class,
