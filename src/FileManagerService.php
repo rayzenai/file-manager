@@ -326,6 +326,41 @@ class FileManagerService
         }
     }
 
+    /**
+     * Delete an image and all resized sizes, returning actual deletion counts.
+     *
+     * @param string $filename
+     * @return array{main: int, resized: int}
+     */
+    public static function deleteImageWithSizes(string $filename): array
+    {
+        $s3 = Storage::disk();
+        $mainDeleted = 0;
+        $resizedDeleted = 0;
+
+        if ($s3->exists($filename)) {
+            $s3->delete($filename);
+            $mainDeleted = 1;
+        }
+
+        // Get sizes from config and skip deletion of resized versions if empty
+        $sizes = static::getImageSizes();
+        if (! empty($sizes)) {
+            $name = Arr::last(explode('/', $filename));
+            $model = Arr::first(explode('/', $filename));
+
+            foreach (array_keys($sizes) as $key) {
+                $resizedPath = "{$model}/{$key}/{$name}";
+                if ($s3->exists($resizedPath)) {
+                    $s3->delete($resizedPath);
+                    $resizedDeleted++;
+                }
+            }
+        }
+
+        return ['main' => $mainDeleted, 'resized' => $resizedDeleted];
+    }
+
     public function uploadTempVideo($file)
     {
         if (Auth::check()) {

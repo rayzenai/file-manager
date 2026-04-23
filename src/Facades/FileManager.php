@@ -19,6 +19,7 @@ use Kirantimsina\FileManager\FileManagerService;
  * @method static string|null moveTempImageWithoutResize($model, $tempFile) Move temp image without resizing
  * @method static void deleteImagesArray($arr) Delete multiple images and their sizes
  * @method static void deleteImage($filename) Delete an image and all its sizes
+ * @method static array deleteImageWithSizes(string $filename) Delete an image and all sizes, returning counts
  * @method static array uploadTempVideo($file) Upload video to temp directory
  * @method static bool moveTempVideo($filename, $to) Move video from temp to final location
  * @method static string mainMediaUrl() Get the main media URL with trailing slash

@@ -157,31 +157,50 @@ class CleanupOldMediaCommand extends Command
         }
 
         $this->info("  Found {$models->count()} {$modelClass} record(s) with old media");
+        $this->newLine();
 
         if ($dryRun) {
+            $totalFiles = 0;
             foreach ($models as $model) {
                 $files = $model->getMediaToPrune();
+                $totalFiles += count($files);
                 foreach ($files as $file) {
                     $this->line("    [DRY] Would delete: {$file}");
                 }
             }
+            $this->line("  [DRY] Total: {$totalFiles} file(s) across {$models->count()} record(s)");
 
             return;
         }
 
         $totalDeleted = 0;
+        $totalResized = 0;
         $totalErrors = 0;
+        $processed = 0;
 
         foreach ($models as $model) {
+            $processed++;
             $result = $model->pruneMedia($diskName);
-            $totalDeleted += $result['files_deleted'];
-            $totalErrors += $result['errors'];
 
-            if ($result['files_deleted'] > 0) {
-                $this->line("    Pruned {$result['files_deleted']} file(s) for {$modelClass} #{$model->id}");
+            // Handle both old format (files_deleted) and new format (main + resized)
+            if (isset($result['main'])) {
+                $mainDeleted = $result['main'];
+                $resizedDeleted = $result['resized'];
+                $errors = $result['errors'];
+                $totalDeleted += $mainDeleted;
+                $totalResized += $resizedDeleted;
+                $totalErrors += $errors;
+
+                $this->line("    [{$processed}/{$models->count()}] {$modelClass} #{$model->id}: {$mainDeleted} main, {$resizedDeleted} resized, {$errors} errors");
+            } else {
+                $totalDeleted += $result['files_deleted'];
+                $totalErrors += $result['errors'];
+
+                $this->line("    [{$processed}/{$models->count()}] {$modelClass} #{$model->id}: {$result['files_deleted']} files, {$result['errors']} errors");
             }
         }
 
-        $this->info("  Summary for {$modelClass}: deleted={$totalDeleted}, errors={$totalErrors}");
+        $this->newLine();
+        $this->info("  Summary for {$modelClass}: {$totalDeleted} main file(s), {$totalResized} resized file(s), {$totalErrors} errors");
     }
 }
